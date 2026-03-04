@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - UPTD Lab</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="login-body">
+
+    <div class="login-card register-card">
+        <div class="auth-icon-wrapper">
+            <img src="/img/logo-banten.png" alt="Logo Banten" style="width: 100%; height: auto;">
+        </div>
+        
+        <h2 class="auth-title">UPTD Pengujian</h2>
+        <p class="auth-subtitle">Bahan Kontruksi Bangunan & Informasi Kontruksi</p>
+
+        <div class="auth-tabs">
+            <a href="/login" class="auth-tab">Login</a>
+            <a href="/register" class="auth-tab active">Register</a>
+        </div>
+
+        <form action="/auth/register" method="POST">
+    
+    <!-- TAMPILKAN PESAN ERROR JIKA ADA -->
+    <% if (locals.error) { %>
+        <div style="color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-circle"></i>
+            <span><%= error %></span>
+        </div>
+    <% } %>
+
+    <!-- TAMPILKAN PESAN SUKSES JIKA ADA (DARI REGISTER) -->
+    <% if (locals.success) { %>
+        <div style="color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-check-circle"></i>
+            <span><%= success %></span>
+        </div>
+    <% } %>
+
+    <!-- PERSONAL INFORMATION -->
+    <div class="form-section-label">Personal Information</div>
+
+    <div class="form-group">
+        <label class="form-label">Nama Lengkap <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-user icon-start"></i>
+            <input type="text" name="full_name" class="form-input" placeholder="Nama lengkap penanggung jawab" required value="<%= locals.formData ? formData.full_name : '' %>">
+        </div>
+        <small style="color: #6c757d; font-size: 0.75rem;">Nama lengkap penanggung jawab / kontak person</small>
+    </div>
+    
+    <div class="form-group">
+        <label class="form-label">Email Address <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-envelope icon-start"></i>
+            <input type="email" name="email" class="form-input" placeholder="name@company.com" required value="<%= locals.formData ? formData.email : '' %>">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Password <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-lock icon-start"></i>
+            <input type="password" name="password" class="form-input" placeholder="Minimal 6 karakter" required minlength="6">
+            <i class="fas fa-eye-slash icon-end" onclick="togglePassword(this)"></i>
+        </div>
+        <small style="color: #6c757d; font-size: 0.75rem;">Minimal 6 karakter</small>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Konfirmasi Password <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-lock icon-start"></i>
+            <input type="password" name="confirm_password" class="form-input" placeholder="Ketik ulang password" required minlength="6">
+            <i class="fas fa-eye-slash icon-end" onclick="togglePassword(this)"></i>
+        </div>
+    </div>
+
+    <div class="form-section-label">Company Information</div>
+
+    <div class="form-group">
+        <label class="form-label">Nama Instansi/Perusahaan <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-building icon-start"></i>
+            <input type="text" name="nama_instansi" class="form-input" placeholder="Contoh: PT. Konstruksi Maju" required value="<%= locals.formData ? formData.nama_instansi : '' %>">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Alamat Instansi <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-map-marker-alt icon-start"></i>
+            <textarea name="alamat" class="form-input" placeholder="Alamat lengkap perusahaan" required rows="3" style="padding-top: 12px; min-height: 80px;"><%= locals.formData ? formData.alamat : '' %></textarea>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Nomor Telepon <span style="color: #dc3545;">*</span></label>
+        <div class="input-wrapper">
+            <i class="fas fa-phone icon-start"></i>
+            <input type="text" name="nomor_telepon" class="form-input" placeholder="Contoh: 081234567890" required value="<%= locals.formData ? formData.nomor_telepon : '' %>">
+        </div>
+    </div>
+
+    <button type="submit" class="btn-auth-base btn-action-register btn-full">
+        Daftar <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
+    </button>
+
+    <p class="terms-text">
+        Dengan mendaftar, Anda menyetujui <a href="/terms" style="color: var(--primary);">Syarat & Ketentuan</a> yang berlaku.
+    </p>
+
+    <p class="terms-text" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eef2f6;">
+        © 2026 UPTD Pengujian Bahan Konstruksi Bangunan Provinsi Banten.
+    </p>
+
+        </form>
+
+        <script>
+        function togglePassword(icon) {
+            const input = icon.parentElement.querySelector('input');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            }
+        }
+
+        // Client-side validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const password = document.querySelector('input[name="password"]').value;
+            const confirm = document.querySelector('input[name="confirm_password"]').value;
+            
+            if (password !== confirm) {
+                e.preventDefault();
+                alert('Password dan konfirmasi password tidak cocok!');
+            }
+            
+            if (password.length < 6) {
+                e.preventDefault();
+                alert('Password minimal 6 karakter!');
+            }
+        });
+        </script>
+    </div>
+
+</body>
+</html>

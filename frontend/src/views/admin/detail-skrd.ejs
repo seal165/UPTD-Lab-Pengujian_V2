@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <%- include('partials/head') %>
+    <style>
+        .invoice-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .invoice-header { border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 20px; }
+        .skeleton-loader { animation: skeleton-loading 1s linear infinite alternate; }
+        @keyframes skeleton-loading {
+            0% { background-color: #e0e0e0; }
+            100% { background-color: #f0f0f0; }
+        }
+        .skeleton-text { height: 1rem; border-radius: 0.25rem; margin-bottom: 0.5rem; }
+        .skeleton-title { height: 2rem; width: 200px; border-radius: 0.25rem; }
+        .text-primary { color: #0d6efd !important; }
+        .badge { font-size: 0.85rem; font-weight: 500; }
+        
+        /* FLOATING BUTTON */
+        .floating-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 999;
+            box-shadow: 0 5px 20px rgba(67, 97, 238, 0.3);
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+        }
+        .floating-btn i {
+            margin-right: 8px;
+        }
+        
+        /* UPLOAD CARD */
+        .upload-card {
+            border: 2px dashed #dee2e6;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .upload-card:hover {
+            border-color: #0d6efd;
+            background: #e9ecef;
+        }
+        .upload-card i {
+            font-size: 3rem;
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+        
+        /* PROOF CARD */
+        .proof-card {
+            background: #f8f9fa;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .proof-card.verified {
+            border-left-color: #28a745;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <%- include('partials/sidebar', { page: 'skrd' }) %>
+
+    <div class="main-content">
+        <!-- Alert Message -->
+        <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
+
+        <!-- Navigation -->
+        <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center no-print">
+            <a href="/admin/skrd" class="text-decoration-none text-muted">
+                <i class="fas fa-arrow-left me-2"></i>Kembali ke List SKRD
+            </a>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary action-btn" onclick="printInvoice()">
+                    <i class="fas fa-print me-2"></i>Cetak Invoice
+                </button>
+                <button class="btn btn-outline-success action-btn" onclick="sendReminder()" id="remindBtn">
+                    <i class="fas fa-bell me-2"></i>Kirim Pengingat
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Invoice -->
+        <div class="invoice-box" id="invoiceContainer">
+            <!-- Skeleton Loading -->
+            <div id="skeletonLoading" style="display: none;">
+                <div class="skeleton-loader skeleton-title mb-4"></div>
+                <div class="skeleton-loader skeleton-text w-75 mb-3"></div>
+                <div class="skeleton-loader skeleton-text w-50 mb-3"></div>
+                <div class="skeleton-loader skeleton-text w-100 mb-3"></div>
+                <div class="skeleton-loader skeleton-text w-100 mb-3"></div>
+            </div>
+
+            <!-- Actual Content -->
+            <div id="invoiceContent" style="display: block;">
+                
+                <!-- ========== PRINT VERSION - SKRD FORMAT ========== -->
+                <div class="print-version" style="display: none;">
+                    <div class="skrd-title-main">SURAT KETETAPAN RETRIBUSI DAERAH (SKRD)</div>
+                    <div class="skrd-number-main" id="printSkrdNumber">100095/SKR/DDPUPR/IV2026</div>
+                    
+                    <div class="period-info-main">
+                        <span><strong>MASA :</strong> <span id="printMonth">February</span></span>
+                        <span><strong>TAHUN :</strong> <span id="printYear">2026</span></span>
+                        <span><strong>NO URUT :</strong> <span id="printNoUrut">DPUPR.00094</span></span>
+                    </div>
+
+                    <div class="company-info-main">
+                        <span class="label">NAMA :</span>
+                        <span class="value" id="printCompanyName">-</span><br>
+                        <span class="label">ALAMAT :</span>
+                        <span class="value" id="printCompanyAddress">-</span>
+                    </div>
+
+                    <div class="npwr-info-main">
+                        <span><strong>NOMER POKOK WAJIB RETRIBUSI (NPWR) :</strong> -</span>
+                        <span><strong>TANGGAL JATUH TEMPO :</strong> <span id="printDueDate">-</span></span>
+                    </div>
+
+                    <!-- Items Table -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th width="40">No</th>
+                                    <th width="100">Kode Rekening</th>
+                                    <th>Uraian Retribusi</th>
+                                    <th width="50" class="text-center">Qty</th>
+                                    <th width="70" class="text-center">Satuan</th>
+                                    <th width="100" class="text-end">Harga (IDR)</th>
+                                    <th width="100" class="text-end">JUMLAH (IDR)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="printItemsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center">Memuat data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Total Section -->
+                    <div class="total-section-main">
+                        <div class="total-row-main">
+                            <span class="total-label-main">Jumlah Ketetapan Pokok Retribusi :</span>
+                            <span class="total-value-main" id="printSubtotal">Rp 0</span>
+                        </div>
+                        <div class="total-row-main">
+                            <span class="total-label-main">Jumlah Sanksi : a. Bunga (2.00% x 0.00)</span>
+                            <span class="total-value-main" id="printSanksi">Rp 0</span>
+                        </div>
+                        <div class="total-row-main">
+                            <span class="total-label-main">b. Kenaikan</span>
+                            <span class="total-value-main">Rp 0</span>
+                        </div>
+                        <div class="total-row-main grand-total-main">
+                            <span class="total-label-main"><strong>JUMLAH Keseluruhan :</strong></span>
+                            <span class="total-value-main" id="printTotal">Rp 0</span>
+                        </div>
+                    </div>
+
+                    <!-- Terbilang -->
+                    <div class="terbilang-main" id="printTerbilang">Dengan Huruf : -</div>
+
+                    <!-- Bank Info -->
+                    <div class="bank-info-main">
+                        <p><strong>Perhatian :</strong></p>
+                        <p>1. Apabila SKRD ini tidak atau kurang dibayar lewat waktu paling lama 30 hari setelah SKRD diterima atau (tanggal jatuh tempo) dikenakan sanksi administrasi berupa bunga sebesar 2.00% perbulan</p>
+                        <p>2. Pembayaran yang dilakukan secara langsung menggunakan Rekening RKUD wajib mencatatkan nomor ID BILLING dan Wajib melakukan konfirmasi pembayaran kepihak dinas/instansi terkait:</p>
+                        <p><strong>Penyeroran dilakukan melalui rekening dibawah ini</strong></p>
+                        <p>Bank : Bank Banten atau PT. Bank Pembangunan Daerah Banten (Perseroda) Tbk</p>
+                        <p>Nama Rekening : RKUD Provinsi Banten</p>
+                        <p>Nomor Rekening : 080 120 2021</p>
+                        <p>Kode Bayar Bank : 137</p>
+                    </div>
+
+                    <!-- Signature -->
+                    <div class="signature-section-main">
+                        <div class="signature-left-main">
+                            <p><strong>Catatan :</strong></p>
+                            <p id="printCatatan">-</p>
+                            <p id="printCatatan2">Tipe Pembayaran (No. Uj 26) Bahan</p>
+                        </div>
+                        <div class="signature-right-main">
+                            <p id="printDate">03-Feb-2026</p>
+                            <p>Pengguna Anggaran Kuasa</p>
+                            <div class="signature-line-main"></div>
+                            <p class="signature-name-main" id="printSigner">Mohammad Faizal Reza ST., M.Si</p>
+                            <p class="signature-nip-main" id="printNip">NIP: 19790307 200312 1 006</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- ========== END PRINT VERSION ========== -->
+
+                <!-- Invoice Header -->
+                <div class="invoice-header d-flex flex-wrap justify-content-between">
+                    <div>
+                        <h4 class="fw-bold text-primary">
+                            <i class="fas fa-flask me-2"></i>UPTD LAB
+                        </h4>
+                        <p class="text-muted small mb-0" id="labAddress">Jl. Raya Lab Pengujian No. 123, Banten</p>
+                        <p class="text-muted small" id="labPhone">Telp: (021) 555-1234</p>
+                    </div>
+                    <div class="text-end">
+                        <h2 class="fw-bold text-dark">INVOICE</h2>
+                        <h5 class="text-muted" id="invoiceNumber">#INV-<span id="invoiceId"></span></h5>
+                        <div id="statusBadge" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Company & Payment Details -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6 class="text-uppercase text-muted small fw-bold">Ditagihkan Kepada:</h6>
+                        <h5 class="fw-bold" id="companyName">-</h5>
+                        <p class="mb-0" id="picName">UP: -</p>
+                        <p class="text-muted" id="companyAddress">-</p>
+                        <p class="text-muted small" id="companyContact">
+                            <i class="fas fa-phone me-1"></i> <span id="companyPhone">-</span><br>
+                            <i class="fas fa-envelope me-1"></i> <span id="companyEmail">-</span>
+                        </p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <h6 class="text-uppercase text-muted small fw-bold">Detail Pembayaran:</h6>
+                        <table class="float-md-end">
+                            <tr>
+                                <td class="text-muted pe-3">No. SKRD:</td>
+                                <td class="fw-bold" id="skrdNumber">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pe-3">Tgl Invoice:</td>
+                                <td class="fw-bold" id="issueDate">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pe-3">Jatuh Tempo:</td>
+                                <td class="fw-bold" id="dueDate">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pe-3">Total Tagihan:</td>
+                                <td class="fw-bold" id="totalTagihanDisplay">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pe-3">Sudah Dibayar:</td>
+                                <td class="fw-bold text-success" id="paidAmountDisplay">Rp 0</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pe-3">Sisa Tagihan:</td>
+                                <td class="fw-bold text-danger" id="remainingDisplay">Rp 0</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 🔥 SECTION DOKUMEN SKRD (DARI ADMIN) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="fw-bold mb-0">
+                            <i class="fas fa-file-pdf me-2 text-danger"></i>
+                            Dokumen SKRD (Untuk User Download)
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- Jika sudah upload -->
+                        <div id="skrdFileSection" style="display: none;">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-3">
+                                    <i class="fas fa-file-pdf fa-2x text-danger"></i>
+                                    <div>
+                                        <p class="fw-bold mb-1" id="skrdFilename"></p>
+                                        <small class="text-muted" id="skrdUploadedAt"></small>
+                                    </div>
+                                </div>
+                                <div>
+                                    <a href="#" class="btn btn-sm btn-outline-primary me-1" id="downloadSkrdBtn" download>
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="uploadNewSkrd()">
+                                        <i class="fas fa-upload me-1"></i>Upload Ulang
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Upload form -->
+                        <div id="skrdUploadSection">
+                            <div class="upload-card" onclick="document.getElementById('skrdFileInput').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <h6 class="fw-bold">Upload SKRD (Format A4)</h6>
+                                <p class="text-muted small mb-0">Klik untuk upload file PDF</p>
+                                <p class="text-muted small">Maksimal 2MB</p>
+                                <input type="file" id="skrdFileInput" class="d-none" accept=".pdf" onchange="uploadSkrdFile()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🔥 SECTION BUKTI PEMBAYARAN DARI USER -->
+                <div class="card mb-4" id="paymentProofSection" style="display: none;">
+                    <div class="card-header bg-light">
+                        <h6 class="fw-bold mb-0">
+                            <i class="fas fa-receipt me-2 text-warning"></i>
+                            Bukti Pembayaran dari User
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="proof-card" id="proofCard">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="bg-white p-3 rounded border">
+                                    <i class="fas fa-file-image fa-2x text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <p class="fw-bold mb-1" id="proofFilename"></p>
+                                            <small class="text-muted" id="proofUploadedAt"></small>
+                                        </div>
+                                        <span class="badge" id="proofStatusBadge">Menunggu Verifikasi</span>
+                                    </div>
+                                    <div class="mt-3 d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="viewProof()">
+                                            <i class="fas fa-eye me-1"></i>Lihat Bukti
+                                        </button>
+                                        <button class="btn btn-sm btn-success" onclick="showVerifyModal()" id="verifyBtn">
+                                            <i class="fas fa-check-circle me-1"></i>Verifikasi & Input Nominal
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="rejectProof()" id="rejectBtn">
+                                            <i class="fas fa-times me-1"></i>Tolak
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🔥 SECTION INPUT PEMBAYARAN (VERIFIKASI) -->
+                <div class="card mb-4" id="paymentInputSection" style="display: none;">
+                    <div class="card-header bg-light">
+                        <h6 class="fw-bold mb-0">
+                            <i class="fas fa-calculator me-2 text-primary"></i>
+                            Verifikasi Pembayaran
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="paymentForm">
+                            <div class="row">
+                                <!-- Informasi Tagihan -->
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Total Tagihan</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light">Rp</span>
+                                        <input type="text" class="form-control bg-light" id="totalTagihan" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Sudah Dibayar</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light">Rp</span>
+                                        <input type="text" class="form-control bg-light" id="sudahDibayar" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Sisa Tagihan</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light">Rp</span>
+                                        <input type="text" class="form-control bg-light" id="sisaTagihan" readonly>
+                                    </div>
+                                </div>
+                                
+                                <!-- 🔥 INPUT NOMINAL PEMBAYARAN -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Nominal yang Dibayarkan <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rp</span>
+                                        <input type="text" class="form-control" id="nominalBayar" 
+                                            placeholder="0" oninput="formatRupiahInput(this)">
+                                    </div>
+                                    <small class="text-muted">Masukkan jumlah yang dibayarkan oleh user</small>
+                                </div>
+                                
+                                <!-- 🔥 SISA SETELAH PEMBAYARAN (OTOMATIS) -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Sisa Setelah Pembayaran</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light">Rp</span>
+                                        <input type="text" class="form-control bg-light" id="sisaSetelah" readonly>
+                                    </div>
+                                    <small class="text-muted" id="sisaStatus">Akan otomatis terisi</small>
+                                </div>
+                                
+                                <!-- Tanggal Pembayaran -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Tanggal Bayar <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="paymentDate" value="<?php echo date('Y-m-d'); ?>">
+                                </div>
+                                
+                                <!-- Catatan Verifikasi -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Catatan Verifikasi</label>
+                                    <textarea class="form-control" id="paymentNotes" rows="3" 
+                                            placeholder="Catatan (opsional)"></textarea>
+                                </div>
+                                
+                                <!-- Info Status Pembayaran -->
+                                <div class="col-12 mb-3">
+                                    <div class="alert alert-info" id="paymentStatusInfo">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Setelah verifikasi, status akan berubah menjadi:
+                                        <strong id="statusAfterPayment">Belum Lunas (Partial)</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 🔥 TOMBOL SIMPAN PERUBAHAN -->
+                            <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                                <button type="button" class="btn btn-light" onclick="cancelVerify()">
+                                    <i class="fas fa-times me-1"></i>Batal
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="submitPayment()">
+                                    <i class="fas fa-save me-1"></i>Simpan dan Verifikasi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 🔥 SECTION RIWAYAT PEMBAYARAN -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="fw-bold mb-0">
+                            <i class="fas fa-history me-2 text-info"></i>
+                            Riwayat Pembayaran
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="paymentHistory">
+                            <p class="text-muted text-center">Belum ada riwayat pembayaran</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items Table -->
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Deskripsi Pengujian</th>
+                                <th class="text-center" width="80">Jml</th>
+                                <th class="text-end" width="150">Harga Satuan</th>
+                                <th class="text-end" width="150">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">
+                                    Memuat item...
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">Subtotal</td>
+                                <td class="text-end" id="subtotal">Rp 0</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">PPN (11%)</td>
+                                <td class="text-end" id="ppn">Rp 0</td>
+                            </tr>
+                            <tr class="bg-primary text-white">
+                                <td colspan="3" class="text-end fw-bold">TOTAL TAGIHAN</td>
+                                <td class="text-end fw-bold fs-5" id="totalAmount">Rp 0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Notes Section -->
+                <div class="row mb-4" id="notesSection">
+                    <div class="col-md-8">
+                        <h6 class="fw-bold small">Catatan:</h6>
+                        <p class="text-muted small" id="paymentNotesDisplay">
+                            -
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center mt-3">
+                        <p class="small mb-5">Hormat Kami,</p>
+                        <div class="border-bottom w-75 mx-auto mb-2"></div>
+                        <p class="fw-bold small" id="createdBy">Bendahara Penerimaan</p>
+                        <p class="small text-muted" id="createdAt"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING BUTTON - VIEW SUBMISSION -->
+    <button class="btn btn-primary floating-btn" onclick="viewSubmission()" id="viewSubmissionBtn">
+        <i class="fas fa-file-alt"></i> Lihat Detail Submission
+    </button>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // ==================== KONFIGURASI ====================
+        const API_BASE_URL = 'http://localhost:5000/api';
+        
+        // Ambil ID dari URL
+        const pathParts = window.location.pathname.split('/');
+        const invoiceId = pathParts[pathParts.length - 1];
+
+        // State
+        let invoiceData = null;
+        let submissionId = null;
+
+        // ==================== CEK TOKEN ====================
+        function getToken() {
+            return localStorage.getItem('admin_token');
+        }
+
+        if (!getToken()) {
+            window.location.href = '/admin/login';
+        }
+
+        // ==================== LOAD DATA ====================
+        async function loadInvoiceDetail() {
+            showLoading(true);
+            
+            console.log('📡 Fetching detail untuk ID:', invoiceId);
+            
+            const timeoutId = setTimeout(() => {
+                showLoading(false);
+                showAlert('Loading terlalu lama, silakan coba lagi', 'warning');
+            }, 8000);
+            
+            try {
+                console.log('🔗 URL:', `${API_BASE_URL}/skrd/${invoiceId}`);
+                
+                const response = await fetch(`${API_BASE_URL}/skrd/${invoiceId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                clearTimeout(timeoutId);
+
+                console.log('📊 Response status:', response.status);
+
+                if (response.status === 401) {
+                    localStorage.removeItem('admin_token');
+                    window.location.href = '/admin/login';
+                    return;
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Error response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('📦 Response:', result);
+
+                if (result.success) {
+                    invoiceData = result.data;
+                    submissionId = result.data.submission_id || null;
+                    updatePage(result.data);
+                } else {
+                    showAlert(result.message || 'Gagal memuat data', 'danger');
+                    showLoading(false);
+                }
+            } catch (error) {
+                clearTimeout(timeoutId);
+                console.error('❌ Error detail:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+                
+                if (error.message.includes('Failed to fetch')) {
+                    showAlert('Tidak dapat terhubung ke server. Pastikan backend running di port 5000', 'danger');
+                } else {
+                    showAlert('Gagal terhubung ke server: ' + error.message, 'danger');
+                }
+                showLoading(false);
+            }
+        }
+
+        // ==================== CETAK INVOICE (FORMAT SURAT TAGIHAN) ====================
+        function printInvoice() {
+            if (!invoiceData) {
+                showAlert('Data belum tersedia', 'warning');
+                return;
+            }
+
+            const printWindow = window.open('', '_blank');
+            const data = invoiceData;
+            const totalAmount = data.total_amount || 0;
+            
+            const today = new Date();
+            const day = today.getDate().toString().padStart(2, '0');
+            const month = today.toLocaleString('id-ID', { month: 'long' });
+            const year = today.getFullYear();
+            const formattedDate = `${day} ${month} ${year}`;
+            
+            const itemsRows = generateInvoiceItems(data);
+            
+            const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Invoice - ${data.invoice_number || ''}</title>
+                <style>
+                    /* 1. Ubah ukuran kertas dan margin dasar */
+                    @page { 
+                        size: A4; 
+                        margin: 15mm; /* Margin luar kertas 1.5cm */
+                    }
+                    
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 0;
+                        background-color: #fff;
+                    }
+
+                    .outer-border {
+                        border: 1.5pt solid black;
+                        padding: 15px; /* Jarak antara garis bingkai ke tulisan */
+                        /* Kalkulasi tinggi agar pas A4 dengan margin 30mm (297 - 60) */
+                        min-height: 230mm; 
+                        position: relative;
+                        box-sizing: border-box;
+                    }
+                    /* Header Style Persis Gambar */
+                    .header-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                    }
+                    .header-table td {
+                        border: 1px solid #777;
+                        padding: 5px;
+                        vertical-align: middle;
+                    }
+                    .logo-col { width: 15%; text-align: center; }
+                    .title-col { width: 45%; text-align: center; }
+                    .meta-col { width: 40%; font-size: 9pt; }
+                    
+                    .logo-img { width: 120px; height: auto; }
+                    .header-title { font-size: 14pt; font-weight: bold; margin: 0; }
+                    .header-subtitle { font-size: 11pt; font-weight: bold; margin: 0; }
+
+                    .doc-num-section { text-align: center; margin: 15px 0; font-size: 11pt; }
+                    
+                    /* Info Pemohon */
+                    .info-section {
+                        width: 100%;
+                        margin-bottom: 20px;
+                        font-size: 10.5pt;
+                    }
+                    .info-section table { width: 100%; border-collapse: collapse; }
+                    .info-section td { padding: 3px 0; vertical-align: top; }
+                    .label { width: 150px; }
+                    .separator { width: 20px; text-align: center; }
+
+                    /* Table Items Style */
+                    .items-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 10px;
+                    }
+                    .items-table th {
+                        background-color: #9dbad5; /* Warna biru sesuai gambar */
+                        border: 1.5pt solid black;
+                        padding: 8px;
+                        font-size: 10pt;
+                        text-align: center;
+                    }
+                    .items-table td {
+                        border: 1px solid black;
+                        padding: 8px;
+                        font-size: 10pt;
+                        min-height: 150px;
+                    }
+                    .empty-row td { height: 150px; vertical-align: top; }
+
+                    .total-box {
+                        border: 1.5pt solid black;
+                        margin-top: -1px;
+                        padding: 8px;
+                        text-align: right;
+                        font-weight: bold;
+                        display: flex;
+                        justify-content: flex-end;
+                        font-size: 10pt;
+                    }
+                    .total-label { width: 100px; text-align: left; }
+
+                    .terbilang-box {
+                        border: 1.5pt solid black;
+                        margin-top: 15px;
+                        padding: 10px;
+                        font-style: italic;
+                        font-weight: bold;
+                        font-size: 10.5pt;
+                    }
+
+                    /* Signature */
+                    .signature-section {
+                        margin-top: 30px;
+                        width: 100%;
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 10.5pt;
+                    }
+                    .sig-block { width: 45%; text-align: center; }
+                    .sig-space { height: 70px; }
+
+                    .footer-note {
+                        position: absolute;
+                        bottom: 20px;
+                        left: 20px;
+                        font-size: 8.5pt;
+                        font-style: italic;
+                    }
+
+                    @media print {
+                        body { padding: 0; }
+                        .outer-border { border: 1.5pt solid black; }
+                        /* Memastikan warna background biru tabel tetap muncul saat print */
+                        .items-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="outer-border">
+                    <table class="header-table">
+                        <tr>
+                            <td rowspan="2" class="logo-col">
+                                <img src="/img/logo-banten.png" class="logo-img" alt="Logo">
+                            </td>
+                            <td class="title-col">
+                                <div class="header-title">FORMULIR</div>
+                            </td>
+                            <td class="meta-col">
+                                No. Dokumen &nbsp;&nbsp;&nbsp;: UPTD-PBKBIK/F-11/PO-07<br>
+                                Terbitan/Revisi : 2/0
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="title-col">
+                                <div class="header-subtitle">SURAT TAGIHAN PEMBAYARAN<br>RETRIBUSI PENGUJIAN</div>
+                            </td>
+                            <td class="meta-col">
+                                Tanggal Revisi : 2 Januari 2023<br>
+                                Halaman 1 dari 1
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="doc-num-section">
+                        Nomor : ${data.skrd_number || data.invoice_number || '................................................'}
+                    </div>
+
+                    <div class="info-section">
+                        <table>
+                            <tr>
+                                <td class="label">Nama Pemohon</td>
+                                <td class="separator">:</td>
+                                <td style="width: 35%">${data.company_name || '.....................................'}</td>
+                                <td style="width: 15%">Tanggal</td>
+                                <td class="separator">:</td>
+                                <td>${formattedDate}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Alamat</td>
+                                <td class="separator">:</td>
+                                <td>${data.address || '.....................................'}</td>
+                                <td>Kode Pengujian</td>
+                                <td class="separator">:</td>
+                                <td>${data.registration_number || '.....................................'}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Nomor Telephone/HP</td>
+                                <td class="separator">:</td>
+                                <td colspan="4">${data.pic_phone || '.....................................'}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px">No.</th>
+                                <th>Jenis Pengujian</th>
+                                <th style="width: 120px">Jumlah Satuan Sample</th>
+                                <th style="width: 100px">Harga Satuan</th>
+                                <th style="width: 120px">Jumlah Biaya</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsRows}
+                            <tr class="empty-row">
+                                <td></td><td></td><td></td><td></td><td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="total-box">
+                        <span class="total-label">Total</span>
+                        <span>${formatRupiah(totalAmount).replace('Rp', 'Rp ')}</span>
+                    </div>
+
+                    <div class="terbilang-box">
+                        Terbilang : ${numberToWords(Math.round(totalAmount))} Rupiah
+                    </div>
+
+                    <div class="signature-section">
+                        <div class="sig-block">
+                            <br><br>
+                            <strong>Bendahara Penerimaan Pembantu</strong>
+                            <div class="sig-space"></div>
+                            ( ................................................. )
+                        </div>
+                        <div class="sig-block">
+                            Serang, .............................. 20......<br>
+                            <strong>Mengetahui,<br>Kepala UPTD,</strong>
+                            <div class="sig-space"></div>
+                            ( ................................................. )
+                        </div>
+                    </div>
+
+                    <div class="footer-note">
+                        * Pembayaran di setorkan paling lambat 14 (empat belas) hari setelah surat tagihan ini diterbitkan<br>
+                        * Pembayaran di transfer melalui Bank Banten Atas Nama : RKUD Provinsi Banten No. Rekening : 0801202021
+                    </div>
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(function() { window.close(); }, 700);
+                    };
+                <\/script>
+            </body>
+            </html>
+            `;
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+        }
+
+        // Helper function untuk generate rows items
+        function generateInvoiceItems(data) {
+            const items = data.items || [];
+            const testType = data.test_type || 'Pengujian';
+            const totalAmount = data.total_amount || 0;
+            const hargaSatuan = Math.round(totalAmount / 1.11);
+            
+            if (items.length === 0) {
+                return `
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>${testType}</td>
+                        <td class="text-center">1 sampel</td>
+                        <td class="text-right">${formatRupiah(hargaSatuan).replace('Rp', 'Rp ')}</td>
+                        <td class="text-right">${formatRupiah(hargaSatuan).replace('Rp', 'Rp ')}</td>
+                    </tr>
+                `;
+            } else {
+                let rows = '';
+                items.forEach((item, index) => {
+                    const description = item.description || item.service_name || item.name || 'Pengujian';
+                    const quantity = item.quantity || 1;
+                    const unit = item.unit || 'sampel';
+                    const price = item.price || item.unit_price || 0;
+                    const subtotal = item.subtotal || (quantity * price);
+                    
+                    rows += `
+                        <tr>
+                            <td class="text-center">${index + 1}</td>
+                            <td>${description}</td>
+                            <td class="text-center">${quantity} ${unit}</td>
+                            <td class="text-right">${formatRupiah(price).replace('Rp', 'Rp ')}</td>
+                            <td class="text-right">${formatRupiah(subtotal).replace('Rp', 'Rp ')}</td>
+                        </tr>
+                    `;
+                });
+                return rows;
+            }
+        }
+
+        // ==================== UPDATE UI ====================
+        function updatePage(data) {
+            console.log('🔄 Update page dengan data:', data);
+            
+            try {
+                // 1. HEADER
+                document.getElementById('invoiceId').textContent = data.id || '';
+                document.getElementById('invoiceNumber').textContent = `#${data.invoice_number || ''}`;
+                updateStatusBadge(data.payment_status);
+                
+                // 2. COMPANY INFO
+                document.getElementById('companyName').textContent = data.company_name || '-';
+                document.getElementById('picName').textContent = data.pic_name ? `UP: ${data.pic_name}` : '-';
+                document.getElementById('companyAddress').textContent = data.address || '-';
+                document.getElementById('companyPhone').textContent = data.pic_phone || '-';
+                document.getElementById('companyEmail').textContent = data.pic_email || '-';
+                
+                // 3. PAYMENT DETAILS
+                document.getElementById('skrdNumber').textContent = data.skrd_number || '-';
+                document.getElementById('issueDate').textContent = formatDate(data.issue_date || data.created_at);
+                
+                const dueDateText = formatDate(data.due_date) + (isOverdue(data.due_date, data.payment_status) ? ' (Jatuh Tempo)' : '');
+                document.getElementById('dueDate').textContent = dueDateText;
+                
+                // Total dan pembayaran
+                const totalAmount = data.total_amount || 0;
+                const paidAmount = data.paid_amount || 0;
+                const remaining = totalAmount - paidAmount;
+                
+                document.getElementById('totalTagihanDisplay').textContent = formatRupiah(totalAmount);
+                document.getElementById('paidAmountDisplay').textContent = formatRupiah(paidAmount);
+                document.getElementById('remainingDisplay').textContent = formatRupiah(remaining);
+                
+                // 4. ITEMS TABLE
+                updateItemsTable(data);
+                
+                // 5. TOTALS
+                const subtotal = totalAmount / 1.11;
+                const ppn = totalAmount - subtotal;
+                
+                document.getElementById('subtotal').textContent = formatRupiah(Math.round(subtotal));
+                document.getElementById('ppn').textContent = formatRupiah(Math.round(ppn));
+                document.getElementById('totalAmount').textContent = formatRupiah(totalAmount);
+                
+                // 6. NOTES
+                document.getElementById('paymentNotesDisplay').textContent = data.notes || '-';
+                document.getElementById('createdBy').textContent = data.created_by || 'Bendahara Penerimaan';
+                document.getElementById('createdAt').textContent = data.created_at ? formatDateTime(data.created_at) : '-';
+                
+                // 7. BUKTI PEMBAYARAN
+                updatePaymentProof(data);
+                
+                // 8. SKRD FILE
+                updateSkrdFile(data);
+                
+                // 9. RIWAYAT PEMBAYARAN
+                updatePaymentHistory(data);
+                
+                // 10. ACTION BUTTONS
+                updateActionButtons(data.payment_status);
+                
+                // 11. PRINT VERSION
+                updatePrintVersion(data);
+                
+                showLoading(false);
+                
+            } catch (error) {
+                console.error('❌ Error di updatePage:', error);
+                showAlert('Terjadi kesalahan saat menampilkan data', 'danger');
+                showLoading(false);
+            }
+        }
+
+        function updateStatusBadge(status) {
+            const badgeDiv = document.getElementById('statusBadge');
+            let badgeHtml = '';
+            
+            switch(status) {
+                case 'paid':
+                    badgeHtml = '<span class="badge bg-success rounded-pill px-3 py-2">LUNAS</span>';
+                    break;
+                case 'partial':
+                    badgeHtml = '<span class="badge bg-warning rounded-pill px-3 py-2">BELUM LUNAS</span>';
+                    break;
+                case 'pending':
+                    badgeHtml = '<span class="badge bg-danger rounded-pill px-3 py-2">BELUM BAYAR</span>';
+                    break;
+                case 'waiting_verify':
+                    badgeHtml = '<span class="badge bg-info rounded-pill px-3 py-2">CEK BUKTI</span>';
+                    break;
+                default:
+                    badgeHtml = `<span class="badge bg-secondary rounded-pill px-3 py-2">${status || '-'}</span>`;
+            }
+            
+            badgeDiv.innerHTML = badgeHtml;
+        }
+
+        function updateItemsTable(data) {
+            const tbody = document.getElementById('itemsTableBody');
+            const items = data.items || [];
+            const regNumber = data.registration_number || '-';
+            const testType = data.test_type || '-';
+            
+            if (items.length === 0) {
+                const totalAmount = data.total_amount || 0;
+                const hargaSatuan = totalAmount / 1.11;
+                
+                tbody.innerHTML = `
+                    <tr>
+                        <td>${testType} <small class="text-muted">(Reg: ${regNumber})</small></td>
+                        <td class="text-center">1</td>
+                        <td class="text-end">${formatRupiah(Math.round(hargaSatuan))}</td>
+                        <td class="text-end">${formatRupiah(Math.round(hargaSatuan))}</td>
+                    </tr>
+                `;
+            } else {
+                let rowsHtml = '';
+                items.forEach(item => {
+                    const description = item.description || item.service_name || item.name || '-';
+                    const quantity = item.quantity || 1;
+                    const price = item.price || item.unit_price || 0;
+                    const subtotal = item.subtotal || (quantity * price);
+                    
+                    rowsHtml += `
+                        <tr>
+                            <td>${description} <small class="text-muted">(Reg: ${regNumber})</small></td>
+                            <td class="text-center">${quantity}</td>
+                            <td class="text-end">${formatRupiah(price)}</td>
+                            <td class="text-end">${formatRupiah(subtotal)}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = rowsHtml;
+            }
+        }
+
+        function updatePaymentProof(data) {
+            const proofSection = document.getElementById('paymentProofSection');
+            const proofStatusBadge = document.getElementById('proofStatusBadge');
+            
+            if (data.payment_proof) {
+                proofSection.style.display = 'block';
+                document.getElementById('proofFilename').textContent = data.payment_proof_filename || 'Bukti Pembayaran';
+                document.getElementById('proofUploadedAt').textContent = `Diunggah: ${formatDateTime(data.payment_proof_uploaded_at)}`;
+                
+                // Update status badge
+                if (data.payment_status === 'waiting_verify') {
+                    proofStatusBadge.className = 'badge bg-warning';
+                    proofStatusBadge.textContent = 'Menunggu Verifikasi';
+                    document.getElementById('verifyBtn').style.display = 'inline-block';
+                    document.getElementById('rejectBtn').style.display = 'inline-block';
+                } else if (data.payment_status === 'partial' || data.payment_status === 'paid') {
+                    proofStatusBadge.className = 'badge bg-success';
+                    proofStatusBadge.textContent = 'Terverifikasi';
+                    document.getElementById('verifyBtn').style.display = 'none';
+                    document.getElementById('rejectBtn').style.display = 'none';
+                }
+            } else {
+                proofSection.style.display = 'none';
+            }
+        }
+
+        function updateSkrdFile(data) {
+            if (data.skrd_file) {
+                document.getElementById('skrdFileSection').style.display = 'block';
+                document.getElementById('skrdUploadSection').style.display = 'none';
+                document.getElementById('skrdFilename').textContent = data.skrd_filename || 'SKRD.pdf';
+                document.getElementById('skrdUploadedAt').textContent = `Diunggah: ${formatDateTime(data.skrd_uploaded_at)}`;
+                document.getElementById('downloadSkrdBtn').href = data.skrd_file;
+            } else {
+                document.getElementById('skrdFileSection').style.display = 'none';
+                document.getElementById('skrdUploadSection').style.display = 'block';
+            }
+        }
+
+        function updatePaymentHistory(data) {
+            const historyDiv = document.getElementById('paymentHistory');
+            
+            // Ini bisa diisi dengan data riwayat pembayaran jika ada
+            // Untuk sementara tampilkan info sederhana
+            const paidAmount = data.paid_amount || 0;
+            const totalAmount = data.total_amount || 0;
+            
+            if (paidAmount > 0) {
+                historyDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                        <div>
+                            <p class="fw-bold mb-1">Pembayaran ${paidAmount >= totalAmount ? 'Lunas' : 'Sebagian'}</p>
+                            <small class="text-muted">${formatDateTime(data.paid_date)}</small>
+                        </div>
+                        <div class="text-end">
+                            <p class="fw-bold text-success mb-0">${formatRupiah(paidAmount)}</p>
+                            <small class="text-muted">${data.payment_notes || '-'}</small>
+                        </div>
+                    </div>
+                `;
+            } else {
+                historyDiv.innerHTML = '<p class="text-muted text-center">Belum ada riwayat pembayaran</p>';
+            }
+        }
+
+        function updatePrintVersion(data) {
+            // Update print version elements
+            const printSkrdNumber = document.getElementById('printSkrdNumber');
+            const printCompanyName = document.getElementById('printCompanyName');
+            const printCompanyAddress = document.getElementById('printCompanyAddress');
+            const printDueDate = document.getElementById('printDueDate');
+            
+            if (printSkrdNumber) printSkrdNumber.textContent = data.skrd_number || '100095/SKR/DDPUPR/IV2026';
+            if (printCompanyName) printCompanyName.textContent = data.company_name || '-';
+            if (printCompanyAddress) printCompanyAddress.textContent = data.address || '-';
+            if (printDueDate) printDueDate.textContent = formatDate(data.due_date);
+            
+            // Month and Year
+            const printMonth = document.getElementById('printMonth');
+            const printYear = document.getElementById('printYear');
+            if (printMonth && printYear) {
+                const now = new Date();
+                printMonth.textContent = now.toLocaleString('id-ID', { month: 'long' });
+                printYear.textContent = now.getFullYear();
+            }
+            
+            // Totals
+            const totalAmount = data.total_amount || 0;
+            const subtotal = totalAmount / 1.11;
+            
+            document.getElementById('printSubtotal').textContent = formatRupiah(Math.round(subtotal));
+            document.getElementById('printTotal').textContent = formatRupiah(totalAmount);
+            
+            // Terbilang
+            const printTerbilang = document.getElementById('printTerbilang');
+            if (printTerbilang) {
+                printTerbilang.textContent = `Dengan Huruf : ${numberToWords(Math.round(totalAmount))} Rupiah`;
+            }
+            
+            // Items table in print version
+            const printItemsBody = document.getElementById('printItemsTableBody');
+            if (printItemsBody) {
+                const testType = data.test_type || 'Pengujian';
+                const hargaSatuan = totalAmount / 1.11;
+                
+                printItemsBody.innerHTML = `
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>4120220</td>
+                        <td>Laboratorium>Lab Pengujian Bahan>Penelitian Laboratorium Untuk Pekerjaan Jalan, Jembatan Dan Pengairan>Besi>A, ${testType}</td>
+                        <td class="text-center">1</td>
+                        <td class="text-center">sample</td>
+                        <td class="text-end">${formatRupiah(Math.round(hargaSatuan)).replace('Rp', '').trim()}</td>
+                        <td class="text-end">${formatRupiah(Math.round(hargaSatuan)).replace('Rp', '').trim()}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        function updateActionButtons(status) {
+            const remindBtn = document.getElementById('remindBtn');
+            
+            if (status === 'paid' || status === 'cancelled') {
+                if (remindBtn) remindBtn.style.display = 'none';
+            } else {
+                if (remindBtn) remindBtn.style.display = 'inline-block';
+            }
+        }
+
+        // ==================== HELPER FUNCTIONS ====================
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            try {
+                const date = new Date(dateString);
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+            } catch {
+                return '-';
+            }
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return '-';
+            try {
+                const date = new Date(dateString);
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} ${hours}:${minutes}`;
+            } catch {
+                return '-';
+            }
+        }
+
+        function formatRupiah(number) {
+            if (number === undefined || number === null) return 'Rp 0';
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(number);
+        }
+
+        function formatRupiahInput(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value) {
+                value = parseInt(value);
+                input.value = formatRupiah(value).replace('Rp', '').trim();
+                hitungSisa();
+            } else {
+                input.value = '';
+                document.getElementById('sisaSetelah').value = '';
+            }
+        }
+
+        function isOverdue(dueDate, status) {
+            if (!dueDate || status === 'paid' || status === 'cancelled') return false;
+            try {
+                return new Date(dueDate) < new Date();
+            } catch {
+                return false;
+            }
+        }
+
+        function numberToWords(num) {
+            if (num === 0) return 'Nol';
+            
+            const words = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+            
+            if (num < 12) return words[num];
+            if (num < 20) return words[num - 10] + ' Belas';
+            if (num < 100) {
+                const puluh = Math.floor(num / 10);
+                const sisa = num % 10;
+                return words[puluh] + ' Puluh' + (sisa > 0 ? ' ' + words[sisa] : '');
+            }
+            if (num < 200) return 'Seratus ' + numberToWords(num - 100);
+            if (num < 1000) {
+                const ratus = Math.floor(num / 100);
+                const sisa = num % 100;
+                return words[ratus] + ' Ratus ' + (sisa > 0 ? numberToWords(sisa) : '');
+            }
+            if (num < 1000000) {
+                const ribu = Math.floor(num / 1000);
+                const sisa = num % 1000;
+                return numberToWords(ribu) + ' Ribu ' + (sisa > 0 ? numberToWords(sisa) : '');
+            }
+            if (num < 1000000000) {
+                const juta = Math.floor(num / 1000000);
+                const sisa = num % 1000000;
+                return numberToWords(juta) + ' Juta ' + (sisa > 0 ? numberToWords(sisa) : '');
+            }
+            return '';
+        }
+
+        // ==================== PAYMENT FUNCTIONS ====================
+        function hitungSisa() {
+            const total = invoiceData?.total_amount || 0;
+            const sudahDibayar = invoiceData?.paid_amount || 0;
+            const sisaSebelum = total - sudahDibayar;
+            
+            // Ambil nominal yang diinput
+            const nominalInput = document.getElementById('nominalBayar').value;
+            const nominalBayar = parseFloat(nominalInput.replace(/\D/g, '')) || 0;
+            
+            // Update display
+            document.getElementById('totalTagihan').value = total.toLocaleString('id-ID');
+            document.getElementById('sudahDibayar').value = sudahDibayar.toLocaleString('id-ID');
+            document.getElementById('sisaTagihan').value = sisaSebelum.toLocaleString('id-ID');
+            
+            // Hitung sisa setelah pembayaran
+            let sisaSetelah = sisaSebelum;
+            if (nominalBayar > 0) {
+                if (nominalBayar > sisaSebelum) {
+                    document.getElementById('sisaSetelah').value = '0';
+                    document.getElementById('sisaStatus').innerHTML = '<span class="text-danger">Melebihi sisa tagihan!</span>';
+                } else {
+                    sisaSetelah = sisaSebelum - nominalBayar;
+                    document.getElementById('sisaSetelah').value = sisaSetelah.toLocaleString('id-ID');
+                    
+                    // Update status info
+                    const statusInfo = document.getElementById('statusAfterPayment');
+                    if (sisaSetelah === 0) {
+                        statusInfo.innerHTML = '<strong class="text-success">Lunas (Paid)</strong>';
+                    } else {
+                        statusInfo.innerHTML = '<strong class="text-warning">Belum Lunas (Partial)</strong>';
+                    }
+                    document.getElementById('sisaStatus').innerHTML = '';
+                }
+            } else {
+                document.getElementById('sisaSetelah').value = sisaSebelum.toLocaleString('id-ID');
+                document.getElementById('sisaStatus').innerHTML = 'Akan otomatis terisi';
+            }
+        }
+
+        function showVerifyModal() {
+            document.getElementById('paymentInputSection').style.display = 'block';
+            document.getElementById('nominalBayar').value = '';
+            hitungSisa();
+            document.getElementById('paymentInputSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function submitPayment() {
+            // Ambil nilai dari form
+            const nominalInput = document.getElementById('nominalBayar').value;
+            const nominalBayar = parseFloat(nominalInput.replace(/\D/g, '')) || 0;
+            const paymentDate = document.getElementById('paymentDate').value;
+            const notes = document.getElementById('paymentNotes').value;
+            const total = invoiceData?.total_amount || 0;
+            const sudahDibayar = invoiceData?.paid_amount || 0;
+            const sisa = total - sudahDibayar;
+            
+            // Validasi
+            if (nominalBayar <= 0) {
+                showAlert('Masukkan nominal pembayaran', 'danger');
+                return;
+            }
+            
+            if (nominalBayar > sisa) {
+                showAlert('Nominal melebihi sisa tagihan', 'danger');
+                return;
+            }
+            
+            if (!paymentDate) {
+                showAlert('Pilih tanggal pembayaran', 'danger');
+                return;
+            }
+            
+            // Konfirmasi
+            const statusText = (sisa - nominalBayar === 0) ? 'LUNAS' : 'BELUM LUNAS';
+            if (!confirm(`Verifikasi pembayaran Rp ${nominalBayar.toLocaleString('id-ID')}?\nStatus akan menjadi: ${statusText}`)) {
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/skrd/${invoiceId}/verify-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        paid_amount: nominalBayar,
+                        paid_date: paymentDate,
+                        notes: notes
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Pembayaran berhasil diverifikasi', 'success');
+                    document.getElementById('paymentInputSection').style.display = 'none';
+                    loadInvoiceDetail(); // Reload data
+                } else {
+                    showAlert(result.message || 'Gagal verifikasi', 'danger');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Gagal verifikasi pembayaran', 'danger');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function cancelVerify() {
+            document.getElementById('paymentInputSection').style.display = 'none';
+            document.getElementById('nominalBayar').value = '';
+            document.getElementById('paymentNotes').value = '';
+        }
+
+        function viewProof() {
+            if (invoiceData?.payment_proof) {
+                window.open(invoiceData.payment_proof, '_blank');
+            }
+        }
+
+        async function rejectProof() {
+            if (!confirm('Tolak bukti pembayaran ini?')) return;
+            
+            const reason = prompt('Alasan penolakan:');
+            if (reason === null) return;
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/skrd/${invoiceId}/reject-proof`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Bukti pembayaran ditolak', 'success');
+                    loadInvoiceDetail();
+                } else {
+                    showAlert(result.message || 'Gagal menolak bukti', 'danger');
+                }
+            } catch (error) {
+                showAlert('Gagal menolak bukti', 'danger');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ==================== SKRD FUNCTIONS ====================
+        async function uploadSkrdFile() {
+            const fileInput = document.getElementById('skrdFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            if (file.size > 2 * 1024 * 1024) {
+                showAlert('File maksimal 2MB', 'danger');
+                fileInput.value = '';
+                return;
+            }
+            
+            if (file.type !== 'application/pdf') {
+                showAlert('File harus PDF', 'danger');
+                fileInput.value = '';
+                return;
+            }
+            
+            showLoading(true);
+            
+            const formData = new FormData();
+            formData.append('skrd_file', file);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/skrd/${invoiceId}/upload-skrd`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('SKRD berhasil diupload', 'success');
+                    loadInvoiceDetail();
+                } else {
+                    showAlert(result.message || 'Gagal upload', 'danger');
+                }
+            } catch (error) {
+                showAlert('Gagal upload file', 'danger');
+            } finally {
+                showLoading(false);
+                fileInput.value = '';
+            }
+        }
+
+        function uploadNewSkrd() {
+            document.getElementById('skrdFileInput').click();
+        }
+
+        // ==================== SUBMISSION ====================
+        function viewSubmission() {
+            if (submissionId) {
+                window.location.href = `/admin/submissions/${submissionId}`;
+            } else {
+                showAlert('Submission tidak ditemukan', 'warning');
+            }
+        }
+
+        // ==================== OTHER ACTIONS ====================
+        async function sendReminder() {
+            if (!confirm('Kirim pengingat pembayaran ke perusahaan?')) return;
+            
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/skrd/${invoiceId}/remind`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Pengingat berhasil dikirim', 'success');
+                } else {
+                    showAlert(result.message || 'Gagal mengirim pengingat', 'danger');
+                }
+            } catch (error) {
+                showAlert('Gagal mengirim pengingat', 'danger');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ==================== UI CONTROLS ====================
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alertMessage');
+            alertDiv.style.display = 'block';
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'"></button>
+            `;
+            setTimeout(() => alertDiv.style.display = 'none', 5000);
+        }
+
+        // ==================== INITIALIZE ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set lab info default
+            document.getElementById('labAddress').textContent = 'Jl. Raya Lab Pengujian No. 123, Banten';
+            document.getElementById('labPhone').textContent = 'Telp: (021) 555-1234';
+            
+            // Load data
+            loadInvoiceDetail();
+        });
+    </script>
+</body>
+</html>

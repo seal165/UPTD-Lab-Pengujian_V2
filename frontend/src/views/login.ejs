@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - User</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="login-body">
+
+    <div class="login-card">
+        <div class="auth-icon-wrapper">
+            <img src="/img/logo-banten.png" alt="Logo Banten" style="width: 100%; height: auto;">
+        </div>
+        
+        <h2 class="auth-title">UPTD Pengujian</h2>
+        <p class="auth-subtitle">Bahan Konstruksi Bangunan & Informasi Konstruksi</p>
+
+        <div class="auth-tabs">
+            <a href="/login" class="auth-tab active">Login</a>
+            <a href="/register" class="auth-tab">Register</a>
+        </div>
+
+        <!-- TAMPILKAN PESAN ERROR JIKA ADA -->
+        <% if (locals.error) { %>
+            <div style="color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-exclamation-circle"></i>
+                <span><%= error %></span>
+            </div>
+        <% } %>
+
+        <!-- TAMPILKAN PESAN SUKSES DARI REGISTER -->
+        <% if (locals.success) { %>
+            <div style="color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-check-circle"></i>
+                <span><%= success %></span>
+            </div>
+        <% } %>
+
+        <form id="loginForm" method="POST" action="/auth/login">
+            
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-envelope icon-start"></i>
+                    <input type="email" 
+                           name="email" 
+                           class="form-input" 
+                           placeholder="Enter your email" 
+                           required
+                           value="<%= locals.formData ? formData.email : '' %>">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock icon-start"></i>
+                    <input type="password" 
+                           name="password" 
+                           class="form-input" 
+                           placeholder="Enter your password" 
+                           required>
+                    <i class="fas fa-eye-slash icon-end" id="togglePassword" style="cursor: pointer;"></i>
+                </div>
+                <div style="text-align: right; margin-top: 5px;">
+                    <a href="/forgot-password" style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">Lupa Password?</a>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-auth-base btn-action-login btn-full" id="loginButton">
+                <span class="button-text">Sign In</span>
+                <span class="button-loader" style="display: none;">
+                    <i class="fas fa-spinner fa-spin"></i> Memproses...
+                </span>
+            </button>
+
+        </form>
+
+        <div class="auth-footer">
+            © 2026 Pengujian Bahan Konstruksi Bangunan & Informasi Konstruksi Provinsi Banten.
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script>
+        // Handle form submission dengan AJAX
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.querySelector('input[name="email"]').value;
+            const password = document.querySelector('input[name="password"]').value;
+            const loginButton = document.getElementById('loginButton');
+            const buttonText = loginButton.querySelector('.button-text');
+            const buttonLoader = loginButton.querySelector('.button-loader');
+            
+            console.log('📝 Mencoba login dengan:', email);
+            
+            // Tampilkan loading
+            buttonText.style.display = 'none';
+            buttonLoader.style.display = 'inline';
+            loginButton.disabled = true;
+            
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const result = await response.json();
+                console.log('📦 Response:', result);
+                
+                if (result.success && result.data) {
+                    const userData = result.data;
+                    
+                    // SIMPAN TOKEN KE LOCALSTORAGE
+                    if (userData.token) {
+                        localStorage.setItem('token', userData.token);
+                        console.log('✅ Token tersimpan di localStorage');
+                    }
+                    
+                    // Simpan data user
+                    localStorage.setItem('user', JSON.stringify({
+                        id: userData.id,
+                        email: userData.email,
+                        full_name: userData.full_name,
+                        role: userData.role
+                    }));
+                    
+                    console.log('✅ Login berhasil sebagai:', userData.role);
+                    
+                    // Redirect berdasarkan role
+                    if (userData.role === 'admin' || userData.role === 'petugas') {
+                        window.location.href = '/admin/dashboard';
+                    } else {
+                        window.location.href = '/user/dashboard';
+                    }
+                    
+                } else {
+                    // Login gagal
+                    buttonText.style.display = 'inline';
+                    buttonLoader.style.display = 'none';
+                    loginButton.disabled = false;
+                    
+                    const errorMsg = result.message || 'Email atau password salah!';
+                    alert(errorMsg);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                buttonText.style.display = 'inline';
+                buttonLoader.style.display = 'none';
+                loginButton.disabled = false;
+                alert('Terjadi kesalahan saat login');
+            }
+        });
+    </script>
+
+</body>
+</html>

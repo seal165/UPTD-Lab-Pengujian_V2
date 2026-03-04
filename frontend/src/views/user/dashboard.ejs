@@ -1,0 +1,227 @@
+<%# views/user/dashboard.ejs %>
+<%- include('partials/header', { title: 'Dashboard - UPTD Lab', extraStyles: '' }) %>
+<%- include('partials/sidebar', { currentPage: 'dashboard', user: user }) %>
+
+<main class="main-content">
+    <%- include('partials/top-navbar', { pageTitle: 'Dashboard', user: user }) %>
+
+    <!-- Data dari backend disimpan di atribut data -->
+    <div id="dashboard-data" 
+         data-user='<%- JSON.stringify(user).replace(/'/g, "\\'") %>'
+         data-dashboard='<%- JSON.stringify(dashboardData).replace(/'/g, "\\'") %>'
+         style="display: none;"></div>
+
+    <!-- DEBUG INFO - HAPUS SETELAH SELESAI -->
+    <div style="background: #f0f9ff; padding: 10px; margin-bottom: 15px; border-radius: 5px; border-left: 4px solid #4361ee;">
+        <strong>Debug Info:</strong><br>
+        Total Submissions: <%= dashboardData.totalSubmissions || 0 %><br>
+        Pending Payment: <%= dashboardData.pendingPayment || 0 %><br>
+        Completed Tests: <%= dashboardData.completedTests || 0 %><br>
+        Recent Submissions: <%= dashboardData.recentSubmissions ? dashboardData.recentSubmissions.length : 0 %>
+    </div>
+
+    <section class="welcome-banner">
+        <div class="banner-text">
+            <h2>Halo, <span id="user-name"><%= (user.full_name || user.name || 'Pengguna') %></span>! 👋</h2>
+            <p>Sistem siap membantu pengujian material dan tinjauan lokasi proyek Anda hari ini.</p>
+        </div>
+        <!-- KEMBALIKAN KE /user/submission (sesuai dengan method userSubmission) -->
+        <a href="/user/submission" class="btn-cta-primary">
+            <i class="fas fa-plus"></i> Buat Pengajuan Baru
+        </a>
+    </section>
+
+    <div class="dashboard-grid-top">
+        <div class="stat-box">
+            <span class="stat-label">Total Pengajuan</span>
+            <div class="stat-main-number" id="total-submissions"><%= dashboardData.totalSubmissions || 0 %></div>
+            <p class="stat-sub">Seluruh riwayat pengujian</p>
+        </div>
+        <div class="stat-box warning">
+            <span class="stat-label">Perlu Pembayaran</span>
+            <div class="stat-main-number" id="pending-payment"><%= dashboardData.pendingPayment || 0 %></div>
+            <p class="stat-sub">Segera konfirmasi pembayaran</p>
+        </div>
+        <div class="stat-box success">
+            <span class="stat-label">Pengujian Selesai</span>
+            <div class="stat-main-number" id="completed-tests"><%= dashboardData.completedTests || 0 %></div>
+            <p class="stat-sub">Laporan siap diunduh</p>
+        </div>
+    </div>
+
+    <div class="dashboard-visual-row">
+        <div class="visual-card">
+            <div class="card-header">
+                <h3>Aktivitas Pengujian</h3>
+                <select id="timeRange" class="chart-select">
+                    <option value="week">7 Hari Terakhir</option>
+                    <option value="month">Bulan Ini</option>
+                </select>
+            </div>
+            <div style="height: 250px;">
+                <canvas id="submissionsChartCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="visual-card side-list">
+            <div class="card-header">
+                <h3>Akses Cepat</h3>
+            </div>
+            <div class="compact-actions">
+                <a href="/user/transaction" class="action-item">
+                    <i class="fas fa-receipt" style="color: var(--warning)"></i> Konfirmasi Bayar
+                </a>
+                <a href="/user/history" class="action-item">
+                    <i class="fas fa-file-invoice" style="color: var(--primary)"></i> Unduh Laporan
+                </a>
+                <a href="/user/profile" class="action-item">
+                    <i class="fas fa-user-edit" style="color: var(--info)"></i> Update Profil
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <section class="table-card">
+        <div class="card-header">
+            <h3>Aktivitas Terbaru</h3>
+            <a href="/user/history" class="view-all-link">Lihat Riwayat <i class="fas fa-arrow-right"></i></a>
+        </div>
+        <div class="table-responsive">
+            <table class="minimal-table">
+                <thead>
+                    <tr>
+                        <th>ID PENGAJUAN</th>
+                        <th>PROYEK / MATERIAL</th>
+                        <th>STATUS</th>
+                        <th>TANGGAL</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-activities-body">
+                    <% if (dashboardData.recentSubmissions && dashboardData.recentSubmissions.length > 0) { %>
+                        <% dashboardData.recentSubmissions.slice(0, 5).forEach(function(sub) { 
+                            // Format tanggal
+                            let formattedDate = '-';
+                            try {
+                                const date = new Date(sub.dateSubmitted || sub.tgl_permohonan || sub.created_at);
+                                formattedDate = date.toLocaleDateString('id-ID');
+                            } catch (e) {
+                                formattedDate = '-';
+                            }
+                            
+                            // Tentukan class status
+                            let statusClass = 'status-proses';
+                            let statusText = sub.status || 'Pending';
+                            
+                            if (statusText === 'Selesai' || statusText === 'completed') {
+                                statusClass = 'status-success';
+                            } else if (statusText === 'Menunggu Verifikasi' || statusText === 'pending') {
+                                statusClass = 'status-proses';
+                            } else if (statusText === 'Lunas') {
+                                statusClass = 'status-success';
+                            } else if (statusText === 'Belum Bayar' || statusText === 'Belum Lunas' || statusText === 'Menunggu SKRD Upload') {
+                                statusClass = 'status-warning';
+                            }
+                        %>
+                        <tr>
+                            <td><strong>#<%= sub.appId || sub.no_urut || sub.id %></strong></td>
+                            <td>
+                                <strong><%= sub.projectName || sub.nama_proyek || sub.material || '-' %></strong><br>
+                                <small style="color: var(--secondary)"><%= sub.serviceType || sub.kode_pengujian || '-' %></small>
+                            </td>
+                            <td>
+                                <span class="status-badge <%= statusClass %>">
+                                    <%= statusText %>
+                                </span>
+                            </td>
+                            <td><%= formattedDate %></td>
+                        </tr>
+                        <% }); %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="4" class="text-center py-4">
+                                <i class="fas fa-inbox fa-2x mb-2" style="color: #ccc;"></i>
+                                <p class="text-muted">Belum ada aktivitas pengajuan</p>
+                                <!-- KEMBALIKAN JUGA DI SINI -->
+                                <a href="/user/submission" class="btn btn-sm btn-primary mt-2">Buat Pengajuan Baru</a>
+                            </td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <%- include('partials/footer') %>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Ambil data dari atribut
+    const dataElement = document.getElementById('dashboard-data');
+    
+    if (!dataElement) {
+        console.error('❌ Dashboard data element not found');
+        return;
+    }
+    
+    try {
+        const dashboardData = JSON.parse(dataElement.dataset.dashboard || '{}');
+        const userData = JSON.parse(dataElement.dataset.user || '{}');
+        
+        console.log('✅ Dashboard data loaded:', dashboardData);
+        console.log('✅ Weekly activity:', dashboardData.weeklyActivity);
+        
+        // Update chart dengan data dari server
+        const weeklyActivity = dashboardData.weeklyActivity || [0,0,0,0,0,0,0];
+        
+        const ctx = document.getElementById('submissionsChartCanvas').getContext('2d');
+        
+        // Gradient Background untuk Chart
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(4, 120, 87, 0.2)');
+        gradient.addColorStop(1, 'rgba(4, 120, 87, 0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+                datasets: [{
+                    label: 'Jumlah Pengajuan',
+                    data: weeklyActivity,
+                    borderColor: '#047857',
+                    borderWidth: 3,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#047857'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { display: false },
+                        ticks: { stepSize: 1 }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+        
+        // Event listener untuk change time range
+        document.getElementById('timeRange').addEventListener('change', function() {
+            console.log('Time range changed to:', this.value);
+            // TODO: Fetch data berdasarkan range
+        });
+        
+    } catch (error) {
+        console.error('❌ Error parsing dashboard data:', error);
+    }
+});
+</script>

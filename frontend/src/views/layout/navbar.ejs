@@ -1,0 +1,19 @@
+<nav class="navbar">
+    <div class="container nav-container">
+        <div class="logo-wrapper">
+            <img src="/img/logo-banten.png" alt="Banten" class="nav-logo">
+            <div class="divider"></div>
+            <img src="/img/logo-pu.png" alt="PUPR" class="nav-logo">
+            <div class="divider"></div>
+            <img src="/img/logo-kan.webp" alt="KAN" class="nav-logo">
+        </div>
+
+        <div class="nav-links">
+            <a href="/" class="<%= active === 'home' ? 'active' : '' %>">Beranda</a>
+            <a href="/services" class="<%= active === 'services' ? 'active' : '' %>">Pelayanan</a>
+            <a href="/profile" class="<%= active === 'profile' ? 'active' : '' %>">Profil</a>
+        </div>
+
+        <a href="/login" class="btn-auth-base btn-action-login">Login</a>
+    </div>
+</nav>

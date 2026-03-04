@@ -1,0 +1,33 @@
+<nav class="top-navbar">
+    <div class="navbar-left">
+        <% if (typeof backLink !== 'undefined' && backLink) { %>
+            <a href="<%= backLink.url %>" class="back-link">
+                <i class="fas fa-arrow-left"></i>
+                <span><%= backLink.text %></span>
+            </a>
+        <% } %>
+        <h1 class="page-title"><%= typeof pageTitle !== 'undefined' ? pageTitle : 'UPTD Lab' %></h1>
+    </div>
+    
+    <div class="navbar-right">
+        <div class="notification-bell" id="notificationBell">
+            <i class="fas fa-bell"></i>
+            <% if (locals.notificationCount && notificationCount > 0) { %>
+                <span class="notification-badge"><%= notificationCount %></span>
+            <% } %>
+        </div>
+        
+        <div class="account-dropdown">
+            <div class="account-info">
+                <div class="account-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="account-details">
+                    <span class="account-name"><%= user?.name || 'User' %></span>
+                    <span class="account-role"><%= user?.role === 'Customer' ? 'Pelanggan' : user?.role || 'User' %></span>
+                </div>
+                <i class="fas fa-chevron-down dropdown-arrow"></i>
+            </div>
+        </div>
+    </div>
+</nav>

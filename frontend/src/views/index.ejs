@@ -1,0 +1,186 @@
+<%- include('layout/header') %>
+<%- include('layout/navbar') %>
+
+    <header class="hero">
+        <div class="container">
+            <div class="hero-wrapper">
+                
+                <div class="hero-text">
+                    <span class="badge-white">LP-1676-IDN (SNI ISO/IEC 17025:2017)</span>
+                    <h1>UPTD Pengujian Bahan & Konstruksi Bangunan</h1>
+                    <p>Dinas Pekerjaan Umum dan Penataan Ruang Provinsi Banten.</p>
+                    <p class="hero-desc">Melayani pengujian laboratorium dan lapangan yang akurat, independen, dan terakreditasi untuk menjamin kualitas infrastruktur Banten.</p>
+                    
+                    <a href="/login" class="btn-permohonan">
+                        <i class="fas fa-edit"></i> Ajukan Permohonan
+                    </a>
+                </div>
+
+                <div class="hero-image">
+                    <img src="/img/gedung-uptd.jpeg" alt="Gedung UPTD PUPR Banten">
+                    <div class="img-accent"></div>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <section id="layanan" class="section bg-light">
+        <div class="container">
+            <div class="text-center">
+                <span class="section-subtitle">Layanan Pengujian</span>
+                <h2 class="section-title">Ruang Lingkup & Tarif</h2>
+            </div>
+
+            <div class="steps-container">
+                <div class="step-card">
+                    <div class="step-icon-box"><i class="fas fa-file-alt"></i></div>
+                    <div>
+                        <h5>1. Permohonan</h5>
+                        <p>Isi form & bawa sampel</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon-box"><i class="fas fa-clipboard-check"></i></div>
+                    <div>
+                        <h5>2. Pengecekan</h5>
+                        <p>Pengecekan sampel</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon-box"><i class="fas fa-search"></i></div>
+                    <div>
+                        <h5>3. Kaji Ulang</h5>
+                        <p>Cek kondisi sampel</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon-box"><i class="fas fa-wallet"></i></div>
+                    <div>
+                        <h5>4. Bayar</h5>
+                        <p>Retribusi via Bank/QRIS</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon-box"><i class="fas fa-flask"></i></div>
+                    <div>
+                        <h5>5. Pengujian</h5>
+                        <p>Analisa Lab/Lapangan</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon-box"><i class="fas fa-certificate"></i></div>
+                    <div>
+                        <h5>6. Selesai</h5>
+                        <p>Ambil Laporan (LHU)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card" style="border-top: 4px solid #16a34a;">
+                    <h3 style="color: #16a34a;"><i class="fas fa-check-circle"></i> Terakreditasi KAN</h3>
+                    <p>Parameter yang sudah masuk ruang lingkup akreditasi:</p>
+                    <ul class="check-list">
+                        <% if (typeof params !== 'undefined' && params.accredited) { %>
+                            <% params.accredited.forEach(item => { %>
+                                <li><%= item %></li>
+                            <% }) %>
+                        <% } %>
+                    </ul>
+                </div>
+
+                <div class="card" style="border-top: 4px solid #ca8a04;">
+                    <h3 style="color: #ca8a04;"><i class="fas fa-exclamation-circle"></i> Belum Terakreditasi KAN </h3>
+                    <p>Layanan pengujian lainnya yang tersedia (dalam proses pengembangan ruang lingkup):</p>
+                    <ul class="check-list" style="color: #64748B;">
+                        <% if (typeof params !== 'undefined' && params.nonAccredited) { %>
+                            <% params.nonAccredited.forEach(item => { %>
+                                <li><%= item %></li>
+                            <% }) %>
+                        <% } %>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="pricing-card" style="margin-top: 40px;">
+                <h3 class="text-center mb-3">Tarif Retribusi (Sampel)</h3>
+                <table class="pricing-table">
+                    <thead>
+                        <tr>
+                            <th>Jenis Pengujian</th>
+                            <th>Satuan</th>
+                            <th>Harga (Rp)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (typeof prices !== 'undefined') { %>
+                            <% prices.forEach(item => { %>
+                            <tr>
+                                <td><%= item.item %></td>
+                                <td><%= item.unit %></td>
+                                <td>Rp <%= item.price %></td>
+                            </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+
+                <div style="text-align: right; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                    <a href="/estimasi" style="color: #2563eb; font-weight: 600; text-decoration: none; font-size: 0.95rem;">
+                        Lihat Estimasi Pengujian <i class="fas fa-arrow-right" style="margin-left: 5px;"></i>
+                    </a>
+                </div>
+            </div>
+            
+        </div>
+    </section>
+
+    <section id="profil" class="section">
+        <div class="container">
+            <div class="text-center">
+                <span class="section-subtitle">Tentang Kami</span>
+                <h2 class="section-title">Sekilas Profil</h2>
+            </div>
+
+            <div class="cards-grid" style="align-items: stretch; margin-bottom: 40px;">
+                <div class="card text-center" style="padding: 40px 30px;">
+                    <h3>Dinas PUPR Prov. Banten</h3>
+                    <p class="mb-3 text-primary font-weight-bold">Induk Organisasi</p>
+                    <p style="color: #555; line-height: 1.6;">
+                        Merupakan unsur pelaksana urusan pemerintahan yang menjadi kewenangan daerah provinsi di bidang pekerjaan umum dan penataan ruang.
+                    </p>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #eee;">
+                        <p style="font-size: 0.9rem; color: #888;">
+                            <i class="fas fa-map-pin"></i> Kota Serang, Kawasan Pusat, Jl. Syekh Moh. Nawawi Albantani, Serang Regency, Banten KP3B
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card text-center" style="padding: 40px 30px;">
+                    <h3>UPTD Pengujian Bahan Kontruksi Bangunan & Informasi Kontruksi</h3>
+                    <p class="mb-3 text-primary font-weight-bold">Unit Pelaksana Teknis</p>
+                    <p style="color: #555; line-height: 1.6;">
+                        Melaksanakan kegiatan teknis operasional di bidang pengujian bahan dan konstruksi bangunan, serta pengelolaan peralatan berat.
+                    </p>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #eee;">
+                        <p style="font-size: 0.9rem; color: #888;">
+                            <i class="fas fa-map-pin"></i> Jalan Bhayangkara No.21, Cipocok Jaya, Serang, Banten
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <p style="color: #64748b; margin-bottom: 20px; font-size: 1.05rem;">
+                    Ingin mengetahui sejarah, struktur organisasi, dan lokasi detail kami?
+                </p>
+                <a href="/profile" class="btn-auth-base" style="background: var(--primary); color: white; border: none; text-decoration: none; padding: 12px 40px; box-shadow: 0 4px 15px rgba(4, 120, 87, 0.3);">
+                    Lihat Profil Lengkap & Lokasi <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
+                </a>
+            </div>
+
+        </div>
+    </section>
+
+<%- include('layout/footer') %>

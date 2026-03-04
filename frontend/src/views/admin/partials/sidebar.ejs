@@ -1,0 +1,59 @@
+<div class="sidebar bg-white p-3 border-end" style="width: 250px; min-height: 100vh;">
+    <div class="d-flex align-items-center mb-4 text-success">
+        <img src="/img/logo-banten.png" alt="Logo Banten" style="height: 40px; width: auto;" class="me-2">
+        <span class="fw-bold fs-4">UPTD Pengujian Bahan Kontruksi Bangunan dan Informasi Kontruksi</span>
+    </div>
+
+    <ul class="nav flex-column gap-2">
+        <li class="nav-item">
+            <a href="/admin/dashboard" class="nav-link <%= page === 'dashboard' ? 'active' : '' %>">
+                <i class="fas fa-th-large me-2"></i> Dashboard
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/submissions" class="nav-link <%= page === 'submissions' ? 'active' : '' %>">
+                <i class="fas fa-folder-open me-2"></i> Submissions
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/skrd" class="nav-link <%= page === 'skrd' ? 'active' : '' %>">
+                <i class="fas fa-money-bill-wave me-2"></i> Invoice / Payment
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/reports" class="nav-link <%= page === 'reports' ? 'active' : '' %>">
+                <i class="fas fa-chart-bar me-2"></i> Reports
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/users" class="nav-link <%= page === 'users' ? 'active' : '' %>">
+                <i class="fas fa-users me-2"></i> User Management
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="/admin/settings" class="nav-link <%= page === 'settings' ? 'active' : '' %>">
+                <i class="fas fa-cog me-2"></i> Settings
+            </a>
+        </li>
+    </ul>
+
+    <div class="mt-auto pt-5">
+        <a href="#" onclick="handleLogout(); return false;" class="nav-link text-danger">
+            <i class="fas fa-sign-out-alt me-2"></i> Logout
+        </a>
+    </div>
+</div>
+
+<script>
+    function handleLogout() {
+        if (confirm('Apakah Anda yakin ingin logout?')) {
+            // Hapus semua data session
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('remember_me');
+            
+            // Redirect ke halaman login
+            window.location.href = '/admin/login';
+        }
+    }
+</script>

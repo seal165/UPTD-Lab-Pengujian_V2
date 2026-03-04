@@ -1,0 +1,56 @@
+<%# views/user/partials/sidebar.ejs %>
+<aside class="sidebar">
+    <div class="sidebar-inner">
+        <div class="logo-section">
+            <h1 class="logo-title">UPTD PBKBIK</h1>
+            <p class="logo-subtitle">Provinsi Banten</p>
+        </div>
+        
+        <nav class="main-menu">
+            <ul>
+                <li class="menu-item <%= currentPage === 'dashboard' ? 'active' : '' %>">
+                    <i class="fas fa-tachometer-alt menu-icon"></i>
+                    <a href="/user/dashboard" class="menu-link">
+                        <span class="menu-text">Dashboard</span>
+                    </a>
+                </li>
+                <li class="menu-item <%= currentPage === 'submission' ? 'active' : '' %>">
+                    <i class="fas fa-file-alt menu-icon"></i>
+                    <a href="/user/submission" class="menu-link">
+                        <span class="menu-text">Submission</span>
+                    </a>
+                </li>
+                <li class="menu-item <%= currentPage === 'history' ? 'active' : '' %>">
+                    <i class="fas fa-history menu-icon"></i>
+                    <a href="/user/history" class="menu-link">
+                        <span class="menu-text">History</span>
+                    </a>
+                </li>
+                <li class="menu-item <%= currentPage === 'transaction' ? 'active' : '' %>">
+                    <i class="fas fa-exchange-alt menu-icon"></i>
+                    <a href="/user/transaction" class="menu-link">
+                        <span class="menu-text">Transaction</span>
+                    </a>
+                </li>
+                </ul>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <a href="/user/profile" class="user-profile-sidebar <%= currentPage === 'profile' ? 'active' : '' %>" style="text-decoration: none; display: flex; align-items: center; width: 100%; transition: all 0.3s;">
+                <div class="user-avatar-sidebar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-info-sidebar">
+                    <h4 style="margin: 0;"><%= user?.name || 'User' %></h4>
+                    <p style="margin: 0;"><%= user?.role || 'Customer' %></p>
+                </div>
+                <i class="fas fa-chevron-right" style="margin-left: auto; font-size: 0.8rem; opacity: 0.5;"></i>
+            </a>
+
+            <button class="logout-btn" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Log Out</span>
+            </button>
+        </div>
+    </div>
+</aside>

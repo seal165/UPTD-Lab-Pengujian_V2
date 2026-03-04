@@ -1,0 +1,21 @@
+<%# views/user/partials/progress-steps.ejs %>
+<div class="progress-steps-small">
+    <div class="step-item <%= step1Completed ? 'completed' : (currentStep === 1 ? 'active' : '') %>">
+        <div class="step-number"><%= step1Completed ? '✓' : '1' %></div>
+        <div class="step-text">Pre-Application & Estimation</div>
+    </div>
+    
+    <div class="step-line <%= step1Completed ? 'completed' : '' %>"></div>
+    
+    <div class="step-item <%= step2Completed ? 'completed' : (currentStep === 2 ? 'active' : '') %>">
+        <div class="step-number"><%= step2Completed ? '✓' : '2' %></div>
+        <div class="step-text">Application</div>
+    </div>
+    
+    <div class="step-line <%= step2Completed ? 'completed' : '' %>"></div>
+    
+    <div class="step-item <%= currentStep === 3 ? 'active' : '' %>">
+        <div class="step-number">3</div>
+        <div class="step-text">Review & Submit</div>
+    </div>
+</div>

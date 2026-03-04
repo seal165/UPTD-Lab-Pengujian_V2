@@ -1,0 +1,313 @@
+<%- include('partials/header') %>
+<link rel="stylesheet" href="/css/submission.css">
+<div class="main-wrapper">
+    <%- include('partials/sidebar', { page: 'submission' }) %>
+    
+    <main class="main-content">
+        <%- include('partials/top-navbar') %>
+        
+        <div class="content-body">
+            <div class="submission-container">
+                <section class="welcome-section">
+                    <h2>Formulir Pengajuan Pengujian</h2>
+                    <p class="subtitle">Dokumen Resmi: UPTD-PBKBIK-F.01-PO.07</p>
+                </section>
+
+                <!-- TAMPILKAN PESAN ERROR JIKA ADA -->
+                <% if (locals.error) { %>
+                    <div class="alert alert-danger" style="background-color: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span><%= error %></span>
+                    </div>
+                <% } %>
+
+                <form action="/user/submission" method="POST" id="applicationForm" enctype="multipart/form-data">
+    
+                    <section class="parameter-section">
+                        <div class="section-header">
+                            <h3><i class="fas fa-microscope"></i> PILIH KATEGORI & JENIS PENGUJIAN</h3>
+                        </div>
+
+                        <div class="category-grid">
+                            <% if (services && services.length > 0) { %>
+                                <% services.forEach((type, typeIndex) => { %>
+                                    <div class="category-card" data-type="<%= type.typeName %>" data-unit="Sampel">
+                                        <i class="fas fa-<%= type.typeName === 'PENGUJIAN BAHAN' ? 'cube' : 'hard-hat' %>"></i>
+                                        <div class="card-content-wrapper">
+                                            <h3><%= type.typeName %></h3>
+                                            <select name="<%= type.typeName === 'PENGUJIAN BAHAN' ? 'uji_bahan' : 'uji_konstruksi' %>" 
+                                                    class="test-select" 
+                                                    data-type="<%= type.typeName %>"
+                                                    onchange="onSelectChange(this)">
+                                                <option value="" data-price="0" data-duration="-">-- Pilih Jenis Uji --</option>
+                                                <% type.categories.forEach(category => { %>
+                                                    <% category.items.forEach(item => { %>
+                                                        <option value="<%= item.id %>" 
+                                                                data-price="<%= item.price %>" 
+                                                                data-duration="<%= item.duration %>"
+                                                                data-method="<%= item.method || '-' %>"
+                                                                data-min-sample="<%= item.min_sample ? parseInt(item.min_sample) : 1 %>"
+                                                                data-name="<%= item.name %>">
+                                                            <%= item.name %> - <%= item.sample %> (Rp <%= (item.price || 0).toLocaleString('id-ID') %>)
+                                                        </option>
+                                                    <% }); %>
+                                                <% }); %>
+                                            </select>
+                                        </div>
+                                    </div>
+                                <% }); %>
+                            <% } else { %>
+                                <div class="category-card">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <div class="card-content-wrapper">
+                                        <h3>Data Tidak Tersedia</h3>
+                                        <p>Silakan coba lagi nanti</p>
+                                    </div>
+                                </div>
+                            <% } %>
+
+                            <!-- ===== CARD BARU: INFORMASI MINIMAL SAMPLE LENGKAP ===== -->
+                            <div class="category-card" id="minSampleCard">
+                                <i class="fas fa-flask" style="color: #4361ee;"></i>
+                                <div class="card-content-wrapper">
+                                    <h3>MINIMAL SAMPLE</h3>
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        <!-- Hint (awal) -->
+                                        <div id="minSampleHint" style="font-size: 0.9rem; color: #718096; display: flex; align-items: center; gap: 5px;">
+                                            <i class="fas fa-info-circle" style="color: #4361ee;"></i>
+                                            <span>Pilih jenis pengujian terlebih dahulu</span>
+                                        </div>
+                                        
+                                        <!-- Data dari database (setelah pilih) -->
+                                        <div id="minSampleData" style="display: none; flex-direction: column; gap: 5px;">
+                                            <div style="font-size: 1.8rem; font-weight: 700; color: #2d3748;" id="minSampleFull"></div>
+                                            <div style="font-size: 0.9rem; color: #4a5568;" id="minSampleDesc"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- CARD QUANTITY DENGAN INFO MINIMAL SAMPLE -->
+                            <div class="category-card">
+                                <i class="fas fa-layer-group"></i>
+                                <div class="card-content-wrapper">
+                                    <h3>JUMLAH (<span id="unitText">Sampel</span>)</h3>
+                                    
+                                    <div class="qty-control" style="display: flex; gap: 5px; align-items: center; margin-top: 8px;">
+                                        <button type="button" id="minusBtn" class="btn-qty" onclick="decrementQty()">-</button>
+                                        <input type="number" id="qtyInput" name="qty_estimasi" class="qty-field" value="1" min="1">
+                                        <button type="button" id="plusBtn" class="btn-qty" onclick="incrementQty()">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="estimation-box">
+                            <div class="est-item">
+                                <span class="est-label">Estimasi Waktu</span>
+                                <span class="est-value" id="timeEstimation">-</span>
+                            </div>
+                            <div class="est-item">
+                                <span class="est-label">Total Estimasi Biaya</span>
+                                <span class="est-value" id="totalPrice">Rp 0</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="parameter-section">
+                        <div class="section-header">
+                            <h3><i class="fas fa-tasks"></i> I. PERMINTAAN PENGUJIAN</h3>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label>Hari / Tanggal <span class="required">*</span></label>
+                                <input type="text" id="request-date" name="tanggal_permohonan" class="readonly-field" readonly>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label>Nomor Permohonan <span class="required">*</span></label>
+                                <input type="text" name="nomor_permohonan" required placeholder="Sesuai surat perusahaan (Contoh: 001/SP/2024)" value="<%= locals.formData ? formData.nomor_permohonan : '' %>">
+                                <small class="field-note">(Diisi sesuai surat permohonan dari perusahaan)</small>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Nama Pemohon <span class="required">*</span></label>
+                                <input type="text" name="nama_pemohon" value="<%= user.name %>" required placeholder="Nama lengkap pemohon" class="editable-field">
+                                <small class="field-note">Nama lengkap penanggung jawab (dapat diubah)</small>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Nama Instansi/Perusahaan</label>
+                                <input type="text" name="nama_instansi" id="namaInstansi" value="<%= user.company %>" readonly class="readonly-field company-field">
+                                <small class="field-note">Nama perusahaan/instansi (sesuai data registrasi)</small>
+                            </div>
+
+                            <div class="input-group full-width">
+                                <label>Alamat <span class="required">*</span></label>
+                                <textarea name="alamat_pemohon" rows="2" required placeholder="Alamat lengkap instansi/pemohon"><%= locals.formData ? formData.alamat_pemohon : '' %></textarea>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Nomor Telepon/HP <span class="required">*</span></label>
+                                <input type="tel" name="nomor_telepon" required placeholder="Contoh: 08123456789" value="<%= locals.formData ? formData.nomor_telepon : '' %>">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Email</label>
+                                <input type="email" name="email" value="<%= user.email %>" readonly class="readonly-field">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Nama Proyek <span class="required">*</span></label>
+                                <input type="text" name="nama_proyek" required placeholder="Masukkan nama proyek" value="<%= locals.formData ? formData.nama_proyek : '' %>">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Lokasi Proyek <span class="required">*</span></label>
+                                <input type="text" name="lokasi_proyek" required placeholder="Lokasi pengerjaan proyek" value="<%= locals.formData ? formData.lokasi_proyek : '' %>">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="identity-section">
+                        <div class="section-header">
+                            <h3><i class="fas fa-vial"></i> II. DATA SAMPLE UJI</h3>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="input-group full-width">
+                                <label>Jenis Sample Uji <span class="required">*</span></label>
+                                <div class="checkbox-group-wrapper">
+                                    <label class="checkbox-item"><input type="checkbox" name="jenis_sampel[]" value="Beton"> Beton</label>
+                                    <label class="checkbox-item"><input type="checkbox" name="jenis_sampel[]" value="Aspal"> Aspal</label>
+                                    <label class="checkbox-item"><input type="checkbox" name="jenis_sampel[]" value="Agregat"> Agregat</label>
+                                    <label class="checkbox-item"><input type="checkbox" name="jenis_sampel[]" value="Besi"> Besi</label>
+                                    <label class="checkbox-item"><input type="checkbox" name="jenis_sampel[]" value="Tanah"> Tanah</label>
+                                    <div class="other-input-wrapper">
+                                        <input type="text" name="jenis_sampel_lainnya" placeholder="Lainnya..." class="small-input" value="<%= locals.formData ? formData.jenis_sampel_lainnya : '' %>">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label>Nama/Identitas Sample Uji <span class="required">*</span></label>
+                                <input type="text" name="nama_sampel" placeholder="Contoh: Silinder Beton K-350" required value="<%= locals.formData ? formData.nama_sampel : '' %>">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Jumlah Sample Uji <span class="required">*</span></label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="number" name="jumlah_sample_angka" id="jumlahSampleAngka" 
+                                        min="1" value="1" required style="width: 100px;" 
+                                        placeholder="Angka">
+                                    <select name="jumlah_sample_satuan" id="jumlahSampleSatuan" required style="width: 120px;">
+                                        <option value="Buah">Buah</option>
+                                        <option value="Kilogram">Kilogram</option>
+                                        <option value="sample">sample</option>
+                                        <option value="Titik">Titik</option>
+                                        <option value="Liter">Liter</option>
+                                        <option value="Meter">Meter</option>
+                                    </select>
+                                </div>
+                                <small class="field-note">Contoh: 3 Buah / 5 Kilogram</small>
+                            </div>
+
+                            <!-- Tambahkan hidden inputs untuk data yang diperlukan -->
+                            <input type="hidden" name="test_type_id" id="testTypeId" value="">
+                            <input type="hidden" name="test_category_id" id="testCategoryId" value="">
+                            <input type="hidden" name="service_id" id="serviceId" value="">
+                            <input type="hidden" name="price_at_time" id="priceAtTime" value="0">
+                            <input type="hidden" name="method_at_time" id="methodAtTime" value="">
+
+                            <div class="input-group">
+                                <label>Tanggal Pengambilan Sample <span class="required">*</span></label>
+                                <input type="date" name="tanggal_sampel" id="tanggalSampel" required value="<%= locals.formData ? formData.tanggal_sampel : '' %>">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Kemasan Sample Uji <span class="required">*</span></label>
+                                <input type="text" name="kemasan_sampel" placeholder="Contoh: Plastik, Ember, dll" required value="<%= locals.formData ? formData.kemasan_sampel : '' %>">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Asal Sample Uji <span class="required">*</span></label>
+                                <input type="text" name="asal_sampel" placeholder="Contoh: Lapangan/Gudang" required value="<%= locals.formData ? formData.asal_sampel : '' %>">
+                            </div>
+
+                            <div class="input-group">
+                                <label>Sample diambil Oleh <span class="required">*</span></label>
+                                <select name="diambil_oleh" required>
+                                    <option value="Pelanggan" <%= (locals.formData && formData.diambil_oleh === 'Pelanggan') ? 'selected' : '' %>>Pelanggan</option>
+                                    <option value="Laboratorium" <%= (locals.formData && formData.diambil_oleh === 'Laboratorium') ? 'selected' : '' %>>Laboratorium</option>
+                                    <option value="Pihak Ketiga" <%= (locals.formData && formData.diambil_oleh === 'Pihak Ketiga') ? 'selected' : '' %>>Pihak Ketiga</option>
+                                </select>
+                            </div>
+
+                            <!-- METODE PENGUJIAN - READ ONLY -->
+                            <div class="input-group">
+                                <label>Metode Pengujian <span class="required">*</span></label>
+                                <input type="text" name="metode_uji" id="metodeUji" class="readonly-field" readonly placeholder="Pilih jenis pengujian terlebih dahulu">
+                            </div>
+
+                            <div class="input-group full-width">
+                                <label>Catatan Tambahan Sample</label>
+                                <textarea name="catatan_pemohon" rows="2" placeholder="Kondisi sample, penanganan khusus, dll"><%= locals.formData ? formData.catatan_pemohon : '' %></textarea>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="parameter-section">
+                        <div class="section-header">
+                            <h3><i class="fas fa-cloud-upload-alt"></i> DOKUMEN PENDUKUNG</h3>
+                        </div>
+                        
+                        <div class="upload-grid">
+                            <div class="input-group"> 
+                                <label>Surat Permohonan (PDF/JPG) <span class="required">*</span></label>
+                                <div class="upload-area"> 
+                                    <i class="fas fa-file-pdf"></i>
+                                    <input type="file" name="surat_permohonan" accept=".pdf,.jpg,.jpeg,.png" required>
+                                    <p>Pilih file permohonan</p>
+                                </div>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label>Scan KTP (PDF/JPG) <span class="required">*</span></label>
+                                <div class="upload-area">
+                                    <i class="fas fa-id-card"></i>
+                                    <input type="file" name="scan_ktp" accept=".pdf,.jpg,.jpeg,.png" required>
+                                    <p>Pilih file KTP</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CARD ESTIMASI SELESAI -->
+                    <div class="completion-estimate-card">
+                        <div class="completion-label">
+                            <i class="fas fa-calendar-check"></i>
+                            <span>Estimasi Selesai Pengujian:</span>
+                        </div>
+                        <div>
+                            <div class="completion-date" id="completionDate">-</div>
+                            <div class="completion-detail">
+                                <span id="totalDays">0</span> hari kerja (termasuk 3 hari perjalanan + 7 hari kaji ulang)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-section">
+                        <button type="submit" class="btn-submit">
+                            <i class="fas fa-paper-plane"></i> KIRIM PERMOHONAN
+                        </button>
+                    </div>
+                    
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/js/user/submission-handler.js"></script>
+<%- include('partials/footer') %>
