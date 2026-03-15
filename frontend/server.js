@@ -18,8 +18,9 @@ app.use(session({
     saveUninitialized: true,
     cookie: { 
         secure: false,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        httpOnly: true
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        httpOnly: true,
+        sameSite: 'lax'
     },
     name: 'uptd.sid'
 }));

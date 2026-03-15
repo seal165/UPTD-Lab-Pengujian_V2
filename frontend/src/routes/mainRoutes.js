@@ -87,6 +87,28 @@ router.get('/admin/login', (req, res) => {
     });
 });
 
+// PASTIKAN INI ADA
+router.get('/admin/dashboard', authMiddleware.verifyPageAccess, pageController.adminDashboard);
+
+// ==================== HALAMAN ADMIN ====================
+router.get('/admin/submissions', authMiddleware.verifyPageAccess, pageController.adminSubmissions);
+router.get('/admin/submissions/:id', authMiddleware.verifyPageAccess, pageController.adminDetailSubmission);
+
+// TAMBAHKAN INI - ROUTE SKRD
+router.get('/admin/skrd', authMiddleware.verifyPageAccess, pageController.adminSKRD);
+router.get('/admin/skrd/:id', authMiddleware.verifyPageAccess, pageController.adminDetailSKRD);
+
+// ==================== HALAMAN ADMIN ====================
+router.get('/admin/kuisioner', authMiddleware.verifyPageAccess, pageController.adminKuisioner);
+
+// ==================== HALAMAN ADMIN USERS ====================
+// TAMBAHKAN INI - ROUTE USERS
+router.get('/admin/users', authMiddleware.verifyPageAccess, pageController.adminUsers);
+router.get('/admin/users/:id', authMiddleware.verifyPageAccess, pageController.adminUserDetail);
+
+// ==================== HALAMAN SETTINGS ====================
+router.get('/admin/settings', authMiddleware.verifyPageAccess, pageController.adminSettings);
+
 // ==================== HALAMAN USER (PEMOHON) ====================
 // Dashboard
 router.get('/user/dashboard', authMiddleware.verifyUserAccess, pageController.userDashboard);
@@ -193,35 +215,63 @@ router.post('/auth/login', async (req, res) => {
         
         const { email, password } = req.body;
         
+        console.log('📝 Login attempt:', { email });
+        
         const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+        
+        console.log('📦 API Response:', response.data);
         
         if (response.data.success) {
             const userData = response.data.data.user || response.data.data;
-            const token = response.data.data.token || response.data.data;
+            const token = response.data.data.token || response.data.token;
             
+            // Simpan di session
             req.session.token = token;
             req.session.user = {
                 id: userData.id,
                 email: userData.email,
-                full_name: userData.full_name,
-                role: userData.role
+                full_name: userData.full_name || userData.name,
+                role: userData.role || 'pelanggan'
             };
             
-            res.json({
-                success: true,
-                data: {
-                    id: userData.id,
-                    email: userData.email,
-                    full_name: userData.full_name,
-                    role: userData.role,
-                    token: token
+            // Save session
+            req.session.save((err) => {
+                if (err) {
+                    console.error('❌ Session save error:', err);
+                    return res.json({
+                        success: false,
+                        message: 'Gagal menyimpan session'
+                    });
                 }
+                
+                console.log('✅ Login success, role:', userData.role);
+                
+                // 🔴 KIRIM RESPONSE JSON YANG LENGKAP
+                res.json({
+                    success: true,
+                    data: {
+                        id: userData.id,
+                        email: userData.email,
+                        full_name: userData.full_name || userData.name,
+                        role: userData.role || 'pelanggan',
+                        token: token
+                    },
+                    redirect: userData.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'
+                });
             });
         } else {
-            res.json({ success: false, message: response.data.message || 'Login gagal' });
+            console.log('❌ Login failed:', response.data.message);
+            res.json({
+                success: false,
+                message: response.data.message || 'Email atau password salah'
+            });
         }
     } catch (error) {
-        res.json({ success: false, message: error.response?.data?.message || 'Terjadi kesalahan' });
+        console.error('❌ Login error:', error.message);
+        res.json({
+            success: false,
+            message: error.response?.data?.message || 'Terjadi kesalahan saat login'
+        });
     }
 });
 

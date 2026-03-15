@@ -135,8 +135,12 @@
                     
                     console.log('✅ Login berhasil sebagai:', userData.role);
                     
-                    // Redirect berdasarkan role
-                    if (userData.role === 'admin' || userData.role === 'petugas') {
+                    // 🔴 GUNAKAN REDIRECT DARI SERVER JIKA ADA
+                    if (result.redirect) {
+                        window.location.href = result.redirect;
+                    } 
+                    // ATAU REDIRECT BERDASARKAN ROLE
+                    else if (userData.role === 'admin' || userData.role === 'petugas') {
                         window.location.href = '/admin/dashboard';
                     } else {
                         window.location.href = '/user/dashboard';
@@ -148,8 +152,25 @@
                     buttonLoader.style.display = 'none';
                     loginButton.disabled = false;
                     
+                    // 🔴 TAMPILKAN PESAN ERROR DI HALAMAN, BUKAN ALERT
                     const errorMsg = result.message || 'Email atau password salah!';
-                    alert(errorMsg);
+                    
+                    // Hapus error lama jika ada
+                    const oldError = document.querySelector('.error-message');
+                    if (oldError) oldError.remove();
+                    
+                    // Buat elemen error baru
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    errorDiv.style.cssText = 'color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;';
+                    errorDiv.innerHTML = `
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>${errorMsg}</span>
+                    `;
+                    
+                    // Sisipkan di atas form
+                    const form = document.getElementById('loginForm');
+                    form.parentNode.insertBefore(errorDiv, form);
                 }
                 
             } catch (error) {
@@ -157,9 +178,45 @@
                 buttonText.style.display = 'inline';
                 buttonLoader.style.display = 'none';
                 loginButton.disabled = false;
-                alert('Terjadi kesalahan saat login');
+                
+                // Tampilkan error di halaman
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;';
+                errorDiv.innerHTML = `
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Terjadi kesalahan saat login. Silakan coba lagi.</span>
+                `;
+                
+                const form = document.getElementById('loginForm');
+                form.parentNode.insertBefore(errorDiv, form);
             }
         });
+
+        // Toggle password visibility
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordInput = document.querySelector('input[name="password"]');
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // Cek parameter URL untuk pesan sukses dari register
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('registered') === 'true') {
+            const successDiv = document.createElement('div');
+            successDiv.style.cssText = 'color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;';
+            successDiv.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                <span>Registrasi berhasil! Silakan login.</span>
+            `;
+            
+            const form = document.getElementById('loginForm');
+            form.parentNode.insertBefore(successDiv, form);
+            
+            // Hapus parameter dari URL
+            window.history.replaceState({}, document.title, '/login');
+        }
     </script>
 
 </body>

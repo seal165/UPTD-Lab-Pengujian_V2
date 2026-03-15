@@ -37,6 +37,7 @@
                 <span class="date-info"><i class="far fa-calendar-alt"></i> <span id="det-date">-</span></span>
             </div>
 
+            <!-- 🔴 INFORMASI LENGKAP PERUSAHAAN -->
             <div class="detail-card">
                 <div class="card-header-custom">
                     <h6><i class="fas fa-building"></i> INFORMASI PERUSAHAAN</h6>
@@ -52,6 +53,10 @@
                             <span id="det-pic">-</span>
                         </div>
                         <div class="info-item">
+                            <label>Jabatan</label>
+                            <span id="det-position">-</span>
+                        </div>
+                        <div class="info-item">
                             <label>Alamat</label>
                             <span id="det-address">-</span>
                         </div>
@@ -59,18 +64,46 @@
                             <label>No. Telepon</label>
                             <span id="det-contact">-</span>
                         </div>
+                        <div class="info-item">
+                            <label>Email</label>
+                            <span id="det-email">-</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <!-- 🔴 INFORMASI PROYEK -->
+            <div class="detail-card">
+                <div class="card-header-custom">
+                    <h6><i class="fas fa-hard-hat"></i> INFORMASI PROYEK</h6>
+                </div>
+                <div class="card-body-custom">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Nama Proyek</label>
+                            <span id="det-project">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Lokasi Proyek</label>
+                            <span id="det-project-location">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔴 INFORMASI PENGUJIAN -->
             <div class="detail-card">
                 <div class="card-header-custom">
                     <h6><i class="fas fa-flask"></i> DETAIL MATERIAL & LAYANAN</h6>
                 </div>
                 <div class="card-body-custom">
                     <div class="category-wrapper">
-                        <label>Kode Pengujian</label>
-                        <span class="category-value" id="det-material">-</span>
+                        <label>Jenis Sample</label>
+                        <span class="category-value" id="det-sample-type">-</span>
+                    </div>
+                    <div class="category-wrapper mt-2">
+                        <label>Metode Pengujian</label>
+                        <span class="category-value" id="det-method">-</span>
                     </div>
 
                     <div class="table-responsive mt-3">
@@ -79,17 +112,19 @@
                                 <tr>
                                     <th>SPESIFIKASI ITEM</th>
                                     <th class="text-center">JUMLAH</th>
-                                    <th class="text-end">HARGA</th>
+                                    <th class="text-end">HARGA SATUAN</th>
+                                    <th class="text-end">SUBTOTAL</th>
                                 </tr>
                             </thead>
                             <tbody id="det-items-body">
                                 <tr>
                                     <td class="fw-bold" id="det-service-name">-</td>
                                     <td class="text-center" id="det-qty">1</td>
-                                    <td class="text-end fw-bold" id="det-price">Rp 0</td>
+                                    <td class="text-end" id="det-unit-price">Rp 0</td>
+                                    <td class="text-end fw-bold" id="det-subtotal">Rp 0</td>
                                 </tr>
                                 <tr class="total-row">
-                                    <td colspan="2" class="text-end fw-bold">TOTAL RETRIBUSI</td>
+                                    <td colspan="3" class="text-end fw-bold">TOTAL RETRIBUSI</td>
                                     <td class="text-end fw-bold" id="det-total">Rp 0</td>
                                 </tr>
                             </tbody>
@@ -98,9 +133,53 @@
                 </div>
             </div>
 
+            <!-- 🔴 INFORMASI PEMBAYARAN -->
             <div class="detail-card">
                 <div class="card-header-custom">
-                    <h6><i class="fas fa-file-alt"></i> DOKUMEN PENDUKUNG (WAJIB) & LAPORAN HASIL</h6>
+                    <h6><i class="fas fa-credit-card"></i> INFORMASI PEMBAYARAN</h6>
+                </div>
+                <div class="card-body-custom">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>No. Invoice</label>
+                            <span id="det-invoice">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Total Tagihan</label>
+                            <span id="det-bill">Rp 0</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Jumlah Dibayar</label>
+                            <span id="det-paid">Rp 0</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Sisa Tagihan</label>
+                            <span id="det-remaining">Rp 0</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Status Pembayaran</label>
+                            <span id="det-payment-status">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Tanggal Pembayaran</label>
+                            <span id="det-payment-date">-</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 🔴 BUKTI PEMBAYARAN -->
+                    <div class="mt-3" id="payment-proof-section" style="display: none;">
+                        <label>Bukti Pembayaran</label>
+                        <div class="document-list mt-2" id="payment-proof-list">
+                            <!-- Akan diisi JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔴 DOKUMEN PENDUKUNG -->
+            <div class="detail-card">
+                <div class="card-header-custom">
+                    <h6><i class="fas fa-file-alt"></i> DOKUMEN PENDUKUNG</h6>
                 </div>
                 <div class="card-body-custom">
                     <div class="document-list">
@@ -126,7 +205,7 @@
                                 <i class="fas fa-file-pdf text-danger fs-3"></i>
                             </div>
                             <div class="doc-info flex-grow-1">
-                                <h6 class="mb-1 small fw-bold">Scan KTP (Kartu Pemilik/Tanda Terdaftar) 
+                                <h6 class="mb-1 small fw-bold">Scan KTP 
                                     <span class="badge bg-danger ms-1" style="font-size: 10px;">Wajib</span>
                                 </h6>
                                 <p class="mb-0 text-muted small" id="status-doc-ktp">Memuat status...</p>
@@ -135,22 +214,54 @@
                                 <!-- Akan diisi JavaScript -->
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <!-- ===== SECTION LAPORAN HASIL PENGUJIAN ===== -->
-                        <div class="document-item d-flex align-items-center p-3 border rounded mt-3" style="border-left: 4px solid #28a745 !important;">
-                            <div class="doc-icon me-3">
-                                <i class="fas fa-file-pdf text-success fs-3"></i>
-                            </div>
-                            <div class="doc-info flex-grow-1">
-                                <h6 class="mb-1 small fw-bold">Laporan Hasil Pengujian 
-                                    <span class="badge bg-success ms-1" style="font-size: 10px;">Hasil</span>
-                                </h6>
-                                <p class="mb-0 text-muted small" id="status-laporan">Memuat status...</p>
-                            </div>
-                            <div class="doc-action" id="action-laporan">
-                                <!-- Akan diisi JavaScript -->
-                            </div>
+            <!-- 🔴 LAPORAN HASIL PENGUJIAN -->
+            <div class="detail-card">
+                <div class="card-header-custom">
+                    <h6><i class="fas fa-file-pdf"></i> LAPORAN HASIL PENGUJIAN</h6>
+                </div>
+                <div class="card-body-custom">
+                    <div class="document-item d-flex align-items-center p-3 border rounded" style="border-left: 4px solid #28a745 !important;">
+                        <div class="doc-icon me-3">
+                            <i class="fas fa-file-pdf text-success fs-3"></i>
                         </div>
+                        <div class="doc-info flex-grow-1">
+                            <h6 class="mb-1 small fw-bold">Laporan Hasil Pengujian 
+                                <span class="badge bg-success ms-1" style="font-size: 10px;">Hasil</span>
+                            </h6>
+                            <p class="mb-0 text-muted small" id="status-laporan">Memuat status...</p>
+                            <small class="text-muted" id="laporan-date"></small>
+                        </div>
+                        <div class="doc-action" id="action-laporan">
+                            <!-- Akan diisi JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔴 CATATAN ADMIN -->
+            <div class="detail-card" id="admin-notes-section" style="display: none;">
+                <div class="card-header-custom">
+                    <h6><i class="fas fa-sticky-note"></i> CATATAN ADMIN</h6>
+                </div>
+                <div class="card-body-custom">
+                    <div class="alert alert-info" id="admin-notes">
+                        -
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🔴 TIMELINE STATUS -->
+            <div class="detail-card">
+                <div class="card-header-custom">
+                    <h6><i class="fas fa-history"></i> TIMELINE PENGAJUAN</h6>
+                </div>
+                <div class="card-body-custom">
+                    <div class="timeline" id="timeline">
+                        <!-- Akan diisi JavaScript -->
                     </div>
                 </div>
             </div>

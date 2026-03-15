@@ -1,6 +1,6 @@
 /**
  * UPTD Lab Submission Handler
- * VERSI FIX - Data sesuai database
+ * VERSI ASLI + MODE SIBUK + PERBAIKAN MINIMAL SAMPLE
  */
 
 // ==================== FUNGSI GLOBAL ====================
@@ -8,34 +8,126 @@
 // Data services dari backend (disimpan di global)
 let servicesData = [];
 
-// Fungsi untuk mengambil data services dari API/database
-async function loadServicesData() {
-    try {
-        // Ambil dari atribut data di HTML jika ada
-        const servicesElement = document.getElementById('services-data');
-        if (servicesElement && servicesElement.dataset.services) {
-            servicesData = JSON.parse(servicesElement.dataset.services);
-            console.log('✅ Services data loaded from DOM:', servicesData.length);
-        } else {
-            // Fallback: fetch dari API
-            const response = await fetch('/api/services');
-            const result = await response.json();
-            if (result.success) {
-                servicesData = result.data;
-                console.log('✅ Services data loaded from API:', servicesData.length);
+// 🔴 TAMBAHKAN VARIABEL UNTUK MODE SIBUK
+let busyModeActive = false;
+let busyModePeriods = [];
+
+// 🔥 FUNGSI UNTUK MENGAMBIL DATA SERVICES DARI DOM
+function loadServicesData() {
+    console.log('📦 Loading services data from DOM...');
+    
+    const allSelects = document.querySelectorAll('.test-select');
+    servicesData = [];
+    
+    allSelects.forEach(select => {
+        const typeName = select.getAttribute('data-type');
+        if (!typeName) return;
+        
+        const typeObj = {
+            typeName: typeName,
+            categories: []
+        };
+        
+        const options = select.querySelectorAll('option[data-price]');
+        const categoryMap = new Map();
+        
+        options.forEach(option => {
+            if (!option.value) return;
+            
+            const price = option.getAttribute('data-price');
+            const duration = option.getAttribute('data-duration');
+            const method = option.getAttribute('data-method');
+            const minSample = option.getAttribute('data-min-sample'); // 🔥 AMBIL MIN SAMPLE
+            const name = option.getAttribute('data-name');
+            
+            console.log(`📊 Option: ${option.value}, minSample: ${minSample}`); // 🔥 LOGGING
+            
+            // Tentukan kategori dari teks option
+            const optionText = option.textContent;
+            let categoryName = 'Umum';
+            
+            if (optionText.includes('Beton')) categoryName = 'Beton';
+            else if (optionText.includes('Aspal')) categoryName = 'Aspal';
+            else if (optionText.includes('Agregat')) categoryName = 'Agregat';
+            else if (optionText.includes('Tanah')) categoryName = 'Tanah';
+            else if (optionText.includes('Besi')) categoryName = 'Besi / Baja';
+            
+            if (!categoryMap.has(categoryName)) {
+                categoryMap.set(categoryName, {
+                    categoryName: categoryName,
+                    items: []
+                });
             }
+            
+            categoryMap.get(categoryName).items.push({
+                id: option.value,
+                name: name || optionText.split(' (Rp')[0],
+                sample: minSample + ' sample',
+                duration: duration,
+                price: price,
+                method: method
+            });
+        });
+        
+        typeObj.categories = Array.from(categoryMap.values());
+        servicesData.push(typeObj);
+    });
+    
+    console.log('✅ Services data loaded:', servicesData.length, 'types');
+}
+
+// 🔴 FUNGSI UNTUK MENGAMBIL DATA MODE SIBUK
+function loadBusyModeData() {
+    const dataElement = document.getElementById('busy-mode-data');
+    if (dataElement) {
+        busyModeActive = dataElement.dataset.active === 'true';
+        try {
+            if (dataElement.dataset.periods) {
+                busyModePeriods = JSON.parse(dataElement.dataset.periods) || [];
+            }
+        } catch (e) {
+            console.error('Error parsing busy mode periods:', e);
         }
-    } catch (error) {
-        console.error('❌ Error loading services data:', error);
+        console.log('📅 Busy mode active:', busyModeActive, 'Periods:', busyModePeriods);
     }
+}
+
+// 🔴 FUNGSI UNTUK MENDAPATKAN TAMBAHAN HARI DARI MODE SIBUK
+function getBusyModeExtraDays() {
+    if (!busyModeActive || busyModePeriods.length === 0) {
+        return 0;
+    }
+    
+    const today = new Date();
+    let extraDays = 0;
+    
+    // Hitung total hari dari periode sibuk yang aktif
+    for (const period of busyModePeriods) {
+        const start = new Date(period.tanggal_mulai);
+        const end = new Date(period.tanggal_selesai);
+        
+        // Jika periode masih berlangsung atau akan datang
+        if (end >= today) {
+            // Hitung sisa hari dari periode ini
+            const periodEnd = end > today ? end : today;
+            const daysInPeriod = Math.ceil((periodEnd - today) / (1000 * 60 * 60 * 24)) + 1;
+            extraDays += Math.max(0, daysInPeriod);
+        }
+    }
+    
+    console.log('📅 Busy mode extra days:', extraDays);
+    return extraDays;
 }
 
 // Fungsi untuk mencari detail service berdasarkan ID
 function getServiceDetails(serviceId) {
+    console.log('🔍 Mencari service dengan ID:', serviceId);
+    
     for (const type of servicesData) {
         for (const category of type.categories) {
             for (const item of category.items) {
                 if (item.id == serviceId) {
+                    console.log('✅ Service ditemukan:', item);
                     return {
                         serviceId: item.id,
                         serviceName: item.name,
@@ -48,6 +140,7 @@ function getServiceDetails(serviceId) {
             }
         }
     }
+    console.log('❌ Service tidak ditemukan untuk ID:', serviceId);
     return null;
 }
 
@@ -165,6 +258,9 @@ function updateAll() {
     const bahanSelect = document.querySelector('select[name="uji_bahan"]');
     const konstruksiSelect = document.querySelector('select[name="uji_konstruksi"]');
     
+    console.log('📋 Bahan select:', bahanSelect?.value);
+    console.log('📋 Konstruksi select:', konstruksiSelect?.value);
+    
     let activeSelect = null;
     let activeSelectName = '';
     let selectedServiceId = null;
@@ -178,6 +274,8 @@ function updateAll() {
         activeSelectName = 'uji_konstruksi';
         selectedServiceId = konstruksiSelect.value;
     }
+    
+    console.log('🎯 Active select:', activeSelectName, 'ID:', selectedServiceId);
     
     if (!activeSelect || !selectedServiceId) {
         // Reset semua
@@ -194,12 +292,14 @@ function updateAll() {
         document.getElementById('methodAtTime').value = '';
         document.getElementById('priceAtTime').value = '0';
         
-        const hint = document.getElementById('minSampleHint');
-        const data = document.getElementById('minSampleData');
-        if (hint && data) {
-            hint.style.display = 'flex';
-            data.style.display = 'none';
+        // 🔥 Reset qtyInput min
+        const qtyInput = document.getElementById('qtyInput');
+        if (qtyInput) {
+            qtyInput.min = 1;
+            qtyInput.setAttribute('data-min', 1);
+            qtyInput.value = 1;
         }
+        
         return;
     }
     
@@ -209,17 +309,11 @@ function updateAll() {
     let price = parseInt(selectedOption.getAttribute('data-price')) || 0;
     let duration = parseInt(selectedOption.getAttribute('data-duration')) || 0;
     let method = selectedOption.getAttribute('data-method') || '-';
-    let minSampleText = selectedOption.getAttribute('data-min-sample') || '1';
-    let itemName = selectedOption.getAttribute('data-name') || selectedOption.textContent.split(' (Rp')[0];
     
-    // Ambil angka dari teks minimal sample
-    let minSampleNumber = 1;
-    const match = minSampleText.match(/\d+/);
-    if (match) {
-        minSampleNumber = parseInt(match[0]);
-    }
+    // 🔥 AMBIL MIN SAMPLE DARI DATABASE (dari attribute data-min-sample)
+    let minSampleNumber = parseInt(selectedOption.getAttribute('data-min-sample')) || 1;
     
-    console.log('Data:', { price, duration, method, minSampleText, minSampleNumber });
+    console.log('📊 Data dari option:', { price, duration, method, minSampleNumber });
     
     // Cari detail service dari data
     const serviceDetails = getServiceDetails(selectedServiceId);
@@ -231,64 +325,60 @@ function updateAll() {
         document.getElementById('serviceId').value = serviceDetails.serviceId || '';
         document.getElementById('methodAtTime').value = serviceDetails.method || method;
         document.getElementById('priceAtTime').value = serviceDetails.price || price;
+        console.log('✅ Menggunakan data dari serviceDetails');
     } else {
         // Fallback ke data dari attribute
         document.getElementById('serviceId').value = selectedServiceId;
         document.getElementById('methodAtTime').value = method;
         document.getElementById('priceAtTime').value = price;
+        console.log('⚠️ Fallback ke data attribute');
     }
     
-    // Update quantity input
+    // 🔥 UPDATE QUANTITY INPUT DENGAN MIN SAMPLE DARI DATABASE
     const qtyInput = document.getElementById('qtyInput');
     if (qtyInput) {
         qtyInput.min = minSampleNumber;
         qtyInput.setAttribute('data-min', minSampleNumber);
-        qtyInput.value = minSampleNumber;
+        qtyInput.value = minSampleNumber; // Set ke nilai minimal
+        console.log('📊 Quantity min dari database:', minSampleNumber);
     }
     
     // Update metode uji
     const metodeUji = document.getElementById('metodeUji');
     if (metodeUji) metodeUji.value = method;
     
-    // Update card minimal sample
-    const hint = document.getElementById('minSampleHint');
-    const data = document.getElementById('minSampleData');
-    const full = document.getElementById('minSampleFull');
-    const desc = document.getElementById('minSampleDesc');
-    
-    if (hint && data && full && desc) {
-        hint.style.display = 'none';
-        data.style.display = 'flex';
-        full.innerText = minSampleText;
-        desc.innerText = itemName;
-    }
-    
     // Hitung total
     const total = price * minSampleNumber;
     document.getElementById('totalPrice').innerText = 'Rp ' + total.toLocaleString('id-ID');
     document.getElementById('timeEstimation').innerText = duration + ' Hari';
     
-    // Update estimasi selesai
+    // Update estimasi selesai (dengan mode sibuk)
     updateCompletionDate(duration);
 }
 
-// Fungsi update estimasi selesai
+// 🔴 FUNGSI UPDATE ESTIMASI SELESAI - DIMODIFIKASI UNTUK MENAMBAHKAN BUSY MODE
 function updateCompletionDate(duration) {
     const tanggalSampel = document.getElementById('tanggalSampel');
     const completionDateEl = document.getElementById('completionDate');
     const totalDaysEl = document.getElementById('totalDays');
+    const busyModeInfo = document.getElementById('busyModeInfo');
     
     if (!tanggalSampel || !completionDateEl || !totalDaysEl) return;
     
     const tanggalValue = tanggalSampel.value;
     
+    // 🔴 PERBAIKI TYPO: 'tangalValue' → 'tanggalValue'
     if (!tanggalValue) {
         completionDateEl.innerText = '-';
         totalDaysEl.innerText = '0';
+        if (busyModeInfo) busyModeInfo.style.display = 'none';
         return;
     }
     
-    const totalHari = 3 + 7 + (parseInt(duration) || 0);
+    // Hitung total hari dengan tambahan mode sibuk
+    const extraDays = getBusyModeExtraDays();
+    const totalHari = 3 + 7 + (parseInt(duration) || 0) + extraDays;
+    
     const startDate = new Date(tanggalValue);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(startDate);
@@ -299,6 +389,15 @@ function updateCompletionDate(duration) {
     
     completionDateEl.innerText = formattedDate;
     totalDaysEl.innerText = totalHari;
+    
+    // Tampilkan info mode sibuk jika aktif
+    if (busyModeInfo) {
+        if (busyModeActive && extraDays > 0) {
+            busyModeInfo.style.display = 'inline';
+        } else {
+            busyModeInfo.style.display = 'none';
+        }
+    }
 }
 
 // Fungsi ketika select berubah
@@ -318,10 +417,13 @@ window.onSelectChange = function(selectElement) {
 
 // ==================== INISIALISASI ====================
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('✅ Handler siap - Versi database');
+    console.log('✅ Handler siap - Versi database + Mode Sibuk');
     
-    // Load data services
-    await loadServicesData();
+    // 🔥 LOAD DATA SERVICES DARI DOM
+    loadServicesData();
+    
+    // 🔴 LOAD DATA MODE SIBUK
+    loadBusyModeData();
     
     // Set default date
     const requestDateInput = document.getElementById('request-date');
@@ -329,6 +431,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         const today = new Date();
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         requestDateInput.value = today.toLocaleDateString('id-ID', options);
+    }
+    
+    // Set default untuk tanggal sampel (hari ini)
+    const tanggalSampel = document.getElementById('tanggalSampel');
+    if (tanggalSampel && !tanggalSampel.value) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        tanggalSampel.value = `${year}-${month}-${day}`;
     }
     
     // CEK TOMBOL
@@ -359,7 +471,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     // Event untuk tanggal sampel
-    const tanggalSampel = document.getElementById('tanggalSampel');
     if (tanggalSampel) {
         tanggalSampel.addEventListener('change', function() {
             const duration = document.getElementById('timeEstimation').innerText;
@@ -392,7 +503,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
     
-    // Di submission-handler.js - TAMBAHKAN CEK DUPLIKASI
+    // Handle form submit
     document.getElementById('applicationForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         

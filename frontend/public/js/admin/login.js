@@ -10,6 +10,7 @@
     const buttonText = document.getElementById('buttonText');
     const buttonSpinner = document.getElementById('buttonSpinner');
     const alertMessage = document.getElementById('alertMessage');
+    const rememberCheck = document.getElementById('remember');
 
     function showAlert(message, type) {
         alertMessage.style.display = 'block';
@@ -18,12 +19,16 @@
             ${message}
             <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'"></button>
         `;
+        setTimeout(() => {
+            if (alertMessage.style.display !== 'none') {
+                alertMessage.style.display = 'none';
+            }
+        }, 5000);
     }
 
     window.togglePassword = function() {
         const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
         passwordInput.setAttribute('type', type);
-        
         const icon = document.getElementById('togglePasswordIcon');
         icon.classList.toggle('fa-eye');
         icon.classList.toggle('fa-eye-slash');
@@ -34,82 +39,81 @@
         showAlert('Silakan hubungi administrator sistem', 'info');
     };
 
-    async function handleLogin(event) {
-        event.preventDefault();
+    // ==================== HANDLE LOGIN ====================
+async function handleLogin(event) {
+    event.preventDefault();
 
-        const email = emailInput.value.trim();
-        const password = passwordInput.value.trim();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
 
-        if (!email || !password) {
-            showAlert('Email dan password harus diisi!', 'warning');
-            return;
-        }
+    if (!email || !password) {
+        showAlert('Email dan password harus diisi!', 'warning');
+        return;
+    }
 
-        loginButton.disabled = true;
-        buttonText.style.display = 'none';
-        buttonSpinner.style.display = 'inline-block';
+    loginButton.disabled = true;
+    buttonText.style.display = 'none';
+    buttonSpinner.style.display = 'inline-block';
 
-        try {
-            const API_URL = 'http://localhost:5000/api';
+    try {
+        const API_URL = 'http://localhost:5000/api';
+        
+        console.log('📡 Mencoba login admin dengan:', email);
+
+        const response = await fetch('/auth/login', {  // PAKAI RELATIVE PATH
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+        console.log('📦 Response:', result);
+
+        if (result.success && result.data) {
+            const userData = result.data;
+            const role = userData.role.toLowerCase();
             
-            console.log('📡 Mencoba login dengan:', email);
-
-            const response = await fetch(`${API_URL}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email, password })
-            });
-
-            console.log('📡 Response status:', response.status);
+            console.log('👤 User role:', role);
             
-            const result = await response.json();
-            console.log('📦 Response dari server:', result);
-
-            if (result.success && result.data) {
-                const userData = result.data;
-                console.log('👤 User data:', userData);
-                console.log('👤 User role:', userData.user.role);
-                console.log('👤 Role type:', typeof userData.user.role);
+            if (role === 'admin' || role === 'superadmin') {
+                console.log('✅ Admin access granted');
                 
-                // Cek role admin (case sensitive)
-                const role = userData.user.role;
+                // HAPUS semua token lama
+                localStorage.clear();
                 
-                if (role === 'admin' || role === 'superadmin') {
-                    console.log('✅ Admin access granted');
-                    
-                    localStorage.setItem('token', userData.token);
-                    localStorage.setItem('user', JSON.stringify({
-                        id: userData.user.id,
-                        email: userData.user.email,
-                        full_name: userData.user.full_name,
-                        role: userData.user.role
-                    }));
+                // SIMPAN token
+                localStorage.setItem('token', userData.token);
+                localStorage.setItem('user', JSON.stringify({
+                    id: userData.id,
+                    email: userData.email,
+                    full_name: userData.full_name,
+                    role: userData.role
+                }));
 
-                    showAlert('Login berhasil! Mengalihkan...', 'success');
-                    
-                    setTimeout(() => {
-                        window.location.href = '/admin/dashboard';
-                    }, 1000);
-                } else {
-                    console.log('❌ Access denied. Role:', role);
-                    showAlert('Akses ditolak. Hanya untuk administrator.', 'danger');
-                    resetButton();
-                }
-
+                console.log('✅ Token admin tersimpan');
+                
+                showAlert('Login berhasil! Mengalihkan...', 'success');
+                
+                // PASTIKAN REDIRECT
+                window.location.href = '/admin/dashboard';
+                
             } else {
-                console.log('❌ Login failed:', result.message);
-                showAlert(result.message || 'Email atau password salah!', 'danger');
+                console.log('❌ Access denied. Bukan admin.');
+                showAlert('Akses ditolak. Hanya untuk administrator.', 'danger');
                 resetButton();
             }
-
-        } catch (error) {
-            console.error('❌ Error:', error);
-            showAlert('Gagal terhubung ke server', 'danger');
+        } else {
+            showAlert(result.message || 'Email atau password salah!', 'danger');
             resetButton();
         }
+    } catch (error) {
+        console.error('❌ Error:', error);
+        showAlert('Gagal terhubung ke server', 'danger');
+        resetButton();
     }
+}
 
     function resetButton() {
         loginButton.disabled = false;
@@ -121,10 +125,15 @@
         if (loginForm) {
             loginForm.addEventListener('submit', handleLogin);
         }
+        passwordInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleLogin(e);
+            }
+        });
         
-        // Isi form dengan default admin (untuk testing)
-        emailInput.value = 'admin@uptd.gov.id';
-        passwordInput.value = 'admin123';
+        // Kosongkan input
+        emailInput.value = '';
+        passwordInput.value = '';
     });
 
 })();
