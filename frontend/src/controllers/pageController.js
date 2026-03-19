@@ -284,24 +284,38 @@ const pageController = {
             if (response.data.success) {
                 const userData = response.data.data.user || response.data.data;
                 const token = response.data.data.token || response.data.data;
-                
-                req.session.user = {
-                    id: userData.id,
-                    email: userData.email,
-                    full_name: userData.full_name,
-                    role: userData.role
-                };
-                req.session.token = token;
-                
-                res.json({
-                    success: true,
-                    data: {
+
+                return req.session.regenerate((regenerateError) => {
+                    if (regenerateError) {
+                        console.error('❌ Failed to regenerate session on login:', regenerateError);
+                        return res.json({ success: false, message: 'Gagal membuat sesi login baru' });
+                    }
+
+                    req.session.user = {
                         id: userData.id,
                         email: userData.email,
                         full_name: userData.full_name,
-                        role: userData.role,
-                        token: token
-                    }
+                        role: userData.role
+                    };
+                    req.session.token = token;
+
+                    return req.session.save((saveError) => {
+                        if (saveError) {
+                            console.error('❌ Failed to save login session:', saveError);
+                            return res.json({ success: false, message: 'Gagal menyimpan sesi login' });
+                        }
+
+                        return res.json({
+                            success: true,
+                            data: {
+                                id: userData.id,
+                                email: userData.email,
+                                full_name: userData.full_name,
+                                role: userData.role,
+                                token: token
+                            }
+                        });
+                    });
                 });
             } else {
                 res.json({ success: false, message: response.data.message || 'Login gagal' });
@@ -377,9 +391,32 @@ const pageController = {
 
     logout: (req, res) => {
         console.log('➡️ Logout user:', req.session?.user?.email);
+
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+        res.set('Surrogate-Control', 'no-store');
+
+        const clearSessionCookie = () => {
+            res.clearCookie('uptd.sid', {
+                path: '/',
+                httpOnly: true,
+                secure: false
+            });
+        };
+
+        if (!req.session) {
+            clearSessionCookie();
+            return res.redirect('/');
+        }
+
         req.session.destroy((err) => {
-            if (err) console.error('❌ Logout error:', err);
-            res.redirect('/login');
+            if (err) {
+                console.error('❌ Logout error:', err);
+            }
+
+            clearSessionCookie();
+            return res.redirect('/');
         });
     },
 
@@ -401,6 +438,47 @@ const pageController = {
             const response = await axios.get(`${API_URL}/user/dashboard`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
+            // Ambil sumber data yang sama dengan menu pengajuan agar sinkron.
+            let historySubmissions = [];
+            try {
+                const historyResponse = await axios.get(`${API_URL}/user/history`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (historyResponse.data?.success) {
+                    historySubmissions = Array.isArray(historyResponse.data.data)
+                        ? historyResponse.data.data
+                        : [];
+                }
+            } catch (historyError) {
+                console.warn('⚠️ Gagal memuat history untuk sinkronisasi dashboard:', historyError.message);
+            }
+
+            const normalizedRecentFromHistory = historySubmissions
+                .slice()
+                .sort((a, b) => {
+                    const aTime = new Date(a.created_at || a.tgl_permohonan || 0).getTime() || 0;
+                    const bTime = new Date(b.created_at || b.tgl_permohonan || 0).getTime() || 0;
+                    return bTime - aTime;
+                })
+                .map((sub) => {
+                    const numericId = Number.parseInt(sub.id, 10);
+                    const hasNumericId = Number.isInteger(numericId) && numericId > 0;
+
+                    let serviceType = sub.kode_pengujian || sub.service_type || '-';
+                    if (sub.total_samples || sub.totalSamples) {
+                        serviceType = `${sub.total_samples || sub.totalSamples} sampel`;
+                    }
+
+                    return {
+                        appId: hasNumericId ? String(numericId).padStart(6, '0') : (sub.no_permohonan || sub.id || '-'),
+                        projectName: sub.nama_proyek || sub.project_name || 'Pengujian',
+                        status: sub.status || 'Menunggu Verifikasi',
+                        dateSubmitted: sub.created_at || sub.tgl_permohonan || null,
+                        serviceType
+                    };
+                });
 
             let dashboardData = {
                 totalSubmissions: 0,
@@ -432,20 +510,29 @@ const pageController = {
                         appId: sub.no_permohonan || sub.id,
                         projectName: sub.nama_proyek || 'Pengujian',
                         status: sub.status || 'Pending',
-                        dateSubmitted: sub.created_at,
+                        dateSubmitted: sub.created_at || sub.tgl_permohonan || null,
                         serviceType: `${sub.totalSamples || 0} sampel`
                     })),
                     recentTransactions: (apiData.recentTransactions || []),
                     weeklyActivity: apiData.weeklyActivity || [0,0,0,0,0,0,0],
                     submissionsChange: apiData.submissionsChange || 0
                 };
+
+                // Prioritaskan data recent submissions dari history agar sama persis dengan menu pengajuan.
+                if (normalizedRecentFromHistory.length > 0) {
+                    dashboardData.recentSubmissions = normalizedRecentFromHistory;
+                    dashboardData.totalSubmissions = historySubmissions.length;
+                }
             }
 
             res.render('user/dashboard', { 
                 title: 'Dashboard - UPTD Lab',
                 pageTitle: 'Dashboard',
                 active: 'dashboard',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 dashboardData: dashboardData
             });
             
@@ -471,7 +558,10 @@ const pageController = {
                 title: 'Dashboard - UPTD Lab',
                 pageTitle: 'Dashboard',
                 active: 'dashboard',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 dashboardData: fallbackData,
                 error: 'Gagal memuat data dashboard'
             });
@@ -484,7 +574,10 @@ const pageController = {
             title: 'Profil Saya', 
             pageTitle: 'Profil Saya',
             active: 'profile',
-            user: req.session?.user
+            user: {
+                ...req.session?.user,
+                name: req.session?.user?.full_name || req.session?.user?.name
+            }
         });
     },
 
@@ -518,7 +611,10 @@ const pageController = {
                 title: 'Riwayat Pengajuan - UPTD Lab',
                 pageTitle: 'History Submission',
                 currentPage: 'history',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 submissions: submissions,
                 success: req.query.success === 'true',
                 message: req.query.message || ''
@@ -536,7 +632,10 @@ const pageController = {
                 title: 'Riwayat Pengajuan - UPTD Lab',
                 pageTitle: 'History Submission',
                 currentPage: 'history',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 submissions: [],
                 success: false,
                 message: ''
@@ -562,7 +661,10 @@ const pageController = {
                 title: 'Detail Pengajuan - UPTD Lab',
                 pageTitle: 'Detail Pengajuan',
                 currentPage: 'history',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 notificationCount: 0,
                 id: submissionId,
                 token: token // Kirim token ke view
@@ -810,7 +912,10 @@ const pageController = {
                 title: 'Transaksi Saya - UPTD Lab',
                 pageTitle: 'Transaction List',
                 currentPage: 'transaction',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 notificationCount: 0,
                 transactions: transactions
             });
@@ -827,7 +932,10 @@ const pageController = {
                 title: 'Transaksi Saya - UPTD Lab',
                 pageTitle: 'Transaction List',
                 currentPage: 'transaction',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 notificationCount: 0,
                 transactions: []
             });
@@ -859,7 +967,10 @@ const pageController = {
                 title: 'Detail Transaksi - UPTD Lab',
                 pageTitle: 'Detail Transaksi',
                 active: 'transaction',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 id: transactionId,
                 transaction: transaction
             });
@@ -870,7 +981,10 @@ const pageController = {
                 title: 'Detail Transaksi - UPTD Lab',
                 pageTitle: 'Detail Transaksi',
                 active: 'transaction',
-                user: req.session.user,
+                user: {
+                    ...req.session.user,
+                    name: req.session.user.full_name || req.session.user.name
+                },
                 id: req.params.id,
                 transaction: null
             });

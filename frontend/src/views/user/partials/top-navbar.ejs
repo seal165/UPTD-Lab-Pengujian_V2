@@ -3,24 +3,46 @@
         <% if (typeof backLink !== 'undefined' && backLink) { %>
             <a href="<%= backLink.url %>" class="back-link">
                 <i class="fas fa-arrow-left"></i>
-                <span><%= backLink.text %></span>
             </a>
         <% } %>
-        <h1 class="page-title"><%= typeof pageTitle !== 'undefined' ? pageTitle : 'UPTD Lab' %></h1>
+        <div class="page-heading">
+            <h1 class="page-title"><%= typeof pageTitle !== 'undefined' ? pageTitle : 'UPTD Lab' %></h1>
+            <p class="page-datetime" id="liveDateTime">Memuat waktu...</p>
+        </div>
     </div>
     
     <div class="navbar-right">
-        <div class="notification-bell" id="notificationBell">
-            <i class="fas fa-bell"></i>
-            <% if (locals.notificationCount && notificationCount > 0) { %>
-                <span class="notification-badge"><%= notificationCount %></span>
-            <% } %>
+        <div class="notification-wrapper" id="notificationWrapper">
+            <button type="button" class="notification-bell" id="notificationBell" aria-label="Buka notifikasi" aria-expanded="false" aria-controls="notificationPanel">
+                <i class="fas fa-bell"></i>
+                <% if (locals.notificationCount && notificationCount > 0) { %>
+                    <span class="notification-badge"><%= notificationCount %></span>
+                <% } %>
+            </button>
+
+            <div class="notification-panel" id="notificationPanel" hidden>
+                <div class="notification-panel-header">
+                    <h4>Notifikasi</h4>
+                    <button type="button" class="notification-action" id="notificationMarkAll">Tandai dibaca</button>
+                </div>
+
+                <div class="notification-panel-body" id="notificationList"></div>
+
+                <div class="notification-empty" id="notificationEmpty" hidden>
+                    <i class="fas fa-bell-slash"></i>
+                    <p>Belum ada notifikasi.</p>
+                </div>
+            </div>
         </div>
         
         <div class="account-dropdown">
             <div class="account-info">
                 <div class="account-avatar">
-                    <i class="fas fa-user-circle"></i>
+                    <% if (user?.avatar) { %>
+                        <img src="<%= user.avatar.startsWith('http') ? user.avatar : ('http://localhost:5000' + user.avatar) %>" alt="Avatar" class="avatar-image" />
+                    <% } else { %>
+                        <i class="fas fa-user-circle"></i>
+                    <% } %>
                 </div>
                 <div class="account-details">
                     <span class="account-name"><%= user?.name || 'User' %></span>

@@ -87,6 +87,58 @@
 
     <script src="/js/auth.js"></script>
     <script>
+        (function initPasswordToggle() {
+            const passwordInput = document.querySelector('input[name="password"]');
+            const toggleIcon = document.getElementById('togglePassword');
+
+            if (!passwordInput || !toggleIcon) return;
+
+            toggleIcon.addEventListener('click', function () {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+
+                toggleIcon.classList.toggle('fa-eye-slash', !isPassword);
+                toggleIcon.classList.toggle('fa-eye', isPassword);
+            });
+        })();
+
+        async function fetchLatestUserProfile(token, fallbackUser) {
+            if (!token) return fallbackUser;
+
+            try {
+                const profileResponse = await fetch('http://localhost:5000/api/user/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!profileResponse.ok) {
+                    return fallbackUser;
+                }
+
+                const profileResult = await profileResponse.json();
+                if (!profileResult.success || !profileResult.data) {
+                    return fallbackUser;
+                }
+
+                return {
+                    ...fallbackUser,
+                    ...profileResult.data,
+                    id: profileResult.data.id || fallbackUser.id,
+                    email: profileResult.data.email || fallbackUser.email,
+                    full_name: profileResult.data.full_name || fallbackUser.full_name,
+                    nama_instansi: profileResult.data.nama_instansi || fallbackUser.nama_instansi || null,
+                    role: profileResult.data.role || fallbackUser.role,
+                    avatar: profileResult.data.avatar || fallbackUser.avatar || null
+                };
+            } catch (error) {
+                console.warn('Gagal ambil profil terbaru, gunakan data login:', error);
+                return fallbackUser;
+            }
+        }
+
         // Handle form submission dengan AJAX
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -124,19 +176,23 @@
                         localStorage.setItem('token', userData.token);
                         console.log('✅ Token tersimpan di localStorage');
                     }
+
+                    const latestUserData = await fetchLatestUserProfile(userData.token, userData);
                     
                     // Simpan data user
                     localStorage.setItem('user', JSON.stringify({
-                        id: userData.id,
-                        email: userData.email,
-                        full_name: userData.full_name,
-                        role: userData.role
+                        id: latestUserData.id,
+                        email: latestUserData.email,
+                        full_name: latestUserData.full_name,
+                        nama_instansi: latestUserData.nama_instansi || null,
+                        role: latestUserData.role,
+                        avatar: latestUserData.avatar || null
                     }));
                     
-                    console.log('✅ Login berhasil sebagai:', userData.role);
+                    console.log('✅ Login berhasil sebagai:', latestUserData.role);
                     
                     // Redirect berdasarkan role
-                    if (userData.role === 'admin' || userData.role === 'petugas') {
+                    if (latestUserData.role === 'admin' || latestUserData.role === 'petugas') {
                         window.location.href = '/admin/dashboard';
                     } else {
                         window.location.href = '/user/dashboard';

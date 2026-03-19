@@ -1,21 +1,21 @@
+<%# views/user/transaction.ejs %>
 <% 
-const title = locals.title || 'Transaction List - UPTD Lab';
-const currentPage = locals.currentPage || 'transaction';
-const pageTitle = locals.pageTitle || 'Transaction List';
+const title = 'Transaksi Saya - UPTD Lab';
+const currentPage = 'transaction';
+const pageTitle = 'Transaksi Saya';
 const user = locals.user || {};
 const notificationCount = locals.notificationCount || 0;
-
-// Data transaksi dari controller
 const transactions = locals.transactions || [];
 %>
+
 <%- include('partials/header', { title }) %>
-<link rel="stylesheet" href="/css/user/transaction.css">
 <%- include('partials/sidebar', { currentPage, user }) %>
 
 <main class="main-content">
     <%- include('partials/top-navbar', { pageTitle, user, notificationCount }) %>
     
-    <div class="transaction-container">
+    <div class="content-body">
+        <div class="transaction-container">
         <div class="transaction-header">
             <h2><i class="fas fa-exchange-alt"></i> Billing & Payments</h2>
         </div>
@@ -63,9 +63,10 @@ const transactions = locals.transactions || [];
                 </tbody>
             </table>
         </div>
+        </div>
     </div>
     
-    <%- include('partials/footer') %>
-</main>
-
 <script src="/js/user/transaction.js"></script>
+
+</main>
+<%- include('partials/footer') %>

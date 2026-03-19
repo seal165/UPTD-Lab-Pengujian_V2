@@ -139,23 +139,28 @@
         
         // ========== BUKTI PEMBAYARAN ==========
         const token = localStorage.getItem('token');
+        const proofSection = document.getElementById('proof-section');
         const proofStatus = document.getElementById('proof-status');
         const proofAction = document.getElementById('proof-action');
         
-        if (proofStatus && proofAction) {
+        if (proofStatus && proofAction && proofSection) {
             if (data.bukti_pembayaran_1 || data.bukti_pembayaran_2) {
                 const bukti = data.bukti_pembayaran_2 || data.bukti_pembayaran_1;
+                proofSection.style.display = 'block';
                 proofStatus.innerHTML = '<i class="fas fa-check-circle text-success"></i> Bukti pembayaran telah diupload';
                 proofAction.innerHTML = `
-                    <a href="http://localhost:5000/api/file/payment/${bukti}?token=${token}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
-                        <i class="fas fa-eye"></i> Lihat Bukti
-                    </a>
-                    <a href="http://localhost:5000/api/file/payment/${bukti}?token=${token}" download class="btn btn-sm btn-outline-success">
-                        <i class="fas fa-download"></i> Download
-                    </a>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <a href="http://localhost:5000/api/file/payment/${bukti}?token=${token}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> Lihat Bukti
+                        </a>
+                        <a href="http://localhost:5000/api/file/payment/${bukti}?token=${token}" download class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
                 `;
             } else {
-                proofStatus.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Belum ada bukti pembayaran';
+                proofSection.style.display = 'block';
+                proofStatus.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Belum ada bukti pembayaran yang diupload';
                 proofAction.innerHTML = '';
             }
         }

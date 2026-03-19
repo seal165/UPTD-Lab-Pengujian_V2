@@ -1,19 +1,23 @@
+<%# views/user/history-detail.ejs %>
+<% 
+const title = 'Detail Pengajuan - UPTD Lab';
+const currentPage = 'history';
+const pageTitle = 'Detail Pengajuan';
+const user = locals.user || {};
+const notificationCount = locals.notificationCount || 0;
+const submissionId = locals.id || '';
+const token = locals.token || '';
+%>
+
 <%- include('partials/header', { title }) %>
-<meta name="csrf-token" content="<%= token || '' %>">
 <%- include('partials/sidebar', { currentPage, user }) %>
 
 <main class="main-content">
-    <%- include('partials/top-navbar', { 
-        pageTitle, 
-        user, 
-        notificationCount,
-        backLink: {
-            url: '/user/history'
-        }
-    }) %>
+    <%- include('partials/top-navbar', { pageTitle, user, notificationCount, backLink: { url: '/user/history', text: 'Kembali' } }) %>
     
-    <!-- Loading State -->
-    <div id="loadingState" style="text-align: center; padding: 50px;">
+    <div class="content-body">
+        <!-- Loading State -->
+        <div id="loadingState" style="text-align: center; padding: 50px;">
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
@@ -105,7 +109,7 @@
                 <div class="card-body-custom">
                     <div class="document-list">
                         <!-- Surat Permohonan -->
-                        <div class="document-item d-flex align-items-center p-3 mb-2 border rounded">
+                        <div class="document-item d-flex align-items-center border rounded">
                             <div class="doc-icon me-3">
                                 <i class="fas fa-file-pdf text-danger fs-3"></i>
                             </div>
@@ -121,7 +125,7 @@
                         </div>
 
                         <!-- Scan KTP -->
-                        <div class="document-item d-flex align-items-center p-3 mb-2 border rounded">
+                        <div class="document-item d-flex align-items-center border rounded">
                             <div class="doc-icon me-3">
                                 <i class="fas fa-file-pdf text-danger fs-3"></i>
                             </div>
@@ -137,7 +141,7 @@
                         </div>
 
                         <!-- ===== SECTION LAPORAN HASIL PENGUJIAN ===== -->
-                        <div class="document-item d-flex align-items-center p-3 border rounded mt-3" style="border-left: 4px solid #28a745 !important;">
+                        <div class="document-item d-flex align-items-center border rounded" style="border-left: 4px solid #28a745 !important;">
                             <div class="doc-icon me-3">
                                 <i class="fas fa-file-pdf text-success fs-3"></i>
                             </div>
@@ -156,9 +160,11 @@
             </div>
         </div>
     </div>
+    </div>
 
-    <%- include('partials/footer') %>
-</main>
-
-<input type="hidden" id="currentSubmissionId" value="<%= id %>">
+<input type="hidden" id="currentSubmissionId" value="<%= submissionId %>">
+<input type="hidden" id="currentUserToken" value="<%= token %>">
 <script src="/js/user/history-detail-handler.js"></script>
+
+</main>
+<%- include('partials/footer') %>

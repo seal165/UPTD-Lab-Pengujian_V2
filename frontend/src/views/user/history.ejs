@@ -1,11 +1,10 @@
+<%# views/user/history.ejs %>
 <% 
-const title = 'History Submission - UPTD Lab';
+const title = 'Riwayat Pengajuan - UPTD Lab';
 const currentPage = 'history';
-const pageTitle = 'History Submission';
+const pageTitle = 'Riwayat Pengajuan';
 const user = locals.user || {};
 const notificationCount = locals.notificationCount || 0;
-
-// DATA REAL DARI DATABASE (dikirim dari controller)
 const historyData = locals.submissions || [];
 %>
 
@@ -13,14 +12,11 @@ const historyData = locals.submissions || [];
 <%- include('partials/sidebar', { currentPage, user }) %>
 
 <main class="main-content">
-    <%- include('partials/top-navbar', { 
-        pageTitle, 
-        user, 
-        notificationCount,
-    }) %>
+    <%- include('partials/top-navbar', { pageTitle, user, notificationCount }) %>
 
-    <!-- Di bagian atas halaman history, tampilkan notifikasi jika ada -->
-    <% if (locals.success) { %>
+    <div class="content-body">
+        <!-- Di bagian atas halaman history, tampilkan notifikasi jika ada -->
+        <% if (locals.success) { %>
         <div class="alert alert-success" style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-check-circle"></i>
             <span><%= locals.message || 'Pengajuan berhasil dikirim' %></span>
@@ -64,6 +60,11 @@ const historyData = locals.submissions || [];
                     <option value="Sedang Diuji">Sedang Diuji</option>
                     <option value="Selesai">Selesai</option>
                 </select>
+                
+                <a href="/user/submission" class="btn-new-submission">
+                    <i class="fas fa-plus"></i>
+                    <span>Buat Pengajuan Baru</span>
+                </a>
             </div>
         </div>
         
@@ -71,13 +72,13 @@ const historyData = locals.submissions || [];
             <table class="history-table">
                 <thead>
                     <tr>
-                        <th>NO. URUT</th>
-                        <th>NO. PERMOHONAN</th>
-                        <th>JENIS PENGUJIAN</th>
-                        <th>PROYEK</th>
-                        <th>TANGGAL</th>
-                        <th>STATUS</th>
-                        <th>AKSI</th>
+                        <th>No. Urut</th>
+                        <th>No. Permohonan</th>
+                        <th>Jenis Pengujian</th>
+                        <th>Proyek</th>
+                        <th>Tanggal</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="historyTableBody">
@@ -165,7 +166,6 @@ const historyData = locals.submissions || [];
                             <td colspan="7" class="empty-state">
                                 <i class="fas fa-inbox fa-3x mb-3"></i>
                                 <p>Belum ada data pengajuan</p>
-                                <a href="/user/submission" class="btn-submit-sm">Buat Pengajuan Baru</a>
                             </td>
                         </tr>
                     <% } %>
@@ -177,47 +177,11 @@ const historyData = locals.submissions || [];
         <div class="pagination-info" id="tableInfo">Menampilkan <%= historyData.length %> data</div>
         <div class="pagination" id="pagination"></div>
     </div>
+    </div>
     
-    <%- include('partials/footer') %>
-</main>
-
 <script src="/js/user/history.js"></script>
 
 <style>
-    /* Style untuk search box - PERBAIKAN agar icon tidak ketimpa */
-    .search-box {
-        position: relative;
-        flex: 1;
-        max-width: 400px;
-    }
-    
-    .search-box .search-icon {
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #94a3b8;
-        font-size: 1rem;
-        z-index: 1;
-        pointer-events: none;
-    }
-    
-    .search-box input {
-        width: 100%;
-        padding: 10px 10px 10px 40px; /* Memberi ruang untuk icon */
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        font-size: 0.95rem;
-        transition: all 0.2s;
-        background-color: white;
-    }
-    
-    .search-box input:focus {
-        outline: none;
-        border-color: #4361ee;
-        box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
-    }
-    
     .jenis-badge {
         display: inline-block;
         padding: 4px 8px;
@@ -280,3 +244,6 @@ const historyData = locals.submissions || [];
         letter-spacing: 0.5px;
     }
 </style>
+
+</main>
+<%- include('partials/footer') %>

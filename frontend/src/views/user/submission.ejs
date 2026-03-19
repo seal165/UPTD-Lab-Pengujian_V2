@@ -1,13 +1,22 @@
-<%- include('partials/header') %>
-<link rel="stylesheet" href="/css/submission.css">
-<div class="main-wrapper">
-    <%- include('partials/sidebar', { page: 'submission' }) %>
-    
-    <main class="main-content">
-        <%- include('partials/top-navbar') %>
+<%# views/user/submission.ejs %>
+<% 
+const title = 'Pengajuan Baru - UPTD Lab';
+const currentPage = 'submission';
+const pageTitle = 'Pengajuan Baru';
+const user = locals.user || {};
+const services = locals.services || [];
+const error = locals.error || null;
+const formData = locals.formData || {};
+%>
+
+<%- include('partials/header', { title }) %>
+<%- include('partials/sidebar', { currentPage, user }) %>
+
+<main class="main-content">
+    <%- include('partials/top-navbar', { pageTitle, user }) %>
         
-        <div class="content-body">
-            <div class="submission-container">
+    <div class="content-body">
+        <div class="submission-container">
                 <section class="welcome-section">
                     <h2>Formulir Pengajuan Pengujian</h2>
                     <p class="subtitle">Dokumen Resmi: UPTD-PBKBIK-F.01-PO.07</p>
@@ -34,7 +43,7 @@
                                     <div class="category-card" data-type="<%= type.typeName %>" data-unit="Sampel">
                                         <i class="fas fa-<%= type.typeName === 'PENGUJIAN BAHAN' ? 'cube' : 'hard-hat' %>"></i>
                                         <div class="card-content-wrapper">
-                                            <h3><%= type.typeName %></h3>
+                                            <h3 style="font-size: 13px;"><%= type.typeName %></h3>
                                             <select name="<%= type.typeName === 'PENGUJIAN BAHAN' ? 'uji_bahan' : 'uji_konstruksi' %>" 
                                                     class="test-select" 
                                                     data-type="<%= type.typeName %>"
@@ -139,7 +148,7 @@
 
                             <div class="input-group">
                                 <label>Nama Instansi/Perusahaan</label>
-                                <input type="text" name="nama_instansi" id="namaInstansi" value="<%= user.company %>" readonly class="readonly-field company-field">
+                                <input type="text" name="nama_instansi" id="namaInstansi" value="<%= user.nama_instansi || '' %>" readonly class="readonly-field company-field">
                                 <small class="field-note">Nama perusahaan/instansi (sesuai data registrasi)</small>
                             </div>
 
@@ -306,8 +315,9 @@
                 </form>
             </div>
         </div>
-    </main>
-</div>
+    </div>
 
 <script src="/js/user/submission-handler.js"></script>
+
+</main>
 <%- include('partials/footer') %>

@@ -6,6 +6,43 @@
     let user = {};
     let notificationCount = 0;
     let isSubmitting = false;
+    let toastTimer = null;
+
+    function getAvatarUrl(avatar) {
+        if (!avatar) return '';
+        return avatar.startsWith('http') ? avatar : `http://localhost:5000${avatar}`;
+    }
+
+    function buildAvatarMarkup(avatar, imageClass, iconClass) {
+        const avatarUrl = getAvatarUrl(avatar);
+        if (avatarUrl) {
+            return `<img src="${avatarUrl}" alt="Profile" class="${imageClass}">`;
+        }
+
+        return `<i class="fas fa-user-circle ${iconClass}"></i>`;
+    }
+
+    function renderProfileAvatar() {
+        const profileAvatar = document.getElementById('profileAvatar');
+        if (!profileAvatar) return;
+
+        profileAvatar.innerHTML = buildAvatarMarkup(
+            user.avatar,
+            'profile-avatar-image',
+            'profile-avatar-icon'
+        );
+    }
+
+    function renderCurrentPhotoPreview() {
+        const photoPreview = document.getElementById('photoPreview');
+        if (!photoPreview) return;
+
+        photoPreview.innerHTML = buildAvatarMarkup(
+            user.avatar,
+            'profile-current-photo-image',
+            'profile-current-photo-icon'
+        );
+    }
 
     // ================ DOM CONTENT LOADED ================
     document.addEventListener('DOMContentLoaded', function() {
@@ -65,23 +102,50 @@
 
     // ================ RENDER PROFILE ================
     function renderProfile() {
+        const setText = (id, value) => {
+            const node = document.getElementById(id);
+            if (node) node.textContent = value;
+        };
+
         // Profile header
-        document.getElementById('profileDisplayName').textContent = user.full_name || 'User';
-        document.getElementById('profileDisplayRole').textContent = user.role || 'Customer';
+        setText('profileDisplayName', user.full_name || 'User');
+        setText('profileDisplayRole', user.role || 'Customer');
+        setText('profileHeaderEmail', user.email || 'Belum diisi');
+        setText('profileHeaderPhone', user.nomor_telepon || 'Belum diisi');
+        setText('profileHeaderCompany', user.nama_instansi || 'Belum diisi');
         
         // Personal info
-        document.getElementById('displayName').textContent = user.full_name || '-';
-        document.getElementById('displayEmail').textContent = user.email || '-';
-        document.getElementById('displayPhone').textContent = user.nomor_telepon || '-';
+        setText('displayName', user.full_name || '-');
+        setText('displayEmail', user.email || '-');
+        setText('displayPhone', user.nomor_telepon || '-');
         
         // Company info
-        document.getElementById('displayCompany').textContent = user.nama_instansi || '-';
-        document.getElementById('displayAddress').textContent = user.alamat || '-';
+        setText('displayCompany', user.nama_instansi || '-');
+        setText('displayAddress', user.alamat || '-');
         
-        // Avatar
-        if (user.avatar) {
-            const avatarUrl = user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`;
-            document.getElementById('profileAvatar').innerHTML = `<img src="${avatarUrl}" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        renderProfileAvatar();
+        renderCurrentPhotoPreview();
+
+        // Sync avatar + identity to localStorage so all pages/partials can use latest profile data
+        try {
+            const currentUserRaw = localStorage.getItem('user');
+            const currentUser = currentUserRaw ? JSON.parse(currentUserRaw) : {};
+            localStorage.setItem('user', JSON.stringify({
+                ...currentUser,
+                full_name: user.full_name || currentUser.full_name,
+                email: user.email || currentUser.email,
+                nomor_telepon: user.nomor_telepon || currentUser.nomor_telepon,
+                role: user.role || currentUser.role,
+                nama_instansi: user.nama_instansi || currentUser.nama_instansi,
+                alamat: user.alamat || currentUser.alamat,
+                avatar: user.avatar || currentUser.avatar || null
+            }));
+
+            if (typeof window.syncUserAvatarUI === 'function') {
+                window.syncUserAvatarUI(user.avatar || currentUser.avatar || '');
+            }
+        } catch (error) {
+            console.warn('Failed to sync user cache:', error);
         }
         
         // Update notification badge
@@ -325,9 +389,10 @@
     function openChangePhotoModal() {
         // Reset
         document.getElementById('photoUpload').value = '';
-        document.getElementById('imagePreview').style.display = 'none';
-        document.getElementById('uploadArea').style.display = 'block';
+        document.getElementById('imagePreview').hidden = true;
+        document.getElementById('uploadArea').hidden = false;
         document.getElementById('savePhotoBtn').disabled = true;
+        renderCurrentPhotoPreview();
         
         // Show modal
         document.getElementById('changePhotoModal').classList.add('active');
@@ -353,8 +418,8 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('previewImage').src = e.target.result;
-            document.getElementById('imagePreview').style.display = 'block';
-            document.getElementById('uploadArea').style.display = 'none';
+            document.getElementById('imagePreview').hidden = false;
+            document.getElementById('uploadArea').hidden = true;
             document.getElementById('savePhotoBtn').disabled = false;
         };
         reader.readAsDataURL(file);
@@ -394,10 +459,24 @@
             if (result.success) {
                 // Update user object with new avatar
                 user.avatar = result.data.avatar;
-                
-                // Update avatar display
-                const avatarUrl = `http://localhost:5000${result.data.avatar}`;
-                document.getElementById('profileAvatar').innerHTML = `<img src="${avatarUrl}" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+
+                // Keep cached user in sync so avatar appears across navbar/sidebar on all pages
+                try {
+                    const currentUserRaw = localStorage.getItem('user');
+                    const currentUser = currentUserRaw ? JSON.parse(currentUserRaw) : {};
+                    localStorage.setItem('user', JSON.stringify({
+                        ...currentUser,
+                        avatar: result.data.avatar
+                    }));
+                } catch (error) {
+                    console.warn('Failed to update localStorage avatar:', error);
+                }
+
+                renderProfile();
+
+                if (typeof window.syncUserAvatarUI === 'function') {
+                    window.syncUserAvatarUI(result.data.avatar);
+                }
                 
                 // Close modal
                 closeModal(document.getElementById('changePhotoModal'));
@@ -437,30 +516,19 @@
     function showToast(message, type = 'success') {
         const toast = document.getElementById('toast');
         if (!toast) return;
-        
-        const bgColor = {
-            'success': '#10B981',
-            'error': '#EF4444',
-            'warning': '#F59E0B',
-            'info': '#3B82F6'
-        }[type] || '#10B981';
-        
-        toast.textContent = message;
-        toast.style.backgroundColor = bgColor;
-        toast.style.display = 'block';
-        
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 3000);
-    }
 
-    function handleLogout(e) {
-        e.preventDefault();
-        localStorage.removeItem('token');
-        showToast('Logging out...', 'info');
-        setTimeout(() => {
-            window.location.href = '/login';
-        }, 1000);
+        if (toastTimer) {
+            clearTimeout(toastTimer);
+        }
+
+        toast.textContent = message;
+        toast.className = `custom-toast toast-${type} is-visible`;
+        toast.hidden = false;
+
+        toastTimer = setTimeout(() => {
+            toast.classList.remove('is-visible');
+            toast.hidden = true;
+        }, 3000);
     }
 
     function setupEventListeners() {
@@ -523,17 +591,14 @@
             uploadArea.addEventListener('click', () => photoUpload.click());
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                uploadArea.style.borderColor = '#2563EB';
-                uploadArea.style.background = '#EFF6FF';
+                uploadArea.classList.add('is-dragover');
             });
             uploadArea.addEventListener('dragleave', () => {
-                uploadArea.style.borderColor = '#CBD5E1';
-                uploadArea.style.background = '#F8FAFC';
+                uploadArea.classList.remove('is-dragover');
             });
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
-                uploadArea.style.borderColor = '#CBD5E1';
-                uploadArea.style.background = '#F8FAFC';
+                uploadArea.classList.remove('is-dragover');
                 
                 const files = e.dataTransfer.files;
                 if (files.length > 0) {
@@ -553,13 +618,7 @@
             });
         }
         
-        // Logout button
-        document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
-        
-        // Notification bell
-        document.getElementById('notificationBell')?.addEventListener('click', function() {
-            showToast('Fitur notifikasi akan segera hadir!', 'info');
-        });
+        // Logout dan notification bell ditangani terpusat di public/js/sidebar.js.
     }
 
     // ================ EXPOSE GLOBAL FUNCTIONS ================

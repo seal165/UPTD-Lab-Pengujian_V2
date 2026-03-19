@@ -11,25 +11,25 @@
                 <li class="menu-item <%= currentPage === 'dashboard' ? 'active' : '' %>">
                     <i class="fas fa-tachometer-alt menu-icon"></i>
                     <a href="/user/dashboard" class="menu-link">
-                        <span class="menu-text">Dashboard</span>
+                        <span class="menu-text">Beranda</span>
                     </a>
                 </li>
                 <li class="menu-item <%= currentPage === 'submission' ? 'active' : '' %>">
                     <i class="fas fa-file-alt menu-icon"></i>
                     <a href="/user/submission" class="menu-link">
-                        <span class="menu-text">Submission</span>
+                        <span class="menu-text">Pengajuan</span>
                     </a>
                 </li>
                 <li class="menu-item <%= currentPage === 'history' ? 'active' : '' %>">
                     <i class="fas fa-history menu-icon"></i>
                     <a href="/user/history" class="menu-link">
-                        <span class="menu-text">History</span>
+                        <span class="menu-text">Riwayat</span>
                     </a>
                 </li>
                 <li class="menu-item <%= currentPage === 'transaction' ? 'active' : '' %>">
                     <i class="fas fa-exchange-alt menu-icon"></i>
                     <a href="/user/transaction" class="menu-link">
-                        <span class="menu-text">Transaction</span>
+                        <span class="menu-text">Transaksi</span>
                     </a>
                 </li>
                 </ul>
@@ -38,10 +38,14 @@
         <div class="sidebar-footer">
             <a href="/user/profile" class="user-profile-sidebar <%= currentPage === 'profile' ? 'active' : '' %>" style="text-decoration: none; display: flex; align-items: center; width: 100%; transition: all 0.3s;">
                 <div class="user-avatar-sidebar">
-                    <i class="fas fa-user-circle"></i>
+                    <% if (user?.avatar) { %>
+                        <img src="<%= user.avatar.startsWith('http') ? user.avatar : ('http://localhost:5000' + user.avatar) %>" alt="Avatar" class="avatar-image" />
+                    <% } else { %>
+                        <i class="fas fa-user-circle"></i>
+                    <% } %>
                 </div>
                 <div class="user-info-sidebar">
-                    <h4 style="margin: 0;"><%= user?.name || 'User' %></h4>
+                    <h4 style="margin: 0;"><%= user?.full_name || user?.name || 'User' %></h4>
                     <p style="margin: 0;"><%= user?.role || 'Customer' %></p>
                 </div>
                 <i class="fas fa-chevron-right" style="margin-left: auto; font-size: 0.8rem; opacity: 0.5;"></i>

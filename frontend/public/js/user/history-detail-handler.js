@@ -6,8 +6,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ History Detail Handler initialized');
         
-        // CEK TOKEN - Ambil dari cookie atau dari meta tag
-        const token = getTokenFromCookie() || getTokenFromMeta();
+        // CEK TOKEN - Ambil dari hidden input dulu, lalu cookie/meta
+        const token = document.getElementById('currentUserToken')?.value || getTokenFromCookie() || getTokenFromMeta();
         console.log('🔑 Token:', token ? 'ADA' : 'TIDAK ADA');
         
         if (!token) {

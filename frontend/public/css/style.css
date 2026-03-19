@@ -261,6 +261,13 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0.5rem; line-height: 1.2;
 .input-wrapper { position: relative; }
 .form-input { width: 100%; padding: 10px 35px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; transition: border-color 0.2s, background-color 0.2s; outline: none; background: #f8fafc; }
 .form-input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.1); }
+
+/* Sembunyikan icon reveal bawaan browser agar tidak double dengan icon custom. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+
 .icon-start { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.9rem; }
 .icon-end { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; cursor: pointer; font-size: 0.9rem; }
 .form-input:focus + .icon-end, .input-wrapper:focus-within .icon-start { color: var(--primary); }

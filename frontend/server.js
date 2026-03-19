@@ -14,8 +14,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Session configuration - HARUS SEBELUM ROUTES
 app.use(session({
     secret: process.env.SESSION_SECRET || 'uptd-lab-secret-key-2026',
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
+    unset: 'destroy',
     cookie: { 
         secure: false,
         maxAge: 7 * 24 * 60 * 60 * 1000,

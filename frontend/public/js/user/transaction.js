@@ -200,8 +200,9 @@
                     <td><span class="status-badge ${statusBadge}">${statusText}</span></td>
                     <td>${formattedDate}</td>
                     <td>
-                        <a href="/user/transaction/${item.id}" class="btn-detail">
-                            <i class="fas fa-eye"></i> Detail
+                        <a href="/user/transaction/${item.id}" class="btn-detail-action">
+                            <span>Detail</span>
+                            <i class="fas fa-chevron-right"></i>
                         </a>
                     </td>
                 </tr>

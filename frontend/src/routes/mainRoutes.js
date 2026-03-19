@@ -198,24 +198,42 @@ router.post('/auth/login', async (req, res) => {
         if (response.data.success) {
             const userData = response.data.data.user || response.data.data;
             const token = response.data.data.token || response.data.data;
-            
-            req.session.token = token;
-            req.session.user = {
-                id: userData.id,
-                email: userData.email,
-                full_name: userData.full_name,
-                role: userData.role
-            };
-            
-            res.json({
-                success: true,
-                data: {
+
+            return req.session.regenerate((regenerateError) => {
+                if (regenerateError) {
+                    console.error('❌ Failed to regenerate login session:', regenerateError);
+                    return res.json({ success: false, message: 'Gagal membuat sesi login baru' });
+                }
+
+                req.session.token = token;
+                req.session.user = {
                     id: userData.id,
                     email: userData.email,
                     full_name: userData.full_name,
+                    nama_instansi: userData.nama_instansi,
                     role: userData.role,
-                    token: token
-                }
+                    avatar: userData.avatar || null
+                };
+
+                return req.session.save((sessionError) => {
+                    if (sessionError) {
+                        console.error('❌ Failed to save login session:', sessionError);
+                        return res.json({ success: false, message: 'Gagal menyimpan sesi login' });
+                    }
+
+                    return res.json({
+                        success: true,
+                        data: {
+                            id: userData.id,
+                            email: userData.email,
+                            full_name: userData.full_name,
+                            nama_instansi: userData.nama_instansi || null,
+                            role: userData.role,
+                            avatar: userData.avatar || null,
+                            token: token
+                        }
+                    });
+                });
             });
         } else {
             res.json({ success: false, message: response.data.message || 'Login gagal' });

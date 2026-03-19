@@ -1,30 +1,28 @@
 <%# views/user/transaction-detail.ejs %>
 <% 
-// Jika variabel tidak dikirim dari controller, gunakan nilai default ini
-const user = locals.user || { name: 'User', role: 'Customer' };
+const title = 'Detail Transaksi - UPTD Lab';
+const currentPage = 'transaction';
+const pageTitle = 'Detail Transaksi';
+const user = locals.user || {};
 const notificationCount = locals.notificationCount || 0;
-const transactionId = locals.id || ''; // ID dari URL params
+const transactionId = locals.id || '';
 %>
-<%- include('partials/header', { title: 'Transaction Detail - UPTD Lab' }) %>
-<link rel="stylesheet" href="/css/user-style.css">
-<%- include('partials/sidebar', { currentPage: 'transaction', user }) %>
+
+<%- include('partials/header', { title }) %>
+<%- include('partials/sidebar', { currentPage, user }) %>
 
 <main class="main-content">
-    <%- include('partials/top-navbar', { 
-        pageTitle: 'Transaction Detail', 
-        user, 
-        notificationCount,
-        backLink: { url: '/user/transaction'}
-    }) %>
+    <%- include('partials/top-navbar', { pageTitle, user, notificationCount, backLink: { url: '/user/transaction', text: 'Kembali' } }) %>
     
-    <!-- Data dari backend disimpan di atribut data -->
-    <div id="transaction-detail-data" 
-         data-id="<%= transactionId %>"
-         data-user='<%- JSON.stringify(user).replace(/'/g, "\\'") %>'
-         style="display: none;"></div>
-    
-    <!-- Loading State -->
-    <div id="loadingState" class="text-center py-5">
+    <div class="content-body">
+        <!-- Data dari backend disimpan di atribut data -->
+        <div id="transaction-detail-data" 
+             data-id="<%= transactionId %>"
+             data-user='<%- JSON.stringify(user).replace(/'/g, "\\'") %>'
+             style="display: none;"></div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
@@ -145,6 +143,15 @@ const transactionId = locals.id || ''; // ID dari URL params
                 </div>
             </div>
             
+            <!-- Bukti Pembayaran Section -->
+            <div class="info-section" id="proof-section" style="display: none;">
+                <h4><i class="fas fa-receipt"></i> Bukti Pembayaran</h4>
+                <div class="proof-container">
+                    <div id="proof-status"></div>
+                    <div id="proof-action"></div>
+                </div>
+            </div>
+
             <!-- Form Upload Bukti Pembayaran -->
             <div id="upload-proof-section" style="display: none;" class="mt-4 p-4 border rounded bg-light">
                 <h5 class="mb-3" id="upload-title"><i class="fas fa-cloud-upload-alt text-primary me-2"></i>Upload Bukti Pembayaran</h5>
@@ -210,10 +217,11 @@ const transactionId = locals.id || ''; // ID dari URL params
             </div>
         </div>
     </div>
+    </div>
     
-    <%- include('partials/footer') %>
-</main>
-
 <div class="custom-toast" id="toast" style="display: none;"></div>
 
 <script src="/js/user/transaction-detail.js"></script>
+
+</main>
+<%- include('partials/footer') %>

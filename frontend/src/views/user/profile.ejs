@@ -1,41 +1,49 @@
 <%# views/user/profile.ejs %>
 <% 
-const title = 'My Profile - UPTD Lab';
+const title = 'Profil Saya - UPTD Lab';
 const currentPage = 'profile';
-const pageTitle = 'My Profile';
+const pageTitle = 'Profil Saya';
 const user = locals.user || {};
 const notificationCount = locals.notificationCount || 0;
+const profileAvatarSrc = user.avatar
+    ? (user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`)
+    : '';
 %>
 
 <%- include('partials/header', { title }) %>
 <%- include('partials/sidebar', { currentPage, user }) %>
 
 <main class="main-content">
-    <%- include('partials/top-navbar', { 
-        pageTitle, 
-        user, 
-        notificationCount,
-    }) %>
-    
+    <%- include('partials/top-navbar', { pageTitle, user, notificationCount }) %>
+
+    <div class="content-body">
     <!-- Profile Content -->
     <div class="profile-container">
         <!-- Profile Header -->
         <div class="profile-header">
             <div class="profile-cover">
-                <div class="profile-avatar-wrapper">
-                    <div class="profile-avatar" id="profileAvatar">
-                        <% if (user.avatar) { %>
-                            <img src="<%= user.avatar %>" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-                        <% } else { %>
-                            <i class="fas fa-user-circle"></i>
-                        <% } %>
+                <div class="profile-cover-content">
+                    <div class="profile-avatar-column">
+                        <div class="profile-avatar-wrapper">
+                            <div class="profile-avatar" id="profileAvatar">
+                                <% if (profileAvatarSrc) { %>
+                                    <img src="<%= profileAvatarSrc %>" alt="Profile" class="profile-avatar-image">
+                                <% } else { %>
+                                    <i class="fas fa-user-circle profile-avatar-icon"></i>
+                                <% } %>
+                            </div>
+                            <button class="btn-change-photo" id="changePhotoBtn" type="button" aria-label="Ubah foto profil">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button class="btn-change-photo" id="changePhotoBtn">
-                        <i class="fas fa-camera"></i>
-                    </button>
+
+                    <div class="profile-identity">
+                        <span class="profile-eyebrow">Akun Pengguna</span>
+                        <h2 id="profileDisplayName"><%= user.full_name || user.name || 'User' %></h2>
+                        <p id="profileDisplayRole"><%= user.role || 'Customer' %></p>
+                    </div>
                 </div>
-                <h2 id="profileDisplayName"><%= user.full_name || user.name || 'User' %></h2>
-                <p id="profileDisplayRole"><%= user.role || 'Customer' %></p>
             </div>
         </div>
         
@@ -43,25 +51,25 @@ const notificationCount = locals.notificationCount || 0;
         <div class="profile-grid">
             <!-- Left Column - Personal Information -->
             <div class="profile-card">
-                <div class="card-header">
+                <div class="profile-card-header">
                     <h3><i class="fas fa-user"></i> Informasi Pribadi</h3>
-                    <button class="btn-edit" id="editPersonalBtn">
+                    <button class="btn-edit" id="editPersonalBtn" type="button">
                         <i class="fas fa-edit"></i> Edit
                     </button>
                 </div>
                 
-                <div class="card-body">
-                    <div class="info-group">
+                <div class="profile-card-body">
+                    <div class="profile-info-group">
                         <label>Nama Lengkap</label>
                         <p id="displayName"><%= user.full_name || '-' %></p>
                     </div>
                     
-                    <div class="info-group">
+                    <div class="profile-info-group">
                         <label>Email</label>
                         <p id="displayEmail"><%= user.email || '-' %></p>
                     </div>
                     
-                    <div class="info-group">
+                    <div class="profile-info-group">
                         <label>Nomor Telepon</label>
                         <p id="displayPhone"><%= user.nomor_telepon || '-' %></p>
                     </div>
@@ -70,20 +78,20 @@ const notificationCount = locals.notificationCount || 0;
             
             <!-- Right Column - Company Information -->
             <div class="profile-card">
-                <div class="card-header">
+                <div class="profile-card-header">
                     <h3><i class="fas fa-building"></i> Informasi Instansi</h3>
-                    <button class="btn-edit" id="editCompanyBtn">
+                    <button class="btn-edit" id="editCompanyBtn" type="button">
                         <i class="fas fa-edit"></i> Edit
                     </button>
                 </div>
                 
-                <div class="card-body">
-                    <div class="info-group">
+                <div class="profile-card-body">
+                    <div class="profile-info-group">
                         <label>Nama Perusahaan / Instansi</label>
                         <p id="displayCompany"><%= user.nama_instansi || '-' %></p>
                     </div>
                     
-                    <div class="info-group">
+                    <div class="profile-info-group">
                         <label>Alamat Instansi</label>
                         <p id="displayAddress"><%= user.alamat || '-' %></p>
                     </div>
@@ -92,28 +100,28 @@ const notificationCount = locals.notificationCount || 0;
             
             <!-- Account Settings -->
             <div class="profile-card full-width">
-                <div class="card-header">
+                <div class="profile-card-header">
                     <h3><i class="fas fa-shield-alt"></i> Pengaturan Akun</h3>
                 </div>
                 
-                <div class="card-body">
+                <div class="profile-card-body">
                     <div class="settings-grid">
-                        <div class="setting-item">
-                            <div class="setting-info">
+                        <div class="profile-setting-item">
+                            <div class="profile-setting-info">
                                 <strong>Ubah Password</strong>
                                 <p>Perbarui password secara berkala untuk keamanan akun</p>
                             </div>
-                            <button class="btn-setting" id="changePasswordBtn">
+                            <button class="btn-setting" id="changePasswordBtn" type="button">
                                 <i class="fas fa-key"></i> Ubah
                             </button>
                         </div>
                         
-                        <div class="setting-item">
-                            <div class="setting-info">
+                        <div class="profile-setting-item">
+                            <div class="profile-setting-info">
                                 <strong>Notifikasi</strong>
                                 <p>Atur preferensi notifikasi email</p>
                             </div>
-                            <button class="btn-setting" id="notificationSettingsBtn">
+                            <button class="btn-setting" id="notificationSettingsBtn" type="button">
                                 <i class="fas fa-bell"></i> Atur
                             </button>
                         </div>
@@ -126,14 +134,14 @@ const notificationCount = locals.notificationCount || 0;
     <!-- Edit Personal Modal -->
     <div class="edit-modal" id="editPersonalModal">
         <div class="edit-modal-content">
-            <div class="edit-modal-header">
+            <div class="profile-modal-header">
                 <h3><i class="fas fa-user-edit"></i> Edit Informasi Pribadi</h3>
-                <button class="btn-close-modal" id="closePersonalModal">
+                <button class="btn-close-modal" id="closePersonalModal" type="button" aria-label="Tutup modal edit informasi pribadi">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
-            <div class="edit-modal-body">
+            <div class="profile-modal-body">
                 <form id="personalForm">
                     <div class="form-group">
                         <label for="editName">Nama Lengkap <span class="required">*</span></label>
@@ -152,9 +160,9 @@ const notificationCount = locals.notificationCount || 0;
                 </form>
             </div>
             
-            <div class="edit-modal-footer">
-                <button class="btn-cancel" id="cancelPersonalBtn">Batal</button>
-                <button class="btn-save" id="savePersonalBtn">
+            <div class="profile-modal-footer">
+                <button class="btn-cancel" id="cancelPersonalBtn" type="button">Batal</button>
+                <button class="btn-save" id="savePersonalBtn" type="button">
                     <i class="fas fa-save"></i> Simpan Perubahan
                 </button>
             </div>
@@ -164,14 +172,14 @@ const notificationCount = locals.notificationCount || 0;
     <!-- Edit Company Modal -->
     <div class="edit-modal" id="editCompanyModal">
         <div class="edit-modal-content">
-            <div class="edit-modal-header">
+            <div class="profile-modal-header">
                 <h3><i class="fas fa-building"></i> Edit Informasi Instansi</h3>
-                <button class="btn-close-modal" id="closeCompanyModal">
+                <button class="btn-close-modal" id="closeCompanyModal" type="button" aria-label="Tutup modal edit informasi instansi">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
-            <div class="edit-modal-body">
+            <div class="profile-modal-body">
                 <form id="companyForm">
                     <div class="form-group">
                         <label for="editCompany">Nama Perusahaan / Instansi</label>
@@ -185,9 +193,9 @@ const notificationCount = locals.notificationCount || 0;
                 </form>
             </div>
             
-            <div class="edit-modal-footer">
-                <button class="btn-cancel" id="cancelCompanyBtn">Batal</button>
-                <button class="btn-save" id="saveCompanyBtn">
+            <div class="profile-modal-footer">
+                <button class="btn-cancel" id="cancelCompanyBtn" type="button">Batal</button>
+                <button class="btn-save" id="saveCompanyBtn" type="button">
                     <i class="fas fa-save"></i> Simpan Perubahan
                 </button>
             </div>
@@ -197,14 +205,14 @@ const notificationCount = locals.notificationCount || 0;
     <!-- Change Password Modal -->
     <div class="edit-modal" id="changePasswordModal">
         <div class="edit-modal-content">
-            <div class="edit-modal-header">
+            <div class="profile-modal-header">
                 <h3><i class="fas fa-key"></i> Ubah Password</h3>
-                <button class="btn-close-modal" id="closePasswordModal">
+                <button class="btn-close-modal" id="closePasswordModal" type="button" aria-label="Tutup modal ubah password">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
-            <div class="edit-modal-body">
+            <div class="profile-modal-body">
                 <form id="passwordForm">
                     <div class="form-group">
                         <label for="currentPassword">Password Saat Ini <span class="required">*</span></label>
@@ -224,9 +232,9 @@ const notificationCount = locals.notificationCount || 0;
                 </form>
             </div>
             
-            <div class="edit-modal-footer">
-                <button class="btn-cancel" id="cancelPasswordBtn">Batal</button>
-                <button class="btn-save" id="savePasswordBtn">
+            <div class="profile-modal-footer">
+                <button class="btn-cancel" id="cancelPasswordBtn" type="button">Batal</button>
+                <button class="btn-save" id="savePasswordBtn" type="button">
                     <i class="fas fa-save"></i> Ubah Password
                 </button>
             </div>
@@ -236,37 +244,37 @@ const notificationCount = locals.notificationCount || 0;
     <!-- Change Photo Modal -->
     <div class="edit-modal" id="changePhotoModal">
         <div class="edit-modal-content">
-            <div class="edit-modal-header">
+            <div class="profile-modal-header">
                 <h3><i class="fas fa-camera"></i> Ubah Foto Profil</h3>
-                <button class="btn-close-modal" id="closePhotoModal">
+                <button class="btn-close-modal" id="closePhotoModal" type="button" aria-label="Tutup modal ubah foto profil">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
-            <div class="edit-modal-body text-center">
+            <div class="profile-modal-body text-center">
                 <div class="current-photo-preview" id="photoPreview">
-                    <% if (user.avatar) { %>
-                        <img src="<%= user.avatar %>" alt="Profile" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;">
+                    <% if (profileAvatarSrc) { %>
+                        <img src="<%= profileAvatarSrc %>" alt="Profile" class="profile-current-photo-image">
                     <% } else { %>
-                        <i class="fas fa-user-circle" style="font-size: 100px; color: #CBD5E1;"></i>
+                        <i class="fas fa-user-circle profile-current-photo-icon"></i>
                     <% } %>
                 </div>
                 
-                <div class="upload-area" id="uploadArea">
+                <div class="profile-upload-area" id="uploadArea">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <p>Klik atau seret file ke sini untuk upload</p>
                     <small>Format: JPG, PNG (Maks. 2MB)</small>
-                    <input type="file" id="photoUpload" accept="image/*" style="display: none;">
+                    <input type="file" id="photoUpload" class="profile-file-input" accept="image/*">
                 </div>
                 
-                <div class="photo-preview" id="imagePreview" style="display: none;">
+                <div class="photo-preview" id="imagePreview" hidden>
                     <img id="previewImage" src="" alt="Preview">
                 </div>
             </div>
             
-            <div class="edit-modal-footer">
-                <button class="btn-cancel" id="cancelPhotoBtn">Batal</button>
-                <button class="btn-save" id="savePhotoBtn" disabled>
+            <div class="profile-modal-footer">
+                <button class="btn-cancel" id="cancelPhotoBtn" type="button">Batal</button>
+                <button class="btn-save" id="savePhotoBtn" type="button" disabled>
                     <i class="fas fa-save"></i> Simpan
                 </button>
             </div>
@@ -274,453 +282,13 @@ const notificationCount = locals.notificationCount || 0;
     </div>
     
     <!-- Toast Notification -->
-    <div class="custom-toast" id="toast" style="display: none;"></div>
+    <div class="custom-toast" id="toast" hidden></div>
     
     <!-- Data container (will be populated by JS) -->
-    <div id="user-data-container" style="display: none;"></div>
+    <div id="user-data-container" hidden></div>
+    </div>
 
-    <style>
-        /* Profile Specific Styles */
-        .profile-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .profile-header {
-            margin-bottom: 30px;
-        }
-
-        .profile-cover {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px;
-            padding: 40px;
-            color: white;
-            position: relative;
-            text-align: center;
-        }
-
-        .profile-avatar-wrapper {
-            position: relative;
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 20px;
-        }
-
-        .profile-avatar {
-            width: 100%;
-            height: 100%;
-            background: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 4px solid white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .profile-avatar i {
-            font-size: 80px;
-            color: #CBD5E1;
-        }
-
-        .btn-change-photo {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            background: #2563EB;
-            color: white;
-            border: none;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            border: 2px solid white;
-            transition: all 0.2s;
-        }
-
-        .btn-change-photo:hover {
-            background: #1D4ED8;
-            transform: scale(1.1);
-        }
-
-        .profile-cover h2 {
-            margin: 0 0 5px;
-            font-size: 28px;
-        }
-
-        .profile-cover p {
-            margin: 0;
-            opacity: 0.9;
-        }
-
-        .profile-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        .profile-card {
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-
-        .profile-card.full-width {
-            grid-column: span 2;
-        }
-
-        .card-header {
-            padding: 20px;
-            border-bottom: 1px solid #E2E8F0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .card-header h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #1E293B;
-        }
-
-        .card-header h3 i {
-            color: #2563EB;
-            margin-right: 10px;
-        }
-
-        .btn-edit {
-            background: none;
-            border: 1px solid #E2E8F0;
-            padding: 6px 12px;
-            border-radius: 6px;
-            color: #64748B;
-            font-size: 13px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.2s;
-        }
-
-        .btn-edit:hover {
-            background: #F1F5F9;
-            color: #2563EB;
-        }
-
-        .card-body {
-            padding: 20px;
-        }
-
-        .info-group {
-            margin-bottom: 16px;
-        }
-
-        .info-group label {
-            display: block;
-            font-size: 12px;
-            color: #64748B;
-            margin-bottom: 4px;
-        }
-
-        .info-group p {
-            margin: 0;
-            font-size: 15px;
-            color: #1E293B;
-            font-weight: 500;
-        }
-
-        .settings-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-        }
-
-        .setting-item {
-            padding: 16px;
-            background: #F8FAFC;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .setting-info {
-            flex: 1;
-        }
-
-        .setting-info strong {
-            display: block;
-            color: #1E293B;
-            margin-bottom: 4px;
-        }
-
-        .setting-info p {
-            margin: 0;
-            font-size: 12px;
-            color: #64748B;
-        }
-
-        .btn-setting {
-            background: white;
-            border: 1px solid #E2E8F0;
-            padding: 8px 12px;
-            border-radius: 6px;
-            color: #475569;
-            font-size: 13px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .btn-setting:hover {
-            background: #2563EB;
-            color: white;
-            border-color: #2563EB;
-        }
-
-        /* Edit Modal */
-        .edit-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .edit-modal.active {
-            display: flex;
-        }
-
-        .edit-modal-content {
-            background: white;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-            animation: slideUp 0.3s ease;
-        }
-
-        .edit-modal-header {
-            padding: 20px;
-            border-bottom: 1px solid #E2E8F0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 10;
-        }
-
-        .edit-modal-header h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #1E293B;
-        }
-
-        .edit-modal-header h3 i {
-            color: #2563EB;
-            margin-right: 10px;
-        }
-
-        .btn-close-modal {
-            background: none;
-            border: none;
-            font-size: 18px;
-            color: #94A3B8;
-            cursor: pointer;
-            padding: 5px;
-        }
-
-        .edit-modal-body {
-            padding: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            color: #475569;
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-
-        .form-group .required {
-            color: #EF4444;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: #2563EB;
-            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-        }
-
-        textarea.form-control {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .form-text {
-            font-size: 12px;
-            color: #94A3B8;
-            margin-top: 4px;
-            display: block;
-        }
-
-        .edit-modal-footer {
-            padding: 20px;
-            border-top: 1px solid #E2E8F0;
-            display: flex;
-            gap: 12px;
-            position: sticky;
-            bottom: 0;
-            background: white;
-            z-index: 10;
-        }
-
-        .btn-cancel, .btn-save {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-cancel {
-            background: #F1F5F9;
-            color: #475569;
-        }
-
-        .btn-save {
-            background: #2563EB;
-            color: white;
-        }
-
-        .btn-save:hover {
-            background: #1D4ED8;
-        }
-
-        .btn-save:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Photo Upload */
-        .text-center {
-            text-align: center;
-        }
-
-        .current-photo-preview {
-            margin-bottom: 20px;
-        }
-
-        .current-photo-preview img {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-
-        .upload-area {
-            border: 2px dashed #CBD5E1;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: #F8FAFC;
-        }
-
-        .upload-area:hover {
-            border-color: #2563EB;
-            background: #EFF6FF;
-        }
-
-        .upload-area i {
-            font-size: 40px;
-            color: #94A3B8;
-            margin-bottom: 10px;
-        }
-
-        .upload-area p {
-            margin: 0 0 5px;
-            color: #475569;
-            font-weight: 500;
-        }
-
-        .upload-area small {
-            color: #94A3B8;
-        }
-
-        .photo-preview {
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .photo-preview img {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 50%;
-            border: 4px solid white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-
-        @media (max-width: 768px) {
-            .profile-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .profile-card.full-width {
-                grid-column: span 1;
-            }
-            
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .setting-item {
-                flex-direction: column;
-                text-align: center;
-                gap: 12px;
-            }
-        }
-    </style>
-
-    <!-- Load JavaScript -->
     <script src="/js/user/profile.js"></script>
 
-</body>
-</html>
+</main>
+<%- include('partials/footer') %>

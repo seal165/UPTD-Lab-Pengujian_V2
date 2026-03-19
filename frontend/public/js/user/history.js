@@ -201,7 +201,6 @@
                     <td colspan="7" class="empty-state">
                         <i class="fas fa-inbox fa-3x mb-3"></i>
                         <p>Data pengajuan tidak ditemukan</p>
-                        <a href="/user/submission" class="btn-submit-sm">Buat Pengajuan Baru</a>
                     </td>
                 </tr>
             `;
