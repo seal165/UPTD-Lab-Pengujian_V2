@@ -1,3 +1,5 @@
+const db = require('../config/database');
+
 const pageController = {
     // ==================== HALAMAN PUBLIK ====================
 
@@ -272,7 +274,10 @@ const pageController = {
         const { email, password } = req.body;
         
         if (!email || !password) {
-            return res.json({ success: false, message: 'Email dan password wajib diisi!' });
+            return res.json({
+                success: false,
+                message: 'Email dan password wajib diisi!'
+            });
         }
         
         try {
@@ -281,6 +286,7 @@ const pageController = {
             
             const response = await axios.post(`${API_URL}/auth/login`, { email, password });
             
+<<<<<<< HEAD
             if (response.data.success) {
                 const userData = response.data.data.user || response.data.data;
                 const token = response.data.data.token || response.data.data;
@@ -316,12 +322,55 @@ const pageController = {
                             }
                         });
                     });
+=======
+            console.log('✅ Login response:', response.data);
+            
+            if (response.data.success && response.data.data) {
+                const userData = response.data.data;
+                const userObj = userData.user || userData;
+                
+                // Simpan di session
+                req.session.user = {
+                    id: userObj.id,
+                    email: userObj.email,
+                    full_name: userObj.full_name,
+                    role: userObj.role
+                };
+                req.session.token = userData.token;
+                
+                // Save session
+                req.session.save((err) => {
+                    if (err) {
+                        console.error('❌ Session save error:', err);
+                    }
+                    console.log('✅ Session saved:', req.session.user);
+                });
+                
+                // 🔴 KIRIM RESPONSE SAMA SEPERTI DI ATAS
+                res.json({
+                    success: true,
+                    data: {
+                        id: userObj.id,
+                        email: userObj.email,
+                        full_name: userObj.full_name,
+                        role: userObj.role,
+                        token: userData.token
+                    },
+                    redirect: userObj.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'
+>>>>>>> 397ed93fdfdffdb5e31032da63f52a4b539cffad
                 });
             } else {
-                res.json({ success: false, message: response.data.message || 'Login gagal' });
+                res.json({
+                    success: false,
+                    message: response.data.message || 'Login gagal'
+                });
             }
         } catch (error) {
-            res.json({ success: false, message: error.response?.data?.message || 'Terjadi kesalahan' });
+            console.error('❌ Login error:', error);
+            res.json({
+                success: false,
+                message: error.response?.data?.message || 'Terjadi kesalahan'
+            });
         }
     },
 
@@ -676,100 +725,89 @@ const pageController = {
         }
     },
 
-    // ==================== USER SUBMISSION (FORM) ====================
+    // ==================== USER SUBMISSION PAGE ====================
     userSubmission: async (req, res) => {
-        console.log('➡️ userSubmission - Menampilkan form pengajuan');
-        
         try {
-            const token = req.session?.token;
+            const userId = req.session?.user?.id || req.user?.id;
             
-            if (!token) return res.redirect('/login');
-
-            // Ambil data services dari database langsung
-            const db = require('../config/database');
+            if (!userId) {
+                return res.redirect('/login');
+            }
+            
+            // 🔥 AMBIL DATA USER DARI DATABASE
+            const [users] = await db.query(
+                'SELECT full_name as name, nama_instansi as company, email FROM users WHERE id = ?',
+                [userId]
+            );
+            
+            // 🔥 AMBIL DATA SERVICES
             const [services] = await db.query(`
                 SELECT 
-                    s.id,
-                    s.service_name,
-                    s.min_sample,
+                    tt.id as type_id,
+                    tt.type_name as typeName,
+                    tc.id as category_id,
+                    tc.category_name as categoryName,
+                    s.id as service_id,
+                    s.service_name as name,
+                    s.min_sample as sample,
                     s.duration_days as duration,
                     s.price,
-                    s.method,
-                    tc.id as category_id,
-                    tc.category_name,
-                    tt.id as type_id,
-                    tt.type_name
-                FROM services s
-                JOIN test_categories tc ON s.category_id = tc.id
-                JOIN test_types tt ON tc.test_type_id = tt.id
-                ORDER BY tt.type_name, tc.category_name, s.service_name
+                    s.method
+                FROM test_types tt
+                JOIN test_categories tc ON tt.id = tc.test_type_id
+                JOIN services s ON tc.id = s.category_id
+                ORDER BY tt.id, tc.id, s.id
             `);
-
-            // Format services untuk dropdown
-            const servicesByType = {};
-            services.forEach(service => {
-                if (!servicesByType[service.type_name]) {
-                    servicesByType[service.type_name] = {
-                        typeName: service.type_name,
-                        categories: {}
+            
+            // 🔥 AMBIL DATA MODE SIBUK
+            let busyMode = { active: false, activePeriods: [] };
+            
+            try {
+                // Cek status mode sibuk
+                const [settings] = await db.query(
+                    'SELECT setting_value FROM settings WHERE setting_key = "busy_mode_active"'
+                );
+                const active = settings.length > 0 ? settings[0].setting_value === '1' : false;
+                
+                if (active) {
+                    // Ambil periode aktif
+                    const [periods] = await db.query(
+                        `SELECT 
+                            id, 
+                            keterangan, 
+                            DATE_FORMAT(tanggal_mulai, '%Y-%m-%d') as tanggal_mulai,
+                            DATE_FORMAT(tanggal_selesai, '%Y-%m-%d') as tanggal_selesai
+                        FROM jadwal_sibuk 
+                        WHERE tanggal_selesai >= CURDATE()
+                        ORDER BY tanggal_mulai ASC`
+                    );
+                    
+                    busyMode = {
+                        active: true,
+                        activePeriods: periods
                     };
                 }
-                if (!servicesByType[service.type_name].categories[service.category_name]) {
-                    servicesByType[service.type_name].categories[service.category_name] = {
-                        categoryName: service.category_name,
-                        items: []
-                    };
-                }
-                
-                // Parse min_sample untuk mendapatkan angka
-                let minSampleNumber = 1;
-                const match = service.min_sample ? service.min_sample.match(/\d+/) : null;
-                if (match) minSampleNumber = parseInt(match[0]);
-                
-                servicesByType[service.type_name].categories[service.category_name].items.push({
-                    id: service.id,
-                    name: service.service_name,
-                    price: parseFloat(service.price) || 0,
-                    duration: service.duration || '7',
-                    sample: service.min_sample || '1 sampel',
-                    min_sample: minSampleNumber,
-                    method: service.method || '-'
-                });
-            });
-
-            const formattedServices = Object.values(servicesByType).map(type => ({
-                typeName: type.typeName,
-                categories: Object.values(type.categories)
-            }));
-
-            res.render('user/submission', { 
-                title: 'Pengajuan Baru - UPTD Lab',
-                pageTitle: 'Pengajuan Baru',
-                active: 'submission',
+            } catch (error) {
+                console.log('Error loading busy mode:', error.message);
+            }
+            
+            // ✅ PANGGIL FUNGSI groupServices YANG SUDAH DITAMBAHKAN
+            const groupedServices = groupServices(services);
+            
+            res.render('user/submission', {
+                title: 'Form Pengajuan Pengujian',
                 currentPage: 'submission',
-                user: {
-                    ...req.session.user,
-                    name: req.session.user.full_name || req.session.user.name,
-                    company: req.session.user.nama_instansi || ''
-                },
-                services: formattedServices,
-                error: req.query.error || null,
-                formData: req.body || {}
+                user: users[0] || { name: '', company: '', email: '' },
+                services: groupedServices,
+                busyMode: busyMode,
+                formData: {},
+                error: null,
+                token: req.csrfToken ? req.csrfToken() : ''
             });
             
         } catch (error) {
-            console.error('❌ Error loading submission form:', error.message);
-            
-            res.render('user/submission', { 
-                title: 'Pengajuan Baru - UPTD Lab',
-                pageTitle: 'Pengajuan Baru',
-                active: 'submission',
-                currentPage: 'submission',
-                user: req.session.user,
-                services: [],
-                error: 'Gagal memuat data layanan',
-                formData: {}
-            });
+            console.error('Error rendering submission page:', error);
+            res.status(500).send('Internal Server Error');
         }
     },
 
@@ -1082,12 +1120,96 @@ const pageController = {
         res.render('admin/login', { title: 'Admin Login' });
     },
 
-    adminDashboard: (req, res) => {
-        res.render('admin/dashboard', { 
-            title: 'Dashboard Admin', 
-            page: 'dashboard',
-            user: req.session?.user 
-        });
+    adminDashboard: async (req, res) => {
+        console.log('➡️ Admin Dashboard dipanggil');
+        console.log('👤 User:', req.session.user);
+        
+        try {
+            const token = req.session?.token;
+            
+            if (!token) {
+                return res.redirect('/admin/login');
+            }
+
+            const axios = require('axios');
+            const API_URL = process.env.API_URL || 'http://localhost:5000/api';
+            
+            // Panggil API untuk ambil data dashboard
+            const response = await axios.get(`${API_URL}/admin/dashboard/stats`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            let dashboardData = {
+                stats: {
+                    income: 'Rp 0',
+                    pending: 0,
+                    completed: 0,
+                    awaitingPayment: 0
+                },
+                activities: [],
+                submissions: [],
+                chartLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+                chartValues: [0, 0, 0, 0, 0, 0]
+            };
+
+            if (response.data && response.data.success) {
+                dashboardData = response.data.data || dashboardData;
+                console.log('✅ Data dashboard dari database:', dashboardData);
+            }
+
+            res.render('admin/dashboard', { 
+                title: 'Dashboard Admin - UPTD Lab',
+                page: 'dashboard',
+                currentPage: 'dashboard',
+                user: req.session.user,
+                data: dashboardData,
+                error: null
+            });
+            
+        } catch (error) {
+            console.error('❌ Error loading admin dashboard:', error.message);
+            
+            // Data dummy sementara jika API error
+            const dummyData = {
+                stats: {
+                    income: 'Rp 125.000.000',
+                    pending: 12,
+                    completed: 45,
+                    awaitingPayment: 8
+                },
+                activities: [
+                    {
+                        company: 'PT. Konstruksi Maju',
+                        description: 'Mengajukan permohonan baru',
+                        time: '5 menit lalu',
+                        status: 'Menunggu Verifikasi',
+                        color: 'warning',
+                        icon: 'file-alt',
+                        badgeColor: 'warning'
+                    }
+                ],
+                submissions: [
+                    {
+                        id: 'SUB001',
+                        company: 'PT. Konstruksi Maju',
+                        type: 'Pengujian Beton',
+                        date: new Date().toLocaleDateString('id-ID'),
+                        status: 'Menunggu Verifikasi'
+                    }
+                ],
+                chartLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
+                chartValues: [15000000, 25000000, 18000000, 32000000, 28000000, 35000000]
+            };
+            
+            res.render('admin/dashboard', { 
+                title: 'Dashboard Admin - UPTD Lab',
+                page: 'dashboard',
+                currentPage: 'dashboard',
+                user: req.session.user,
+                data: dummyData,
+                error: 'Gagal memuat data dari server'
+            });
+        }
     },
 
     adminSubmissions: async (req, res) => {
@@ -1141,29 +1263,40 @@ const pageController = {
         }
     },
 
+    // ==================== ADMIN DETAIL SUBMISSION ====================
     adminDetailSubmission: (req, res) => {
+        console.log('➡️ Admin Detail Submission, ID:', req.params.id);
+        
         res.render('admin/detail-submission', { 
             title: 'Detail Pengajuan', 
             page: 'submissions', 
+            currentPage: 'submissions',
             submissionId: req.params.id,
             user: req.session?.user 
         });
     },
 
+    // ==================== ADMIN SKRD ====================
     adminSKRD: (req, res) => {
+        console.log('➡️ Admin SKRD dipanggil');
+        
         res.render('admin/skrd', { 
-            title: 'Manajemen SKRD', 
+            title: 'Manajemen SKRD - UPTD Lab',
             page: 'skrd',
+            currentPage: 'skrd',
             user: req.session?.user 
         });
     },
 
     adminDetailSKRD: (req, res) => {
+        console.log('➡️ Admin SKRD Detail, ID:', req.params.id);
+        
         res.render('admin/detail-skrd', { 
-            title: 'Detail SKRD', 
-            page: 'skrd', 
-            invoiceId: req.params.id,
-            user: req.session?.user 
+            title: 'Detail SKRD - UPTD Lab',
+            page: 'skrd',
+            currentPage: 'skrd',
+            user: req.session?.user,
+            id: req.params.id 
         });
     },
 
@@ -1175,11 +1308,12 @@ const pageController = {
         });
     },
 
+    // ==================== ADMIN USERS ====================
     adminUsers: (req, res) => {
         res.render('admin/users', { 
             title: 'Data Pemohon', 
             page: 'users',
-            user: req.session?.user 
+            user: req.session?.user || req.user 
         });
     },
 
@@ -1188,18 +1322,20 @@ const pageController = {
             title: 'Detail Pemohon', 
             page: 'users', 
             userId: req.params.id,
-            user: req.session?.user 
+            user: req.session?.user || req.user 
         });
     },
 
+    // ==================== ADMIN SETTINGS ====================
     adminSettings: (req, res) => {
         res.render('admin/settings', { 
             title: 'Pengaturan Sistem', 
             page: 'settings',
-            user: req.session?.user 
+            user: req.session?.user || req.user 
         });
     },
 
+    // Method lainnya (sudah ada)
     adminLogout: (req, res) => {
         req.session.destroy();
         res.redirect('/admin/login');
@@ -1233,14 +1369,16 @@ const pageController = {
         });
     },
 
+    // ==================== ADMIN KUISIONER ====================
     adminKuisioner: (req, res) => {
-        res.render('admin/kuisioner/index', { 
-            title: 'Data Kuesioner', 
+        console.log('➡️ Admin Kuisioner dipanggil');
+        console.log('👤 User:', req.session?.user);
+        
+        res.render('admin/kuisioner', {
+            title: 'Manajemen Kuisioner - UPTD Lab',
             page: 'kuisioner',
-            user: req.session?.user,
-            kuisioner: [],
-            stats: {},
-            pagination: { page: 1, totalPages: 0, total: 0 }
+            currentPage: 'kuisioner',
+            user: req.session?.user
         });
     },
 
@@ -1262,5 +1400,48 @@ const pageController = {
         });
     }
 };
+
+// Helper function untuk mengelompokkan services
+function groupServices(services) {
+    const grouped = [];
+    const typeMap = new Map();
+    
+    services.forEach(item => {
+        // Cek apakah tipe sudah ada
+        if (!typeMap.has(item.type_id)) {
+            typeMap.set(item.type_id, {
+                typeId: item.type_id,
+                typeName: item.typeName,
+                categories: []
+            });
+            grouped.push(typeMap.get(item.type_id));
+        }
+        
+        const currentType = typeMap.get(item.type_id);
+        
+        // Cek apakah kategori sudah ada di tipe ini
+        let category = currentType.categories.find(c => c.categoryId === item.category_id);
+        if (!category) {
+            category = {
+                categoryId: item.category_id,
+                categoryName: item.categoryName,
+                items: []
+            };
+            currentType.categories.push(category);
+        }
+        
+        // Tambahkan item ke kategori
+        category.items.push({
+            id: item.service_id,
+            name: item.name,
+            sample: item.sample,
+            duration: item.duration,
+            price: item.price,
+            method: item.method
+        });
+    });
+    
+    return grouped;
+}
 
 module.exports = pageController;

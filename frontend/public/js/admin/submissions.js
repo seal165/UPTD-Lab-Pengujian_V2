@@ -19,7 +19,7 @@
 
     // ==================== CEK TOKEN ====================
     function getToken() {
-        return localStorage.getItem('admin_token');
+        return localStorage.getItem('token'); // GANTI: dari admin_token jadi token
     }
 
     if (!getToken()) {
@@ -50,9 +50,14 @@
         // Render tabel dari data awal
         if (initialSubmissions.length > 0) {
             renderTable(initialSubmissions);
+            updatePaginationInfo(initialPagination);
+        } else {
+            // Load data jika tidak ada data awal
+            loadSubmissions();
         }
     } catch (error) {
         console.error('❌ Error parsing page data:', error);
+        loadSubmissions();
     }
 
     // ==================== FUNGSI TOAST/ALERT ====================
@@ -104,6 +109,9 @@
                 case 'Belum Lunas':
                     statusClass = 'badge-soft-danger';
                     break;
+                case 'Menunggu SKRD Upload':
+                    statusClass = 'badge-soft-warning';
+                    break;
                 case 'Lunas':
                     statusClass = 'badge-soft-success';
                     break;
@@ -115,32 +123,32 @@
                     break;
             }
             
-            // Tentukan kategori dari kode_pengujian
-            let categoryText = '-';
-            if (sub.kode_pengujian) {
-                if (sub.kode_pengujian.includes('Bahan')) {
-                    categoryText = 'Pengujian Bahan';
-                } else if (sub.kode_pengujian.includes('Konstruksi')) {
-                    categoryText = 'Pengujian Konstruksi';
-                }
-            }
-            
             // Format tanggal
             const dateStr = sub.tgl_permohonan || sub.created_at;
             const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('id-ID', {
                 day: '2-digit', month: 'short', year: 'numeric'
             }) : '-';
             
+            // Nama perusahaan/pemohon
+            const namaPerusahaan = sub.nama_instansi || sub.nama_pemohon || '-';
+            const namaPemohon = sub.nama_pemohon || '-';
+            
+            // Jenis pengujian
+            const jenisPengujian = sub.jenis_pengujian || '-';
+            
             html += `
                 <tr style="cursor: pointer;" onclick="viewDetail(${sub.id})">
-                    <td><span class="fw-bold">#${sub.no_urut || sub.id}</span></td>
                     <td>
-                        <div class="fw-bold">${sub.instansi || sub.nama_pemohon || '-'}</div>
-                        <small class="text-muted">${sub.nama_pemohon || '-'}</small>
+                        <span class="fw-bold">${sub.no_urut || `#${sub.id}`}</span>
+                        <small class="d-block text-muted">${sub.no_permohonan || ''}</small>
                     </td>
                     <td>
-                        <div>${sub.kode_pengujian || '-'}</div>
-                        <small class="text-muted">${categoryText}</small>
+                        <div class="fw-bold">${namaPerusahaan}</div>
+                        <small class="text-muted">${namaPemohon}</small>
+                    </td>
+                    <td>
+                        <div>${jenisPengujian}</div>
+                        <small class="text-muted">${sub.total_samples || 0} sampel</small>
                     </td>
                     <td>${formattedDate}</td>
                     <td><span class="badge ${statusClass} px-3 py-2 rounded-pill">${sub.status || '-'}</span></td>
@@ -154,17 +162,17 @@
         });
         
         tbody.innerHTML = html;
-        
-        // Update pagination info
-        const start = ((currentPage - 1) * ITEMS_PER_PAGE) + 1;
-        const end = Math.min(currentPage * ITEMS_PER_PAGE, totalData);
+    }
+
+    // ==================== UPDATE PAGINATION INFO ====================
+    function updatePaginationInfo(pagination) {
+        const start = ((pagination.page - 1) * ITEMS_PER_PAGE) + 1;
+        const end = Math.min(pagination.page * ITEMS_PER_PAGE, pagination.total);
         const paginationInfo = document.getElementById('paginationInfo');
-        if (paginationInfo) {
-            paginationInfo.innerHTML = `Menampilkan ${start}-${end} dari ${totalData} data`;
-        }
         
-        // Update pagination buttons
-        updatePagination();
+        if (paginationInfo) {
+            paginationInfo.innerHTML = `Menampilkan ${start}-${end} dari ${pagination.total} data`;
+        }
     }
 
     // ==================== LOAD DATA ====================
@@ -206,7 +214,7 @@
             });
 
             if (response.status === 401) {
-                localStorage.removeItem('admin_token');
+                localStorage.removeItem('token');
                 window.location.href = '/admin/login';
                 return;
             }
@@ -220,6 +228,7 @@
                 const data = result.data;
                 totalData = data.total || 0;
                 renderTable(data.submissions || []);
+                updatePagination(data);
             } else {
                 showAlert(result.message || 'Gagal memuat data', 'danger');
             }
@@ -229,12 +238,13 @@
         }
     }
 
-    // ==================== PAGINATION ====================
-    function updatePagination() {
-        const totalPages = Math.ceil(totalData / ITEMS_PER_PAGE);
+    // ==================== UPDATE PAGINATION ====================
+    function updatePagination(data) {
+        const totalPages = data.totalPages || 1;
         const pagination = document.getElementById('pagination');
         
         if (!pagination) return;
+        
         if (totalPages <= 1) {
             pagination.innerHTML = '';
             return;
@@ -242,10 +252,12 @@
 
         let html = '';
         
+        // Previous button
         if (currentPage > 1) {
             html += `<li class="page-item"><a class="page-link" href="#" onclick="window.changePage(${currentPage - 1})"><i class="fas fa-chevron-left"></i></a></li>`;
         }
         
+        // Page numbers
         for (let i = 1; i <= totalPages; i++) {
             if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
                 html += `<li class="page-item ${currentPage === i ? 'active' : ''}">
@@ -256,11 +268,20 @@
             }
         }
         
+        // Next button
         if (currentPage < totalPages) {
             html += `<li class="page-item"><a class="page-link" href="#" onclick="window.changePage(${currentPage + 1})"><i class="fas fa-chevron-right"></i></a></li>`;
         }
         
         pagination.innerHTML = html;
+        
+        // Update pagination info
+        const paginationInfo = document.getElementById('paginationInfo');
+        if (paginationInfo) {
+            const start = ((currentPage - 1) * ITEMS_PER_PAGE) + 1;
+            const end = Math.min(currentPage * ITEMS_PER_PAGE, data.total);
+            paginationInfo.innerHTML = `Menampilkan ${start}-${end} dari ${data.total} data`;
+        }
     }
 
     // ==================== FILTER FUNCTIONS ====================

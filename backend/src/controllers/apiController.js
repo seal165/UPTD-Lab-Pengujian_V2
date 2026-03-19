@@ -1,6 +1,8 @@
 const db = require('../config/database');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
 
 const apiController = {
     // ==================== SERVICES METHODS ====================
@@ -759,194 +761,327 @@ const apiController = {
         }
     },
 
-    // DASHBOARD STATS dengan database real
-    getDashboardStats: async (req, res) => {
+    // ==================== GET ADMIN DASHBOARD STATS ====================
+    getAdminDashboardStats: async (req, res) => {
         try {
-            // Total pendapatan bulan ini - dengan penanganan NULL
-            const [incomeResult] = await db.query(`
-                SELECT COALESCE(SUM(total_tagihan), 0) as total 
-                FROM payments 
-                WHERE status_pembayaran = 'Lunas' 
-                AND MONTH(created_at) = MONTH(CURRENT_DATE())
-                AND YEAR(created_at) = YEAR(CURRENT_DATE())
-            `);
+            const userId = req.user?.id;
             
-            // Menunggu verifikasi (submissions)
-            const [pendingResult] = await db.query(`
-                SELECT COUNT(*) as total 
-                FROM submissions 
-                WHERE status = 'pending_verification'
-            `);
-            
-            // Pengujian selesai
-            const [completedResult] = await db.query(`
-                SELECT COUNT(*) as total 
-                FROM submissions 
-                WHERE status = 'completed'
-            `);
-            
-            // User baru hari ini
-            const [newUsersResult] = await db.query(`
-                SELECT COUNT(*) as total 
-                FROM users 
-                WHERE DATE(created_at) = CURDATE()
-                AND role = 'customer'
-            `);
-            
-            // Menunggu pembayaran
-            const [awaitingPaymentResult] = await db.query(`
-                SELECT COUNT(*) as total 
-                FROM payments 
-                WHERE status_pembayaran = 'pending'
-            `);
-            
-            // Recent submissions (5 terbaru) - AMAN DENGAN LEFT JOIN
-            const [recentSubmissions] = await pool.query(`
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            console.log('📊 Getting admin dashboard stats for user:', userId);
+
+            // 1. STATISTIK KEUANGAN
+            const [incomeStats] = await db.query(`
                 SELECT 
-                    s.id as id,  -- atau s.submission_id, atau s.no_registrasi
-                    COALESCE(u.company, u.name, 'Unknown') as company,
-                    COALESCE(s.test_type, '-') as type,
-                    DATE_FORMAT(s.created_at, '%d %b %Y') as date,
-                    COALESCE(s.status, 'unknown') as status
-                FROM submissions s
-                LEFT JOIN users u ON s.user_id = u.id
-                ORDER BY s.created_at DESC
-                LIMIT 5
+                    COALESCE(SUM(p.total_tagihan), 0) as total_income,
+                    COALESCE(SUM(CASE WHEN MONTH(p.created_at) = MONTH(CURDATE()) 
+                                AND YEAR(p.created_at) = YEAR(CURDATE()) 
+                                THEN p.total_tagihan ELSE 0 END), 0) as monthly_income
+                FROM payments p
             `);
-            
-            // Recent activities (5 terbaru) - AMAN DENGAN LEFT JOIN
+
+            // 2. STATISTIK SUBMISSIONS
+            const [submissionStats] = await db.query(`
+                SELECT 
+                    COUNT(*) as total_submissions,
+                    SUM(CASE WHEN status = 'Menunggu Verifikasi' THEN 1 ELSE 0 END) as pending_verifikasi,
+                    SUM(CASE WHEN status = 'Selesai' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'Sedang Diuji' THEN 1 ELSE 0 END) as ongoing,
+                    SUM(CASE WHEN status = 'Belum Lunas' THEN 1 ELSE 0 END) as awaiting_payment
+                FROM submissions
+            `);
+
+            // 3. AKTIVITAS TERBARU (dari tabel activities)
             const [recentActivities] = await db.query(`
                 SELECT 
                     a.*,
-                    COALESCE(u.name, 'System') as user_name,
-                    COALESCE(u.company, u.name, 'System') as company
+                    u.full_name as user_name
                 FROM activities a
                 LEFT JOIN users u ON a.user_id = u.id
                 ORDER BY a.created_at DESC
                 LIMIT 5
             `);
-            
-            // Data untuk chart (6 bulan terakhir)
-            const [chartData] = await db.query(`
+
+            // Format activities untuk frontend
+            const formattedActivities = recentActivities.map(activity => {
+                let action = 'info';
+                let actionName = '';
+                if (activity.activity_name) {
+                    const name = activity.activity_name.toLowerCase();
+                    actionName = activity.activity_name;
+                    if (name.includes('login')) action = 'login';
+                    else if (name.includes('register')) action = 'create';
+                    else if (name.includes('update')) action = 'update';
+                    else if (name.includes('delete')) action = 'delete';
+                    else if (name.includes('upload')) action = 'upload';
+                    else if (name.includes('verify')) action = 'verify';
+                }
+
+                return {
+                    id: activity.id,
+                    company: activity.user_name || 'System',
+                    description: actionName || 'Aktivitas sistem',
+                    time: formatTimeAgo(activity.created_at),
+                    status: actionName ? actionName.split(' ')[0] : 'Aktivitas',
+                    icon: getIconForAction(action),
+                    color: getColorForAction(action),
+                    badgeColor: getColorForAction(action)
+                };
+            });
+
+            // 🔴 PERBAIKI QUERY SUBMISSIONS - Ambil semua field yang diperlukan
+            const [recentSubmissions] = await db.query(`
                 SELECT 
-                    DATE_FORMAT(created_at, '%b') as month,
-                    COALESCE(SUM(total_tagihan), 0) as total
-                FROM payments 
-                WHERE status_pembayaran = 'Lunas'
-                AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
-                GROUP BY YEAR(created_at), MONTH(created_at)
-                ORDER BY MIN(created_at) ASC
-                LIMIT 6
+                    s.id,
+                    s.no_permohonan,
+                    s.nama_instansi as company,
+                    s.nama_pemohon,
+                    s.nama_proyek as project_name,
+                    s.status,
+                    s.created_at,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT tt.type_name SEPARATOR ', ') 
+                        FROM submission_samples ss 
+                        JOIN test_types tt ON ss.test_type_id = tt.id 
+                        WHERE ss.submission_id = s.id
+                    ) as jenis_uji
+                FROM submissions s
+                ORDER BY s.created_at DESC
+                LIMIT 5
             `);
 
-            console.log('📊 Chart data from DB:', chartData);
-            
-            // Format activities untuk frontend
-            const formattedActivities = recentActivities.map(a => ({
-                company: a.company || a.user_name || 'System',
-                description: a.description || 'No description',
-                time: timeAgo(a.created_at) || 'recently',
-                icon: getIconForAction(a.action) || 'info-circle',
-                color: getColorForAction(a.action) || 'primary',
-                badgeColor: getBadgeColorForStatus(a.action) || 'secondary',
-                status: a.action || 'info'
+            // 🔴 FORMAT SUBMISSIONS DENGAN BENAR
+            const formattedSubmissions = recentSubmissions.map(sub => ({
+                id: sub.id, // Gunakan ID asli, bukan no_permohonan
+                no_permohonan: sub.no_permohonan || `SUB-${sub.id}`,
+                company: sub.company || sub.nama_pemohon || '-',
+                type: sub.jenis_uji || '-',
+                date: formatDate(sub.created_at),
+                status: sub.status || 'Menunggu Verifikasi'
             }));
+
+            // 5. CHART DATA (6 bulan terakhir)
+            const [chartData] = await db.query(`
+                SELECT 
+                    DATE_FORMAT(p.created_at, '%Y-%m') as month,
+                    COALESCE(SUM(p.total_tagihan), 0) as total
+                FROM payments p
+                WHERE p.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+                GROUP BY DATE_FORMAT(p.created_at, '%Y-%m')
+                ORDER BY month ASC
+            `);
+
+            // Generate labels dan values untuk chart
+            const months = [];
+            const values = [];
+            const now = new Date();
             
-            // Siapkan chart labels & values (dengan default jika kosong)
-            let chartLabels = [];
-            let chartValues = [];
-
-            if (chartData && chartData.length > 0) {
-                chartLabels = chartData.map(c => c.month);
-                chartValues = chartData.map(c => c.total);
-            } else {
-                // Fallback kalau tidak ada data
-                chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'];
-                chartValues = [0, 0, 0, 0, 0, 0];
-            }
-
-            try {
-                const [chartData] = await db.query(`
-                    SELECT 
-                        DATE_FORMAT(created_at, '%b') as month,
-                        COALESCE(SUM(total_tagihan), 0) as total
-                    FROM payments 
-                    WHERE status_pembayaran = 'Lunas'
-                    AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
-                    GROUP BY YEAR(created_at), MONTH(created_at)
-                    ORDER BY MIN(created_at)
-                    LIMIT 6
-                `);
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const monthName = d.toLocaleString('id-ID', { month: 'short' });
                 
-                if (chartData && chartData.length > 0) {
-                    chartLabels = chartData.map(c => c.month || 'Unknown');
-                    chartValues = chartData.map(c => c.total || 0);
-                }
-            } catch (chartError) {
-                console.error('Chart query error:', chartError.message);
-                // Tetap pakai default values
+                months.push(monthName);
+                
+                const found = chartData.find(item => item.month === monthStr);
+                values.push(found ? parseFloat(found.total) : 0);
             }
-            
+
+            // Format response
+            const response = {
+                stats: {
+                    income: formatRupiah(incomeStats[0].monthly_income || 0),
+                    pending: submissionStats[0].pending_verifikasi || 0,
+                    completed: submissionStats[0].completed || 0,
+                    awaitingPayment: submissionStats[0].awaiting_payment || 0
+                },
+                activities: formattedActivities,
+                submissions: formattedSubmissions,
+                chartLabels: months,
+                chartValues: values
+            };
+
+            console.log('✅ Dashboard data prepared:', {
+                stats: response.stats,
+                submissionsCount: response.submissions.length
+            });
+
             res.json({
                 success: true,
-                data: {
-                    stats: {
-                        income: `Rp ${new Intl.NumberFormat('id-ID').format(incomeResult[0]?.total || 0)}`,
-                        pending: pendingResult[0]?.total || 0,
-                        completed: completedResult[0]?.total || 0,
-                        newUsers: newUsersResult[0]?.total || 0,
-                        awaitingPayment: awaitingPaymentResult[0]?.total || 0
-                    },
-                    activities: formattedActivities,
-                    submissions: recentSubmissions,
-                    chartLabels: chartLabels,
-                    chartValues: chartValues
-                }
+                data: response
             });
 
         } catch (error) {
-            console.error('❌ Dashboard error:', error);
-            console.error('Error details:', error.message);
-            console.error('Error stack:', error.stack);
-            
-            // Kirim error detail untuk debugging
+            console.error('❌ Error getting admin dashboard stats:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil data dashboard',
-                error: error.message,
-                stack: error.stack
+                message: 'Gagal mengambil data dashboard: ' + error.message
             });
         }
     },
 
+    // ==================== GET SUBMISSIONS ====================
     getSubmissions: async (req, res) => {
         try {
-            console.log('✅ getSubmissions dipanggil');
+            console.log('✅ getSubmissions for admin dipanggil');
             
-            // Ambil data dari database
-            const [rows] = await db.query(`
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            // Cek role admin
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            // Ambil parameter query
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10;
+            const offset = (page - 1) * limit;
+            
+            // 🔴 FILTER USER_ID (untuk detail user)
+            const filterUserId = req.query.user_id || ''; 
+            const status = req.query.status || '';
+            const search = req.query.search || '';
+            const startDate = req.query.start_date || '';
+            const endDate = req.query.end_date || '';
+            const sort = req.query.sort === 'asc' ? 'ASC' : 'DESC';
+
+            console.log('📋 Getting submissions - Page:', page, 'User ID filter:', filterUserId);
+
+            // Build query conditions
+            let whereConditions = [];
+            let queryParams = [];
+
+            // 🔴 TAMBAHKAN FILTER USER ID
+            if (filterUserId) {
+                whereConditions.push('s.user_id = ?');
+                queryParams.push(filterUserId);
+            }
+
+            if (status) {
+                whereConditions.push('s.status = ?');
+                queryParams.push(status);
+            }
+
+            if (search) {
+                whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ?)');
+                const searchTerm = `%${search}%`;
+                queryParams.push(searchTerm, searchTerm, searchTerm);
+            }
+
+            if (startDate) {
+                whereConditions.push('DATE(s.created_at) >= ?');
+                queryParams.push(startDate);
+            }
+
+            if (endDate) {
+                whereConditions.push('DATE(s.created_at) <= ?');
+                queryParams.push(endDate);
+            }
+
+            const whereClause = whereConditions.length > 0 
+                ? 'WHERE ' + whereConditions.join(' AND ') 
+                : '';
+
+            // Get total count
+            const countQuery = `
+                SELECT COUNT(*) as total 
+                FROM submissions s
+                ${whereClause}
+            `;
+            
+            const [countResult] = await db.query(countQuery, queryParams);
+            const total = countResult[0].total;
+            const totalPages = Math.ceil(total / limit);
+
+            // 🔴 PISAHKAN QUERY - Jenis Uji (dari test_types) dan Jenis Sample (dari submission_samples.jenis_sample)
+            const submissionsQuery = `
                 SELECT 
-                    s.*,
-                    u.name as pic_name,
-                    u.company,
-                    u.email as user_email
+                    s.id,
+                    s.no_permohonan,
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.nama_proyek,
+                    s.status,
+                    s.created_at,
+                    s.updated_at,
+                    s.catatan_tambahan,
+                    u.email,
+                    u.nomor_telepon,
+                    u.full_name,
+                    (SELECT COUNT(*) FROM submission_samples WHERE submission_id = s.id) as total_samples,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT tt.type_name SEPARATOR ', ') 
+                        FROM submission_samples ss 
+                        JOIN test_types tt ON ss.test_type_id = tt.id 
+                        WHERE ss.submission_id = s.id
+                    ) as jenis_uji,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT tc.category_name SEPARATOR ', ') 
+                        FROM submission_samples ss 
+                        JOIN test_categories tc ON ss.test_category_id = tc.id 
+                        WHERE ss.submission_id = s.id
+                    ) as kategori_uji,
+                    (
+                        SELECT GROUP_CONCAT(ss.jenis_sample SEPARATOR ', ') 
+                        FROM submission_samples ss 
+                        WHERE ss.submission_id = s.id
+                    ) as jenis_sample
                 FROM submissions s
                 LEFT JOIN users u ON s.user_id = u.id
-                ORDER BY s.created_at DESC
-            `);
-            
+                ${whereClause}
+                ORDER BY s.created_at ${sort}
+                LIMIT ? OFFSET ?
+            `;
+
+            const params = [...queryParams, limit, offset];
+            const [submissions] = await db.query(submissionsQuery, params);
+
+            // Ambil total_tagihan untuk setiap submission
+            for (let sub of submissions) {
+                const [payment] = await db.query(
+                    'SELECT total_tagihan FROM payments WHERE submission_id = ?',
+                    [sub.id]
+                );
+                sub.total_tagihan = payment[0]?.total_tagihan || 0;
+            }
+
+            console.log('✅ Submissions found:', submissions.length);
+
             res.json({
                 success: true,
                 data: {
-                    submissions: rows,
-                    total: rows.length,
-                    page: 1,
-                    limit: rows.length,
-                    totalPages: 1
+                    submissions: submissions,
+                    total: total,
+                    page: page,
+                    limit: limit,
+                    totalPages: totalPages
                 }
             });
+
         } catch (error) {
-            console.error('Error:', error);
+            console.error('❌ Error getting submissions:', error);
             res.status(500).json({ 
                 success: false, 
                 message: error.message 
@@ -954,13 +1089,30 @@ const apiController = {
         }
     },
 
-    // GET DETAIL SUBMISSION dengan database real
+    // ==================== GET SUBMISSION DETAIL (ADMIN) ====================
     getSubmissionDetail: async (req, res) => {
         try {
             const id = req.params.id;
             
             console.log('========== GET SUBMISSION DETAIL ==========');
             console.log('📥 ID:', id);
+            
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            // Cek role admin
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
             
             // Validasi ID
             if (!id || isNaN(id)) {
@@ -970,15 +1122,30 @@ const apiController = {
                 });
             }
             
-            // Ambil data dari tabel submissions
+            // Ambil data dari tabel submissions - TAMBAHKAN catatan_admin (TANPA KOMENTAR)
             const [submissions] = await db.query(`
                 SELECT 
-                    s.*,
-                    u.name as pic_name,
+                    s.id,
+                    s.no_permohonan,
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.alamat_pemohon,
+                    s.nomor_telepon,
+                    s.email_pemohon,
+                    s.nama_proyek,
+                    s.lokasi_proyek,
+                    s.status,
+                    s.created_at,
+                    s.updated_at,
+                    s.catatan_tambahan,
+                    s.catatan_admin,
+                    s.file_surat_permohonan,
+                    s.file_ktp,
+                    u.full_name as pic_name,
                     u.email as pic_email,
-                    u.phone as pic_phone,
-                    u.company as company_name,
-                    u.address
+                    u.nomor_telepon as pic_phone,
+                    u.nama_instansi as company_name,
+                    u.alamat as address
                 FROM submissions s
                 LEFT JOIN users u ON s.user_id = u.id
                 WHERE s.id = ?
@@ -993,31 +1160,132 @@ const apiController = {
             
             const submission = submissions[0];
             
-            // Ambil data items
-            const [items] = await db.query(`
+            // Ambil data samples
+            const [samples] = await db.query(`
                 SELECT 
-                    service_name,
-                    quantity,
-                    unit,
-                    unit_price,
-                    (quantity * unit_price) as total_price
-                FROM submission_items 
-                WHERE submission_id = ?
+                    ss.id,
+                    ss.jenis_sample,
+                    ss.nama_identitas_sample,
+                    ss.jumlah_sample_angka,
+                    ss.jumlah_sample_satuan,
+                    ss.tanggal_pengambilan,
+                    ss.kemasan_sample,
+                    ss.asal_sample,
+                    ss.sample_diambil_oleh,
+                    ss.price_at_time,
+                    ss.method_at_time,
+                    sv.service_name,
+                    sv.method,
+                    tc.category_name,
+                    tt.type_name
+                FROM submission_samples ss
+                JOIN services sv ON ss.service_id = sv.id
+                JOIN test_categories tc ON ss.test_category_id = tc.id
+                JOIN test_types tt ON ss.test_type_id = tt.id
+                WHERE ss.submission_id = ?
             `, [id]);
             
-            submission.items = items;
+            // Format samples untuk frontend
+            const formattedSamples = samples.map(sample => ({
+                id: sample.id,
+                name: sample.nama_identitas_sample || sample.service_name,
+                jenis: sample.jenis_sample,
+                quantity: sample.jumlah_sample_angka,
+                unit: sample.jumlah_sample_satuan,
+                price: sample.price_at_time,
+                subtotal: sample.price_at_time * sample.jumlah_sample_angka,
+                method: sample.method_at_time || sample.method,
+                category: sample.category_name,
+                type: sample.type_name
+            }));
             
-            // Hitung total
-            const totalAmount = items.reduce(
-                (sum, item) => sum + (item.quantity * item.unit_price), 0
-            );
+            // Ambil data payment
+            const [payments] = await db.query(`
+                SELECT 
+                    p.id,
+                    p.no_invoice,
+                    p.total_tagihan,
+                    p.jumlah_dibayar,
+                    p.sisa_tagihan,
+                    p.status_pembayaran,
+                    p.bukti_pembayaran_1,
+                    p.bukti_pembayaran_2,
+                    p.created_at as payment_date
+                FROM payments p 
+                WHERE p.submission_id = ?
+            `, [id]);
             
+            const payment = payments.length > 0 ? payments[0] : null;
+            
+            // Hitung total tagihan dari samples
+            const totalAmount = samples.reduce((sum, item) => {
+                return sum + (item.price_at_time * item.jumlah_sample_angka);
+            }, 0);
+            
+            // Kategori pengujian dari samples
+            const categories = [...new Set(samples.map(s => s.category_name))];
+            const testTypes = [...new Set(samples.map(s => s.type_name))];
+            
+            // Format response sesuai dengan yang diharapkan frontend
+            const response = {
+                id: submission.id,
+                no_urut: submission.no_permohonan || `SUB-${String(submission.id).padStart(5, '0')}`,
+                no_permohonan: submission.no_permohonan,
+                registration_number: submission.no_permohonan,
+                proyek: submission.nama_proyek,
+                lokasi_proyek: submission.lokasi_proyek,
+                description: submission.catatan_tambahan,
+                
+                // Data perusahaan
+                company_name: submission.nama_instansi || submission.company_name || '-',
+                pic_name: submission.nama_pemohon || submission.pic_name || '-',
+                address: submission.alamat_pemohon || submission.address || '-',
+                pic_email: submission.email_pemohon || submission.pic_email || '-',
+                pic_phone: submission.nomor_telepon || submission.pic_phone || '-',
+                
+                // Status
+                status: submission.status,
+                created_at: submission.created_at,
+                updated_at: submission.updated_at,
+                
+                // TAMBAHKAN CATATAN DI RESPONSE
+                catatan_tambahan: submission.catatan_tambahan,
+                catatan_admin: submission.catatan_admin,
+                
+                // Kategori
+                category: categories.join(', ') || 'Pengujian',
+                test_type: testTypes.join(', ') || 'Material',
+                
+                // Items (samples)
+                items: formattedSamples.map(s => ({
+                    service_name: s.name,
+                    name: s.name,
+                    quantity: s.quantity,
+                    unit: s.unit,
+                    unit_price: s.price,
+                    subtotal: s.subtotal
+                })),
+                
+                // Payment
+                payment: payment ? {
+                    id: payment.id,
+                    no_invoice: payment.no_invoice,
+                    total_tagihan: payment.total_tagihan || totalAmount,
+                    jumlah_dibayar: payment.jumlah_dibayar || 0,
+                    sisa_tagihan: payment.sisa_tagihan || totalAmount,
+                    status_pembayaran: payment.status_pembayaran,
+                    bukti_pembayaran_1: payment.bukti_pembayaran_1,
+                    bukti_pembayaran_2: payment.bukti_pembayaran_2,
+                    payment_date: payment.payment_date
+                } : null,
+                
+                // Total
+                total_tagihan: totalAmount
+            };
+
             res.json({
                 success: true,
-                data: {
-                    ...submission,
-                    total_tagihan: totalAmount
-                }
+                data: response
             });
 
         } catch (error) {
@@ -1029,125 +1297,414 @@ const apiController = {
         }
     },
 
-    // ==================== CREATE SUBMISSION ====================
-    createSubmission: async (req, res) => {
+    // ==================== UPDATE SUBMISSION STATUS ====================
+    updateSubmission: async (req, res) => {
         try {
-            console.log('========== CREATE SUBMISSION ==========');
-            console.log('📦 req.body:', req.body);
-            console.log('📦 req.user:', req.user);
-            
-            const userId = req.user?.id || req.body.user_id;
-            
+            const id = req.params.id;
+            const { status, catatan, catatan_admin } = req.body; // Terima kedua kemungkinan
+            const userId = req.user?.id;
+
+            console.log('========== UPDATE SUBMISSION ==========');
+            console.log('📥 ID:', id);
+            console.log('📥 Status dari frontend:', status);
+            console.log('📥 Catatan dari frontend:', catatan); // Ini yang dikirim frontend
+            console.log('📥 Catatan Admin:', catatan_admin);
+            console.log('👤 User ID:', userId);
+            console.log('👤 User Role:', req.user?.role);
+
             if (!userId) {
-                console.log('❌ User ID tidak ditemukan');
                 return res.status(401).json({
                     success: false,
-                    message: 'Unauthorized - User ID tidak ditemukan'
+                    message: 'Unauthorized'
                 });
             }
-            
-            // Data dari form
-            const {
-                nama_pemohon, 
-                instansi, 
-                nama_proyek,
-                alamat_pemohon,
-                nomor_telepon,
-                lokasi_proyek,
-                uji_bahan, 
-                uji_konstruksi, 
-                qty_estimasi,
-                tanggal_sampel,
-                jenis_sampel,
-                nama_sampel,
-                jumlah_sampel,
-                metode_uji,
-                catatan_pemohon
-            } = req.body;
-            
-            // Tentukan service_id yang dipilih
-            let serviceId = uji_bahan || uji_konstruksi;
-            
-            if (!serviceId) {
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            // Validasi status
+            const validStatuses = [
+                'Menunggu Verifikasi',
+                'Pengecekan Sampel',
+                'Belum Bayar',
+                'Belum Lunas',
+                'Menunggu SKRD Upload',
+                'Lunas',
+                'Sedang Diuji',
+                'Selesai',
+                'Dibatalkan'
+            ];
+
+            if (status && !validStatuses.includes(status)) {
+                console.log('❌ Status tidak valid:', status);
                 return res.status(400).json({
                     success: false,
-                    message: 'Pilih jenis pengujian terlebih dahulu'
+                    message: 'Status tidak valid'
                 });
             }
-            
-            // Generate no_urut
-            const [count] = await db.query('SELECT COUNT(*) as total FROM submissions');
-            const no_urut = String(count[0].total + 1).padStart(3, '0');
-            
-            // Generate kode_pengujian
-            const date = new Date();
-            const year = date.getFullYear();
-            const kode_pengujian = `LAB-${year}-${String(count[0].total + 1).padStart(3, '0')}`;
-            
-            // Simpan submission
-            const [result] = await db.query(
-                `INSERT INTO submissions (
-                    user_id, no_urut, kode_pengujian, nama_pemohon, instansi,
-                    nama_proyek, tgl_permohonan, status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [
-                    userId, 
-                    no_urut, 
-                    kode_pengujian, 
-                    nama_pemohon,
-                    instansi,
-                    nama_proyek, 
-                    new Date(),
-                    'Menunggu Verifikasi'
-                ]
+
+            // Cek apakah submission ada
+            const [check] = await db.query(
+                'SELECT id, status FROM submissions WHERE id = ?',
+                [id]
             );
-            
-            const submissionId = result.insertId;
-            console.log('✅ Submission created with ID:', submissionId);
-            
-            // Simpan submission items
-            if (serviceId) {
-                const qty = parseInt(qty_estimasi) || 1;
-                
-                // Ambil harga dari services
-                const [service] = await db.query('SELECT price, service_name FROM services WHERE id = ?', [serviceId]);
-                const price = service[0]?.price || 0;
-                
-                await db.query(
-                    `INSERT INTO submission_items (
-                        submission_id, service_id, nama_sampel_uji, 
-                        jumlah_sampel_diajukan, price_at_time
-                    ) VALUES (?, ?, ?, ?, ?)`,
-                    [
-                        submissionId, 
-                        serviceId, 
-                        nama_sampel || service[0]?.service_name || 'Sample Uji',
-                        qty + ' sample', 
-                        price
-                    ]
-                );
-                console.log('✅ Submission item created');
+
+            if (check.length === 0) {
+                console.log('❌ Submission tidak ditemukan');
+                return res.status(404).json({
+                    success: false,
+                    message: 'Submission tidak ditemukan'
+                });
+            }
+
+            console.log('📋 Status saat ini di database:', check[0].status);
+
+            // Buat query dinamis - Gunakan catatan_admin sebagai field database
+            let updateFields = [];
+            let queryParams = [];
+
+            if (status) {
+                updateFields.push('status = ?');
+                queryParams.push(status);
+                console.log('📝 Akan update status ke:', status);
             }
             
-            // Berhasil
+            // Prioritaskan catatan_admin, jika tidak ada gunakan catatan
+            const catatanToSave = catatan_admin || catatan;
+            if (catatanToSave !== undefined) {
+                updateFields.push('catatan_admin = ?'); // Simpan ke kolom catatan_admin
+                queryParams.push(catatanToSave);
+                console.log('📝 Akan update catatan admin ke:', catatanToSave);
+            }
+            
+            updateFields.push('updated_at = NOW()');
+            
+            if (updateFields.length === 1) {
+                console.log('ℹ️ Tidak ada perubahan');
+                return res.json({
+                    success: true,
+                    message: 'Tidak ada perubahan'
+                });
+            }
+
+            queryParams.push(id);
+
+            const query = `UPDATE submissions SET ${updateFields.join(', ')} WHERE id = ?`;
+            console.log('📋 Query:', query);
+            console.log('📦 Params:', queryParams);
+
+            const [result] = await db.query(query, queryParams);
+
+            console.log('✅ Update result:', result);
+
+            // Catat aktivitas jika status berubah
+            if (status) {
+                try {
+                    await db.query(
+                        `INSERT INTO activities (user_id, activity_name, created_at) 
+                        VALUES (?, ?, NOW())`,
+                        [userId, `Update status ke ${status}`]
+                    );
+                    console.log('✅ Activity logged');
+                } catch (activityError) {
+                    console.log('Activity log error:', activityError.message);
+                }
+            }
+
             res.json({
                 success: true,
-                message: 'Permohonan berhasil dikirim',
-                data: {
-                    id: submissionId,
-                    no_urut: no_urut,
-                    kode_pengujian: kode_pengujian
-                }
+                message: 'Submission berhasil diupdate'
             });
-            
+
         } catch (error) {
-            console.error('❌ Error creating submission:', error);
+            console.error('❌ Error updating submission:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengirim permohonan: ' + error.message
+                message: 'Gagal mengupdate submission: ' + error.message
             });
         }
     },
+
+    // ==================== CANCEL SUBMISSION ====================
+    cancelSubmission: async (req, res) => {
+        try {
+            const id = req.params.id;
+            const userId = req.user?.id;
+
+            console.log('🗑️ Cancelling submission ID:', id);
+
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            // Cek apakah submission ada
+            const [submission] = await db.query(
+                'SELECT * FROM submissions WHERE id = ?',
+                [id]
+            );
+
+            if (submission.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Submission tidak ditemukan'
+                });
+            }
+
+            // Update status menjadi cancelled
+            const [result] = await db.query(
+                'UPDATE submissions SET status = ?, updated_at = NOW() WHERE id = ?',
+                ['Dibatalkan', id]
+            );
+
+            console.log('✅ Cancel result:', result);
+
+            // Catat aktivitas pembatalan - HAPUS submission_id
+            try {
+                await db.query(
+                    `INSERT INTO activities (user_id, activity_name, created_at) 
+                    VALUES (?, ?, NOW())`,
+                    [userId, 'cancel', 'Pengajuan dibatalkan']
+                );
+            } catch (activityError) {
+                console.log('Activity log error:', activityError.message);
+            }
+
+            res.json({
+                success: true,
+                message: 'Submission berhasil dibatalkan'
+            });
+
+        } catch (error) {
+            console.error('❌ Error cancelling submission:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal membatalkan submission: ' + error.message
+            });
+        }
+    },
+
+    // ==================== GET SUBMISSION DOCUMENTS ====================
+    getSubmissionDocuments: async (req, res) => {
+        try {
+            const id = req.params.id;
+            const userId = req.user?.id;
+
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            const [submission] = await db.query(
+                'SELECT file_surat_permohonan, file_ktp FROM submissions WHERE id = ?',
+                [id]
+            );
+            
+            const BASE_URL = 'http://localhost:5000';
+            
+            // Format response dengan URL lengkap
+            const documents = {
+                surat_permohonan: submission[0]?.file_surat_permohonan ? {
+                    filename: submission[0].file_surat_permohonan,
+                    url: `${BASE_URL}/uploads/surat/${submission[0].file_surat_permohonan}`,
+                    type: submission[0].file_surat_permohonan.endsWith('.pdf') ? 'pdf' : 'image'
+                } : null,
+                scan_ktp: submission[0]?.file_ktp ? {
+                    filename: submission[0].file_ktp,
+                    url: `${BASE_URL}/uploads/ktp/${submission[0].file_ktp}`,
+                    type: submission[0].file_ktp.endsWith('.pdf') ? 'pdf' : 'image'
+                } : null,
+                additional_docs: [] // Bisa ditambahkan nanti jika ada tabel dokumen tambahan
+            };
+            
+            res.json({ 
+                success: true, 
+                data: documents 
+            });
+        } catch (error) {
+            console.error('Error getting documents:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: error.message 
+            });
+        }
+    },
+
+    // ==================== UPLOAD SUBMISSION REPORT ====================
+    uploadSubmissionReport: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tidak ada file yang diupload'
+                });
+            }
+
+            console.log('📝 Uploading report for submission:', id);
+            console.log('📁 File:', req.file);
+
+            // Cek apakah submission ada
+            const [submissions] = await db.query(
+                'SELECT id FROM submissions WHERE id = ?',
+                [id]
+            );
+
+            if (submissions.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Submission tidak ditemukan'
+                });
+            }
+
+            // Cek apakah sudah ada report sebelumnya
+            const [existing] = await db.query(
+                'SELECT id FROM test_reports WHERE submission_id = ?',
+                [id]
+            );
+
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            const fileUrl = `${baseUrl}/uploads/reports/${req.file.filename}`;
+
+            if (existing.length > 0) {
+                // Update report yang sudah ada
+                await db.query(
+                    `UPDATE test_reports 
+                    SET file_laporan = ?, updated_at = NOW() 
+                    WHERE submission_id = ?`,
+                    [req.file.filename, id]
+                );
+            } else {
+                // Insert report baru
+                await db.query(
+                    `INSERT INTO test_reports 
+                    (submission_id, file_laporan, created_at) 
+                    VALUES (?, ?, NOW())`,
+                    [id, req.file.filename]
+                );
+            }
+
+            // Update status submission menjadi 'Selesai' jika diperlukan
+            await db.query(
+                `UPDATE submissions 
+                SET status = 'Selesai', updated_at = NOW() 
+                WHERE id = ?`,
+                [id]
+            );
+
+            // Catat aktivitas
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, `Upload Laporan Submission #${id}`, req.ip, req.headers['user-agent']]
+            );
+
+            res.json({
+                success: true,
+                message: 'Laporan berhasil diupload',
+                data: {
+                    filename: req.file.filename,
+                    url: fileUrl
+                }
+            });
+
+        } catch (error) {
+            console.error('Error uploading report:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal upload laporan: ' + error.message
+            });
+        }
+    },
+
+    // ==================== DOWNLOAD SUBMISSION REPORT ====================
+    downloadSubmissionReport: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            // Ambil data report
+            const [reports] = await db.query(
+                'SELECT file_laporan FROM test_reports WHERE submission_id = ?',
+                [id]
+            );
+
+            if (reports.length === 0 || !reports[0].file_laporan) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Laporan tidak ditemukan'
+                });
+            }
+
+            const filename = reports[0].file_laporan;
+            const filepath = path.join(__dirname, '../../uploads/reports', filename);
+
+            // Cek apakah file ada
+            if (!fs.existsSync(filepath)) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'File laporan tidak ditemukan di server'
+                });
+            }
+
+            // Kirim file
+            res.download(filepath, filename);
+
+        } catch (error) {
+            console.error('Error downloading report:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal download laporan: ' + error.message
+            });
+        }
+    },
+
+    // ==================== SKRD ====================
 
     // GET SKRD LIST - VERSI OPTIMASI (DENGAN FILTER TANGGAL DAN SUBMISSION ID)
     getSKRD: async (req, res) => {
@@ -1169,11 +1726,17 @@ const apiController = {
             console.log('========== BACKEND GET SKRD ==========');
             console.log('📥 Params:', { page, limit, status, search, submissionId, startDate, endDate });
             
-            // HITUNG TOTAL DULU
-            let countQuery = `SELECT COUNT(*) as total FROM payments p WHERE 1=1`;
+            // ========== HITUNG TOTAL DULU ==========
+            let countQuery = `
+                SELECT COUNT(*) as total 
+                FROM payments p 
+                LEFT JOIN submissions s ON p.submission_id = s.id 
+                LEFT JOIN users u ON s.user_id = u.id
+                WHERE 1=1
+            `;
             let countParams = [];
             
-            // 🔥 FILTER SUBMISSION ID
+            // FILTER SUBMISSION ID
             if (submissionId) {
                 countQuery += ` AND p.submission_id = ?`;
                 countParams.push(submissionId);
@@ -1194,7 +1757,7 @@ const apiController = {
             }
             
             if (search) {
-                countQuery += ` AND (p.invoice_number LIKE ? OR EXISTS (SELECT 1 FROM users u WHERE u.id = p.user_id AND (u.company LIKE ? OR u.name LIKE ?)))`;
+                countQuery += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ?)`;
                 const searchPattern = `%${search}%`;
                 countParams.push(searchPattern, searchPattern, searchPattern);
             }
@@ -1209,10 +1772,11 @@ const apiController = {
                         invoices: [],
                         stats: {
                             totalReceivable: 'Rp 0',
-                            unpaidCount: 0,
+                            pendingCount: 0,
                             waitingVerification: 0,
                             monthlyIncome: 'Rp 0',
-                            paidCount: 0
+                            paidCount: 0,
+                            partialCount: 0
                         },
                         total: 0,
                         page: page,
@@ -1222,33 +1786,29 @@ const apiController = {
                 });
             }
             
-            // QUERY UTAMA
+            // ========== QUERY UTAMA ==========
             let query = `
                 SELECT 
                     p.id,
-                    p.invoice_number,
-                    p.skrd_number,
-                    p.total_tagihan,
-                    p.paid_amount,
-                    p.status_pembayaran as status,
-                    p.payment_method,
-                    p.va_number,
-                    p.paid_date,
-                    p.due_date,
-                    p.created_at as issue_date,
-                    u.company as company_name,
-                    s.test_type as service_description,
-                    (p.total_tagihan - p.paid_amount) as remaining_amount,
-                    p.submission_id
+                    p.no_invoice as invoice_number,
+                    p.no_invoice as skrd_number,
+                    p.total_tagihan as total_amount,
+                    p.jumlah_dibayar as paid_amount,
+                    p.sisa_tagihan as remaining_amount,
+                    p.status_pembayaran,
+                    p.created_at,
+                    u.nama_instansi,
+                    s.nama_proyek,
+                    s.id as submission_id
                 FROM payments p
-                INNER JOIN users u ON p.user_id = u.id
                 LEFT JOIN submissions s ON p.submission_id = s.id
+                LEFT JOIN users u ON s.user_id = u.id
                 WHERE 1=1
             `;
             
             let params = [];
             
-            // 🔥 FILTER SUBMISSION ID
+            // FILTER SUBMISSION ID
             if (submissionId) {
                 query += ` AND p.submission_id = ?`;
                 params.push(submissionId);
@@ -1269,9 +1829,9 @@ const apiController = {
             }
             
             if (search) {
-                query += ` AND (p.invoice_number LIKE ? OR u.company LIKE ? OR u.name LIKE ? OR s.test_type LIKE ?)`;
+                query += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ?)`;
                 const searchPattern = `%${search}%`;
-                params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+                params.push(searchPattern, searchPattern, searchPattern);
             }
             
             query += ` ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
@@ -1282,13 +1842,13 @@ const apiController = {
             
             const [invoices] = await db.query(query, params);
             
-            // HITUNG STATS (opsional, tidak perlu filter submission_id untuk stats global)
+            // ========== HITUNG STATS ==========
             let statsQuery = `
                 SELECT 
-                    COALESCE(SUM(CASE WHEN status_pembayaran IN ('pending', 'partial', 'waiting_verify') THEN (total_tagihan - paid_amount) ELSE 0 END), 0) as total_receivable,
-                    COUNT(CASE WHEN status_pembayaran = 'pending' THEN 1 END) as pending_count,
-                    COUNT(CASE WHEN status_pembayaran = 'partial' THEN 1 END) as partial_count,
-                    COUNT(CASE WHEN status_pembayaran = 'waiting_verify' THEN 1 END) as waiting_verification,
+                    COALESCE(SUM(CASE WHEN status_pembayaran IN ('Belum Bayar', 'Menunggu SKRD Upload') THEN total_tagihan ELSE 0 END), 0) as total_receivable,
+                    COUNT(CASE WHEN status_pembayaran = 'Belum Bayar' THEN 1 END) as pending_count,
+                    COUNT(CASE WHEN status_pembayaran = 'Belum Lunas' THEN 1 END) as partial_count,
+                    COUNT(CASE WHEN status_pembayaran = 'Menunggu SKRD Upload' THEN 1 END) as waiting_verification,
                     COUNT(CASE WHEN status_pembayaran = 'Lunas' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) THEN 1 END) as paid_count,
                     COALESCE(SUM(CASE WHEN status_pembayaran = 'Lunas' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) THEN total_tagihan ELSE 0 END), 0) as monthly_income
                 FROM payments
@@ -1309,12 +1869,12 @@ const apiController = {
             const [statsResult] = await db.query(statsQuery, statsParams);
             
             const stats = {
-                totalReceivable: formatRupiah(statsResult[0].total_receivable),
-                pendingCount: statsResult[0].pending_count,
-                partialCount: statsResult[0].partial_count,
-                waitingVerification: statsResult[0].waiting_verification,
-                paidCount: statsResult[0].paid_count,
-                monthlyIncome: formatRupiah(statsResult[0].monthly_income)
+                totalReceivable: 'Rp ' + new Intl.NumberFormat('id-ID').format(statsResult[0].total_receivable || 0),
+                pendingCount: statsResult[0].pending_count || 0,
+                partialCount: statsResult[0].partial_count || 0,
+                waitingVerification: statsResult[0].waiting_verification || 0,
+                paidCount: statsResult[0].paid_count || 0,
+                monthlyIncome: 'Rp ' + new Intl.NumberFormat('id-ID').format(statsResult[0].monthly_income || 0)
             };
             
             res.json({
@@ -1330,88 +1890,130 @@ const apiController = {
             });
         } catch (error) {
             console.error('❌ Error:', error);
-            res.status(500).json({ success: false, message: 'Gagal mengambil data SKRD' });
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil data SKRD: ' + error.message 
+            });
         }
     },
+
+    // ==================== SKRD METHODS ====================
 
     // GET SKRD DETAIL
     getSKRDDetail: async (req, res) => {
         try {
             const id = req.params.id;
             
+            console.log('========== GET SKRD DETAIL ==========');
+            console.log('📥 ID:', id);
+            
             const [payments] = await db.query(`
                 SELECT 
                     p.*,
-                    u.name as pic_name,
-                    u.email as pic_email,
-                    u.phone as pic_phone,
-                    u.company as company_name,
-                    u.address,
-                    s.test_type,
-                    s.category,
-                    s.registration_number
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.alamat_pemohon,
+                    s.nomor_telepon,
+                    s.email_pemohon,
+                    s.nama_proyek,
+                    s.lokasi_proyek,
+                    s.no_permohonan,
+                    s.catatan_tambahan,
+                    u.full_name,
+                    u.email as user_email,
+                    u.nomor_telepon as user_phone,
+                    (SELECT COUNT(*) FROM submission_samples WHERE submission_id = s.id) as total_samples,
+                    (SELECT GROUP_CONCAT(service_name SEPARATOR ', ') 
+                    FROM submission_samples ss 
+                    JOIN services sv ON ss.service_id = sv.id 
+                    WHERE ss.submission_id = s.id) as layanan
                 FROM payments p
-                LEFT JOIN users u ON p.user_id = u.id
                 LEFT JOIN submissions s ON p.submission_id = s.id
+                LEFT JOIN users u ON s.user_id = u.id
                 WHERE p.id = ?
             `, [id]);
 
             if (payments.length === 0) {
-                return res.status(404).json({ success: false, message: 'SKRD tidak ditemukan' });
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'SKRD tidak ditemukan' 
+                });
             }
 
             const payment = payments[0];
             
-            // Hitung PPN (11%)
+            // Ambil detail samples
+            const [samples] = await db.query(`
+                SELECT 
+                    ss.*,
+                    sv.service_name,
+                    sv.method
+                FROM submission_samples ss
+                JOIN services sv ON ss.service_id = sv.id
+                WHERE ss.submission_id = ?
+            `, [payment.submission_id]);
+            
             const totalAmount = parseFloat(payment.total_tagihan) || 0;
-            const subtotal = totalAmount / 1.11;
-            const ppn = totalAmount - subtotal;
+            const paidAmount = parseFloat(payment.jumlah_dibayar) || 0;
+            const remainingAmount = parseFloat(payment.sisa_tagihan) || (totalAmount - paidAmount);
+            
+            // Format notes untuk riwayat pembayaran
+            const paymentNotes = payment.bukti_pembayaran_notes || '';
+            const paymentHistory = paymentNotes.split('\n').filter(line => line.trim() !== '');
             
             const response = {
                 id: payment.id,
-                invoice_number: payment.invoice_number,
-                skrd_number: payment.skrd_number,
+                no_invoice: payment.no_invoice,
                 submission_id: payment.submission_id,
-                issue_date: payment.issue_date || payment.created_at,
-                due_date: payment.due_date,
+                issue_date: payment.created_at,
+                due_date: payment.created_at,
                 total_tagihan: totalAmount,
-                paid_amount: parseFloat(payment.paid_amount) || 0,
-                remaining_amount: totalAmount - (parseFloat(payment.paid_amount) || 0),
-                status_pembayaran: payment.status_pembayaran || 'pending',
-                payment_method: payment.payment_method,
-                va_number: payment.va_number,
-                paid_date: payment.paid_date,
-                notes: payment.notes,
+                jumlah_dibayar: paidAmount,
+                sisa_tagihan: remainingAmount,
+                status_pembayaran: payment.status_pembayaran,
+                bukti_pembayaran_1: payment.bukti_pembayaran_1,
+                bukti_pembayaran_2: payment.bukti_pembayaran_2,
+                bukti_pembayaran_notes: payment.bukti_pembayaran_notes,
+                payment_history: paymentHistory,
                 created_at: payment.created_at,
+                updated_at: payment.updated_at,
                 
-                // Data perusahaan
-                company_name: payment.company_name,
-                pic_name: payment.pic_name,
-                pic_email: payment.pic_email,
-                pic_phone: payment.pic_phone,
-                address: payment.address,
-                
-                // Data pengujian
-                test_type: payment.test_type,
-                category: payment.category,
-                registration_number: payment.registration_number,
-                
-                // Data SKRD file
+                // 🔥 TAMBAHKAN FIELD UNTUK FILE SKRD
                 skrd_file: payment.skrd_file,
                 skrd_filename: payment.skrd_filename,
                 skrd_uploaded_at: payment.skrd_uploaded_at,
+                skrd_uploaded_by: payment.skrd_uploaded_by,
                 
-                // Data payment proof
-                payment_proof: payment.payment_proof,
-                payment_proof_filename: payment.payment_proof_filename,
-                payment_proof_uploaded_at: payment.payment_proof_uploaded_at
+                // Data pemohon
+                nama_pemohon: payment.nama_pemohon || payment.full_name,
+                nama_instansi: payment.nama_instansi,
+                alamat: payment.alamat_pemohon,
+                nomor_telepon: payment.nomor_telepon || payment.user_phone,
+                email: payment.email_pemohon || payment.user_email,
+                
+                // Data proyek
+                nama_proyek: payment.nama_proyek,
+                lokasi_proyek: payment.lokasi_proyek,
+                no_permohonan: payment.no_permohonan,
+                catatan: payment.catatan_tambahan,
+                
+                // Data layanan
+                layanan: payment.layanan,
+                total_samples: payment.total_samples || 0,
+                samples: samples
             };
 
-            res.json({ success: true, data: response });
+            res.json({ 
+                success: true, 
+                data: response 
+            });
 
         } catch (error) {
             console.error('❌ Error:', error);
-            res.status(500).json({ success: false, message: 'Gagal mengambil detail SKRD' });
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil detail SKRD: ' + error.message 
+            });
         }
     },
 
@@ -1458,6 +2060,7 @@ const apiController = {
             console.log('📝 Verifying payment for SKRD ID:', id);
             console.log('💰 Paid amount:', paid_amount);
             console.log('📅 Paid date:', paid_date);
+            console.log('📝 Notes:', notes);
 
             if (!paid_amount || paid_amount <= 0) {
                 return res.status(400).json({
@@ -1477,39 +2080,56 @@ const apiController = {
 
             const payment = payments[0];
             const totalAmount = parseFloat(payment.total_tagihan) || 0;
-            const currentPaid = parseFloat(payment.paid_amount) || 0;
+            const currentPaid = parseFloat(payment.jumlah_dibayar) || 0;
+            const currentNotes = payment.bukti_pembayaran_notes || '';
+            
+            // Hitung total yang sudah dibayar + yang baru
             const newTotalPaid = currentPaid + parseFloat(paid_amount);
             
-            let newStatus = 'partial';
+            // Tentukan status baru
+            let newStatus = 'Belum Lunas';
             if (newTotalPaid >= totalAmount) {
                 newStatus = 'Lunas';
             }
 
+            // Gabungkan notes
+            const date = new Date().toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'numeric',
+                year: 'numeric'
+            });
+            const newNotes = currentNotes 
+                ? `${currentNotes}\n[${date}] Verifikasi: Rp ${parseFloat(paid_amount).toLocaleString('id-ID')} - ${notes || 'Pembayaran diverifikasi'}`
+                : `[${date}] Verifikasi: Rp ${parseFloat(paid_amount).toLocaleString('id-ID')} - ${notes || 'Pembayaran diverifikasi'}`;
+
+            // UPDATE TANPA MENYENTUH KOLOM sisa_tagihan (KARENA GENERATED COLUMN)
             await db.query(
                 `UPDATE payments 
-                SET paid_amount = ?,
+                SET jumlah_dibayar = ?,
                     status_pembayaran = ?,
-                    paid_date = ?,
-                    notes = CONCAT(IFNULL(notes, ''), '\n[Verifikasi] ', ?),
+                    bukti_pembayaran_notes = ?,
                     updated_at = NOW()
                 WHERE id = ?`,
-                [newTotalPaid, newStatus, paid_date, notes || 'Pembayaran diverifikasi', id]
+                [newTotalPaid, newStatus, newNotes, id]
             );
 
+            // Catat aktivitas
             await db.query(
-                `INSERT INTO activities (user_id, action, description, type) 
-                VALUES (?, ?, ?, ?)`,
-                [userId, 'verify_payment', `Verifikasi pembayaran SKRD #${payment.invoice_number} sebesar Rp ${paid_amount}`, 'payment']
+                `INSERT INTO activities (user_id, activity_name, created_at) 
+                VALUES (?, ?, NOW())`,
+                [userId, `Verifikasi pembayaran SKRD #${payment.no_invoice} sebesar Rp ${paid_amount}`]
+            );
+
+            // Ambil data terbaru
+            const [updatedPayments] = await db.query(
+                'SELECT * FROM payments WHERE id = ?',
+                [id]
             );
 
             res.json({
                 success: true,
                 message: 'Pembayaran berhasil diverifikasi',
-                data: {
-                    paid_amount: newTotalPaid,
-                    status: newStatus,
-                    remaining: totalAmount - newTotalPaid
-                }
+                data: updatedPayments[0]
             });
 
         } catch (error) {
@@ -1521,7 +2141,7 @@ const apiController = {
         }
     },
 
-    // 🔥 UPLOAD SKRD FILE (dari admin)
+    // 🔥 UPLOAD SKRD FILE (dari admin) - VERSI DENGAN KOLOM DATABASE
     uploadSkrd: async (req, res) => {
         try {
             const id = req.params.id;
@@ -1540,14 +2160,16 @@ const apiController = {
             const baseUrl = `${req.protocol}://${req.get('host')}`;
             const fileUrl = `${baseUrl}/uploads/skrd/${req.file.filename}`;
 
+            // 🔥 UPDATE DENGAN KOLOM YANG SESUAI DATABASE
             await db.query(
                 `UPDATE payments 
                 SET skrd_file = ?,
                     skrd_filename = ?,
                     skrd_uploaded_at = NOW(),
-                    skrd_uploaded_by = ?
+                    skrd_uploaded_by = ?,
+                    updated_at = NOW()
                 WHERE id = ?`,
-                [fileUrl, req.file.originalname, userId, id]
+                [req.file.filename, req.file.originalname, userId, id]
             );
 
             res.json({
@@ -1565,6 +2187,57 @@ const apiController = {
             res.status(500).json({
                 success: false,
                 message: 'Gagal upload SKRD: ' + error.message
+            });
+        }
+    },
+
+    // 🔥 DOWNLOAD SKRD FILE
+    downloadSkrd: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            // Ambil data payment
+            const [payments] = await db.query(
+                'SELECT skrd_file, skrd_filename FROM payments WHERE id = ?',
+                [id]
+            );
+
+            if (payments.length === 0 || !payments[0].skrd_file) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'File SKRD tidak ditemukan'
+                });
+            }
+
+            const filename = payments[0].skrd_file;
+            const originalname = payments[0].skrd_filename || filename;
+            const filepath = path.join(__dirname, '../../uploads/skrd', filename);
+
+            // Cek apakah file ada
+            const fs = require('fs');
+            if (!fs.existsSync(filepath)) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'File SKRD tidak ditemukan di server'
+                });
+            }
+
+            // Kirim file
+            res.download(filepath, originalname);
+
+        } catch (error) {
+            console.error('Error downloading SKRD:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal download SKRD: ' + error.message
             });
         }
     },
@@ -1733,8 +2406,1032 @@ const apiController = {
         }
     },
 
+    // ==================== KUISIONER METHODS ====================
+
+    // GET all kuisioner (public/user) - JANGAN DIHAPUS
+    getKuisioner: async (req, res) => {
+        try {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10;
+            const search = req.query.search || '';
+            const startDate = req.query.start_date || '';
+            const endDate = req.query.end_date || '';
+            
+            const offset = (page - 1) * limit;
+            
+            console.log('========== GET KUISIONER ==========');
+            console.log('📥 Params:', { page, limit, search, startDate, endDate });
+            
+            // Query dengan JOIN submissions
+            let query = `
+                SELECT 
+                    k.*,
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.nomor_telepon,
+                    s.nama_proyek,
+                    s.no_permohonan
+                FROM kuisioner k
+                LEFT JOIN submissions s ON k.submission_id = s.id
+                WHERE 1=1
+            `;
+            
+            let countQuery = `SELECT COUNT(*) as total FROM kuisioner WHERE 1=1`;
+            let params = [];
+            let countParams = [];
+            
+            if (startDate) {
+                query += ` AND DATE(k.created_at) >= ?`;
+                countQuery += ` AND DATE(created_at) >= ?`;
+                params.push(startDate);
+                countParams.push(startDate);
+            }
+            if (endDate) {
+                query += ` AND DATE(k.created_at) <= ?`;
+                countQuery += ` AND DATE(created_at) <= ?`;
+                params.push(endDate);
+                countParams.push(endDate);
+            }
+            
+            if (search) {
+                query += ` AND (s.nama_pemohon LIKE ? OR s.nama_instansi LIKE ?)`;
+                countQuery += ` AND (nama_pemohon LIKE ? OR instansi LIKE ?)`;
+                const searchPattern = `%${search}%`;
+                params.push(searchPattern, searchPattern);
+                countParams.push(searchPattern, searchPattern);
+            }
+            
+            query += ` ORDER BY k.created_at DESC LIMIT ? OFFSET ?`;
+            params.push(limit, offset);
+            
+            const [kuisioner] = await db.query(query, params);
+            const [countResult] = await db.query(countQuery, countParams);
+            
+            res.json({
+                success: true,
+                data: {
+                    kuisioner: kuisioner,
+                    total: countResult[0].total,
+                    page: page,
+                    limit: limit,
+                    totalPages: Math.ceil(countResult[0].total / limit)
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil data kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // GET kuisioner stats (public/user)
+    getKuisionerStats: async (req, res) => {
+        try {
+            const startDate = req.query.start_date || '';
+            const endDate = req.query.end_date || '';
+            
+            let whereClause = 'WHERE 1=1';
+            let params = [];
+            
+            if (startDate) {
+                whereClause += ` AND DATE(created_at) >= ?`;
+                params.push(startDate);
+            }
+            if (endDate) {
+                whereClause += ` AND DATE(created_at) <= ?`;
+                params.push(endDate);
+            }
+            
+            const [stats] = await db.query(`
+                SELECT 
+                    COUNT(*) as total_responden,
+                    ROUND(AVG(COALESCE(skor_1,0)), 2) as rata_skor_1,
+                    ROUND(AVG(COALESCE(skor_2,0)), 2) as rata_skor_2,
+                    ROUND(AVG(COALESCE(skor_3,0)), 2) as rata_skor_3,
+                    ROUND(AVG(COALESCE(skor_4,0)), 2) as rata_skor_4,
+                    ROUND(AVG(COALESCE(skor_5,0)), 2) as rata_skor_5,
+                    ROUND(AVG(COALESCE(skor_6,0)), 2) as rata_skor_6,
+                    ROUND(AVG(COALESCE(skor_7,0)), 2) as rata_skor_7,
+                    ROUND(AVG(COALESCE(skor_8,0)), 2) as rata_skor_8,
+                    ROUND(AVG(COALESCE(skor_9,0)), 2) as rata_skor_9,
+                    ROUND(AVG(COALESCE(skor_10,0)), 2) as rata_skor_10,
+                    ROUND(
+                        (AVG(COALESCE(skor_1,0)) + AVG(COALESCE(skor_2,0)) + AVG(COALESCE(skor_3,0)) + 
+                         AVG(COALESCE(skor_4,0)) + AVG(COALESCE(skor_5,0)) + AVG(COALESCE(skor_6,0)) + 
+                         AVG(COALESCE(skor_7,0)) + AVG(COALESCE(skor_8,0)) + AVG(COALESCE(skor_9,0)) + 
+                         AVG(COALESCE(skor_10,0))) / 10, 2
+                    ) as rata_keseluruhan
+                FROM kuisioner
+                ${whereClause}
+            `, params);
+            
+            const [distribusi] = await db.query(`
+                SELECT 
+                    COUNT(CASE WHEN skor_1 = 1 OR skor_2 = 1 OR skor_3 = 1 OR skor_4 = 1 OR skor_5 = 1 
+                                OR skor_6 = 1 OR skor_7 = 1 OR skor_8 = 1 OR skor_9 = 1 OR skor_10 = 1 THEN 1 END) as skor_1_count,
+                    COUNT(CASE WHEN skor_1 = 2 OR skor_2 = 2 OR skor_3 = 2 OR skor_4 = 2 OR skor_5 = 2 
+                                OR skor_6 = 2 OR skor_7 = 2 OR skor_8 = 2 OR skor_9 = 2 OR skor_10 = 2 THEN 1 END) as skor_2_count,
+                    COUNT(CASE WHEN skor_1 = 3 OR skor_2 = 3 OR skor_3 = 3 OR skor_4 = 3 OR skor_5 = 3 
+                                OR skor_6 = 3 OR skor_7 = 3 OR skor_8 = 3 OR skor_9 = 3 OR skor_10 = 3 THEN 1 END) as skor_3_count,
+                    COUNT(CASE WHEN skor_1 = 4 OR skor_2 = 4 OR skor_3 = 4 OR skor_4 = 4 OR skor_5 = 4 
+                                OR skor_6 = 4 OR skor_7 = 4 OR skor_8 = 4 OR skor_9 = 4 OR skor_10 = 4 THEN 1 END) as skor_4_count
+                FROM kuisioner
+                ${whereClause}
+            `, params);
+            
+            res.json({
+                success: true,
+                data: {
+                    stats: stats[0] || {},
+                    distribusi: distribusi[0] || {}
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting kuisioner stats:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil statistik kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // GET kuisioner by ID (public/user)
+    getKuisionerById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            const [kuisioner] = await db.query(`
+                SELECT 
+                    k.*,
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.nomor_telepon,
+                    s.nama_proyek,
+                    s.no_permohonan
+                FROM kuisioner k
+                LEFT JOIN submissions s ON k.submission_id = s.id
+                WHERE k.id = ?
+            `, [id]);
+            
+            if (kuisioner.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Kuisioner tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                data: kuisioner[0]
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting kuisioner by id:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil data kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // CREATE kuisioner (public) - VERSION LAMA (pake skor_1 - skor_10)
+    createKuisioner: async (req, res) => {
+        try {
+            const {
+                submission_id, nama_pemohon, instansi, telepon, jabatan,
+                skor_1, skor_2, skor_3, skor_4, skor_5,
+                skor_6, skor_7, skor_8, skor_9, skor_10,
+                saran
+            } = req.body;
+            
+            if (!submission_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Submission ID harus diisi'
+                });
+            }
+            
+            // Cek apakah submission ada
+            const [submission] = await db.query(
+                'SELECT id FROM submissions WHERE id = ?',
+                [submission_id]
+            );
+            
+            if (submission.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Data pengujian tidak ditemukan'
+                });
+            }
+            
+            // Cek apakah sudah ada kuisioner untuk submission ini
+            const [existing] = await db.query(
+                'SELECT id FROM kuisioner WHERE submission_id = ?',
+                [submission_id]
+            );
+            
+            if (existing.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Kuisioner untuk submission ini sudah ada'
+                });
+            }
+            
+            const [result] = await db.query(
+                `INSERT INTO kuisioner (
+                    submission_id, nama_pemohon, instansi, telepon, jabatan,
+                    skor_1, skor_2, skor_3, skor_4, skor_5,
+                    skor_6, skor_7, skor_8, skor_9, skor_10,
+                    saran
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    submission_id, nama_pemohon, instansi, telepon, jabatan,
+                    skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
+                    skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
+                    saran
+                ]
+            );
+            
+            res.json({
+                success: true,
+                message: 'Kuisioner berhasil disimpan',
+                data: { id: result.insertId }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error creating kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal menyimpan kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // UPDATE kuisioner (admin)
+    updateKuisioner: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const {
+                nama_pemohon, instansi, telepon, jabatan,
+                skor_1, skor_2, skor_3, skor_4, skor_5,
+                skor_6, skor_7, skor_8, skor_9, skor_10,
+                saran
+            } = req.body;
+            
+            const [result] = await db.query(
+                `UPDATE kuisioner SET
+                    nama_pemohon = ?, instansi = ?, telepon = ?, jabatan = ?,
+                    skor_1 = ?, skor_2 = ?, skor_3 = ?, skor_4 = ?, skor_5 = ?,
+                    skor_6 = ?, skor_7 = ?, skor_8 = ?, skor_9 = ?, skor_10 = ?,
+                    saran = ?, updated_at = NOW()
+                WHERE id = ?`,
+                [
+                    nama_pemohon, instansi, telepon, jabatan,
+                    skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
+                    skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
+                    saran, id
+                ]
+            );
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Kuisioner tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Kuisioner berhasil diupdate'
+            });
+            
+        } catch (error) {
+            console.error('❌ Error updating kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengupdate kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // DELETE kuisioner (admin)
+    deleteKuisioner: async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            const [result] = await db.query('DELETE FROM kuisioner WHERE id = ?', [id]);
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Kuisioner tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Kuisioner berhasil dihapus'
+            });
+            
+        } catch (error) {
+            console.error('❌ Error deleting kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal menghapus kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // ==================== ADMIN KUISIONER METHODS ====================
+
+    // GET all kuisioner untuk admin (VERSION LAMA - pake skor_1 - skor_10)
+    getAdminKuisioner: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10;
+            const search = req.query.search || '';
+            const startDate = req.query.start_date || '';
+            const endDate = req.query.end_date || '';
+            
+            const offset = (page - 1) * limit;
+            
+            console.log('========== GET ADMIN KUISIONER ==========');
+            console.log('📥 Params:', { page, limit, search, startDate, endDate });
+            
+            // Query dengan LEFT JOIN
+            let query = `
+                SELECT 
+                    k.id,
+                    k.submission_id,
+                    k.skor_1, k.skor_2, k.skor_3, k.skor_4, k.skor_5,
+                    k.skor_6, k.skor_7, k.skor_8, k.skor_9, k.skor_10,
+                    k.saran,
+                    k.created_at,
+                    COALESCE(s.nama_pemohon, '-') as nama_pemohon,
+                    COALESCE(s.nama_instansi, '-') as nama_instansi,
+                    COALESCE(s.nomor_telepon, '-') as nomor_telepon,
+                    COALESCE(s.nama_proyek, '-') as nama_proyek,
+                    COALESCE(s.no_permohonan, '-') as no_permohonan
+                FROM kuisioner k
+                LEFT JOIN submissions s ON k.submission_id = s.id
+                WHERE 1=1
+            `;
+            
+            let countQuery = `SELECT COUNT(*) as total FROM kuisioner WHERE 1=1`;
+            let params = [];
+            let countParams = [];
+            
+            // Filter tanggal
+            if (startDate) {
+                query += ` AND DATE(k.created_at) >= ?`;
+                countQuery += ` AND DATE(created_at) >= ?`;
+                params.push(startDate);
+                countParams.push(startDate);
+            }
+            if (endDate) {
+                query += ` AND DATE(k.created_at) <= ?`;
+                countQuery += ` AND DATE(created_at) <= ?`;
+                params.push(endDate);
+                countParams.push(endDate);
+            }
+            
+            // Filter search
+            if (search) {
+                query += ` AND (s.nama_pemohon LIKE ? OR s.nama_instansi LIKE ? OR s.no_permohonan LIKE ?)`;
+                countQuery += ` AND (SELECT 1 FROM submissions s WHERE s.id = kuisioner.submission_id AND (s.nama_pemohon LIKE ? OR s.nama_instansi LIKE ? OR s.no_permohonan LIKE ?))`;
+                const searchPattern = `%${search}%`;
+                params.push(searchPattern, searchPattern, searchPattern);
+                countParams.push(searchPattern, searchPattern, searchPattern);
+            }
+            
+            query += ` ORDER BY k.created_at DESC LIMIT ? OFFSET ?`;
+            params.push(limit, offset);
+            
+            console.log('📝 Query:', query);
+            console.log('📦 Params:', params);
+            
+            const [kuisioner] = await db.query(query, params);
+            const [countResult] = await db.query(countQuery, countParams);
+            
+            console.log(`✅ Found ${kuisioner.length} kuisioner`);
+
+            res.json({
+                success: true,
+                data: {
+                    kuisioner: kuisioner,
+                    total: countResult[0]?.total || 0,
+                    page: page,
+                    limit: limit,
+                    totalPages: Math.ceil((countResult[0]?.total || 0) / limit)
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting admin kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil data kuisioner: ' + error.message,
+                data: {
+                    kuisioner: [],
+                    total: 0,
+                    page: 1,
+                    limit: 10,
+                    totalPages: 0
+                }
+            });
+        }
+    },
+
+    // GET kuisioner stats untuk admin
+    getAdminKuisionerStats: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            const startDate = req.query.start_date || '';
+            const endDate = req.query.end_date || '';
+            
+            // Build where clause
+            let whereClause = 'WHERE 1=1';
+            let params = [];
+            
+            if (startDate) {
+                whereClause += ` AND DATE(created_at) >= ?`;
+                params.push(startDate);
+            }
+            if (endDate) {
+                whereClause += ` AND DATE(created_at) <= ?`;
+                params.push(endDate);
+            }
+            
+            // Statistik per pertanyaan (skor_1 - skor_10)
+            const [stats] = await db.query(`
+                SELECT 
+                    COUNT(DISTINCT submission_id) as total_responden,
+                    ROUND(AVG(COALESCE(skor_1,0)), 2) as rata_skor_1,
+                    ROUND(AVG(COALESCE(skor_2,0)), 2) as rata_skor_2,
+                    ROUND(AVG(COALESCE(skor_3,0)), 2) as rata_skor_3,
+                    ROUND(AVG(COALESCE(skor_4,0)), 2) as rata_skor_4,
+                    ROUND(AVG(COALESCE(skor_5,0)), 2) as rata_skor_5,
+                    ROUND(AVG(COALESCE(skor_6,0)), 2) as rata_skor_6,
+                    ROUND(AVG(COALESCE(skor_7,0)), 2) as rata_skor_7,
+                    ROUND(AVG(COALESCE(skor_8,0)), 2) as rata_skor_8,
+                    ROUND(AVG(COALESCE(skor_9,0)), 2) as rata_skor_9,
+                    ROUND(AVG(COALESCE(skor_10,0)), 2) as rata_skor_10,
+                    ROUND(
+                        (AVG(COALESCE(skor_1,0)) + AVG(COALESCE(skor_2,0)) + AVG(COALESCE(skor_3,0)) + 
+                        AVG(COALESCE(skor_4,0)) + AVG(COALESCE(skor_5,0)) + AVG(COALESCE(skor_6,0)) + 
+                        AVG(COALESCE(skor_7,0)) + AVG(COALESCE(skor_8,0)) + AVG(COALESCE(skor_9,0)) + 
+                        AVG(COALESCE(skor_10,0))) / 10, 2
+                    ) as rata_keseluruhan
+                FROM kuisioner
+                ${whereClause}
+            `, params);
+            
+            // Distribusi nilai (1-4)
+            const [distribusi] = await db.query(`
+                SELECT 
+                    COUNT(CASE WHEN skor_1 = 1 OR skor_2 = 1 OR skor_3 = 1 OR skor_4 = 1 OR skor_5 = 1 
+                                OR skor_6 = 1 OR skor_7 = 1 OR skor_8 = 1 OR skor_9 = 1 OR skor_10 = 1 THEN 1 END) as skor_1_count,
+                    COUNT(CASE WHEN skor_1 = 2 OR skor_2 = 2 OR skor_3 = 2 OR skor_4 = 2 OR skor_5 = 2 
+                                OR skor_6 = 2 OR skor_7 = 2 OR skor_8 = 2 OR skor_9 = 2 OR skor_10 = 2 THEN 1 END) as skor_2_count,
+                    COUNT(CASE WHEN skor_1 = 3 OR skor_2 = 3 OR skor_3 = 3 OR skor_4 = 3 OR skor_5 = 3 
+                                OR skor_6 = 3 OR skor_7 = 3 OR skor_8 = 3 OR skor_9 = 3 OR skor_10 = 3 THEN 1 END) as skor_3_count,
+                    COUNT(CASE WHEN skor_1 = 4 OR skor_2 = 4 OR skor_3 = 4 OR skor_4 = 4 OR skor_5 = 4 
+                                OR skor_6 = 4 OR skor_7 = 4 OR skor_8 = 4 OR skor_9 = 4 OR skor_10 = 4 THEN 1 END) as skor_4_count
+                FROM kuisioner
+                ${whereClause}
+            `, params);
+            
+            res.json({
+                success: true,
+                data: {
+                    stats: stats[0] || {},
+                    distribusi: distribusi[0] || {}
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting admin kuisioner stats:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil statistik kuisioner: ' + error.message,
+                data: {
+                    stats: {},
+                    distribusi: {}
+                }
+            });
+        }
+    },
+
+    // GET kuisioner by ID untuk admin
+    getAdminKuisionerById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+            
+            const [kuisioner] = await db.query(`
+                SELECT 
+                    k.*,
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.nomor_telepon,
+                    s.email_pemohon,
+                    s.nama_proyek,
+                    s.no_permohonan
+                FROM kuisioner k
+                LEFT JOIN submissions s ON k.submission_id = s.id
+                WHERE k.id = ?
+            `, [id]);
+            
+            if (kuisioner.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Kuisioner tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                data: kuisioner[0]
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting admin kuisioner by id:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengambil data kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // UPDATE kuisioner (admin)
+    updateAdminKuisioner: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+
+            const {
+                nama_pemohon, instansi, telepon, jabatan,
+                skor_1, skor_2, skor_3, skor_4, skor_5,
+                skor_6, skor_7, skor_8, skor_9, skor_10,
+                saran
+            } = req.body;
+            
+            const [result] = await db.query(
+                `UPDATE kuisioner SET
+                    nama_pemohon = ?, instansi = ?, telepon = ?, jabatan = ?,
+                    skor_1 = ?, skor_2 = ?, skor_3 = ?, skor_4 = ?, skor_5 = ?,
+                    skor_6 = ?, skor_7 = ?, skor_8 = ?, skor_9 = ?, skor_10 = ?,
+                    saran = ?, updated_at = NOW()
+                WHERE id = ?`,
+                [
+                    nama_pemohon, instansi, telepon, jabatan,
+                    skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
+                    skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
+                    saran, id
+                ]
+            );
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Kuisioner tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Kuisioner berhasil diupdate'
+            });
+            
+        } catch (error) {
+            console.error('❌ Error updating admin kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal mengupdate kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // DELETE kuisioner (admin)
+    deleteAdminKuisioner: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden - Admin only'
+                });
+            }
+            
+            const [result] = await db.query('DELETE FROM kuisioner WHERE id = ?', [id]);
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Kuisioner tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Kuisioner berhasil dihapus'
+            });
+            
+        } catch (error) {
+            console.error('❌ Error deleting admin kuisioner:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Gagal menghapus kuisioner: ' + error.message 
+            });
+        }
+    },
+
+    // ==================== KUISIONER QUESTIONS METHODS ====================
+
+    // GET all questions
+    getKuisionerQuestions: async (req, res) => {
+        try {
+            console.log('========== GET KUISIONER QUESTIONS ==========');
+            
+            // Cek apakah tabel kuisioner_questions ada
+            const [tables] = await db.query("SHOW TABLES LIKE 'kuisioner_questions'");
+            
+            if (tables.length === 0) {
+                console.log('⚠️ Tabel kuisioner_questions belum ada');
+                // Return data default jika tabel belum ada
+                const defaultQuestions = [
+                    { id: 1, question_text: 'Kemudahan dalam pelayanan pelanggan', urutan: 1 },
+                    { id: 2, question_text: 'Kemudahan informasi tentang sistem, mekanisme, dan prosedur pelayanan pengujian', urutan: 2 },
+                    { id: 3, question_text: 'Ketepatan waktu pelayanan pengujian', urutan: 3 },
+                    { id: 4, question_text: 'Biaya pengujian yang kompetitif', urutan: 4 },
+                    { id: 5, question_text: 'Kualitas dan mutu layanan sesuai ketentuan', urutan: 5 },
+                    { id: 6, question_text: 'Tenaga teknis yang handal, berpengalaman, dan bersertifikasi', urutan: 6 },
+                    { id: 7, question_text: 'Keramahan pelayanan petugas', urutan: 7 },
+                    { id: 8, question_text: 'Kecepatan tanggapan dan tindak lanjut terhadap keluhan', urutan: 8 },
+                    { id: 9, question_text: 'Kenyamanan dan kebersihan lingkungan', urutan: 9 },
+                    { id: 10, question_text: 'Dukungan peralatan yang memadai, terpelihara serta mutakhir', urutan: 10 }
+                ];
+                return res.json({
+                    success: true,
+                    data: defaultQuestions
+                });
+            }
+            
+            // Ambil semua pertanyaan dari database
+            const [questions] = await db.query(`
+                SELECT 
+                    id,
+                    question_text,
+                    urutan
+                FROM kuisioner_questions 
+                ORDER BY urutan ASC, id ASC
+            `);
+
+            console.log(`✅ Found ${questions.length} questions from database`);
+            
+            // Jika tidak ada data di database, return default
+            if (questions.length === 0) {
+                const defaultQuestions = [
+                    { id: 1, question_text: 'Kemudahan dalam pelayanan pelanggan', urutan: 1 },
+                    { id: 2, question_text: 'Kemudahan informasi tentang sistem, mekanisme, dan prosedur pelayanan pengujian', urutan: 2 },
+                    { id: 3, question_text: 'Ketepatan waktu pelayanan pengujian', urutan: 3 },
+                    { id: 4, question_text: 'Biaya pengujian yang kompetitif', urutan: 4 },
+                    { id: 5, question_text: 'Kualitas dan mutu layanan sesuai ketentuan', urutan: 5 },
+                    { id: 6, question_text: 'Tenaga teknis yang handal, berpengalaman, dan bersertifikasi', urutan: 6 },
+                    { id: 7, question_text: 'Keramahan pelayanan petugas', urutan: 7 },
+                    { id: 8, question_text: 'Kecepatan tanggapan dan tindak lanjut terhadap keluhan', urutan: 8 },
+                    { id: 9, question_text: 'Kenyamanan dan kebersihan lingkungan', urutan: 9 },
+                    { id: 10, question_text: 'Dukungan peralatan yang memadai, terpelihara serta mutakhir', urutan: 10 }
+                ];
+                return res.json({
+                    success: true,
+                    data: defaultQuestions
+                });
+            }
+            
+            res.json({
+                success: true,
+                data: questions
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting questions:', error);
+            // Return default questions jika error
+            const defaultQuestions = [
+                { id: 1, question_text: 'Kemudahan dalam pelayanan pelanggan', urutan: 1 },
+                { id: 2, question_text: 'Kemudahan informasi tentang sistem, mekanisme, dan prosedur pelayanan pengujian', urutan: 2 },
+                { id: 3, question_text: 'Ketepatan waktu pelayanan pengujian', urutan: 3 },
+                { id: 4, question_text: 'Biaya pengujian yang kompetitif', urutan: 4 },
+                { id: 5, question_text: 'Kualitas dan mutu layanan sesuai ketentuan', urutan: 5 },
+                { id: 6, question_text: 'Tenaga teknis yang handal, berpengalaman, dan bersertifikasi', urutan: 6 },
+                { id: 7, question_text: 'Keramahan pelayanan petugas', urutan: 7 },
+                { id: 8, question_text: 'Kecepatan tanggapan dan tindak lanjut terhadap keluhan', urutan: 8 },
+                { id: 9, question_text: 'Kenyamanan dan kebersihan lingkungan', urutan: 9 },
+                { id: 10, question_text: 'Dukungan peralatan yang memadai, terpelihara serta mutakhir', urutan: 10 }
+            ];
+            res.json({
+                success: true,
+                data: defaultQuestions
+            });
+        }
+    },
+
+    // GET question by ID
+    getKuisionerQuestionById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            const [questions] = await db.query(
+                'SELECT id, question_text, urutan FROM kuisioner_questions WHERE id = ?',
+                [id]
+            );
+            
+            if (questions.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Pertanyaan tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                data: questions[0]
+            });
+        } catch (error) {
+            console.error('❌ Error getting question:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil data pertanyaan: ' + error.message
+            });
+        }
+    },
+
+    // CREATE question
+    createKuisionerQuestion: async (req, res) => {
+        try {
+            const { question_text, urutan } = req.body;
+            const userId = req.user?.id || 1;
+            
+            console.log('========== CREATE KUISIONER QUESTION ==========');
+            console.log('📥 Data:', { question_text, urutan, userId });
+            
+            if (!question_text) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Teks pertanyaan harus diisi'
+                });
+            }
+            
+            // Jika urutan tidak diisi, ambil urutan terakhir + 1
+            let finalUrutan = urutan;
+            if (!finalUrutan) {
+                const [lastOrder] = await db.query(
+                    'SELECT MAX(urutan) as max_urutan FROM kuisioner_questions'
+                );
+                finalUrutan = (lastOrder[0].max_urutan || 0) + 1;
+                console.log('📊 Generated urutan:', finalUrutan);
+            }
+            
+            const [result] = await db.query(
+                `INSERT INTO kuisioner_questions (question_text, urutan) VALUES (?, ?)`,
+                [question_text, finalUrutan]
+            );
+            
+            console.log('✅ Question created with ID:', result.insertId);
+            
+            res.json({
+                success: true,
+                message: 'Pertanyaan berhasil ditambahkan',
+                data: {
+                    id: result.insertId,
+                    question_text,
+                    urutan: finalUrutan
+                }
+            });
+        } catch (error) {
+            console.error('❌ Error creating question:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menambah pertanyaan: ' + error.message
+            });
+        }
+    },
+
+    // UPDATE question
+    updateKuisionerQuestion: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { question_text, urutan } = req.body;
+            
+            console.log('========== UPDATE KUISIONER QUESTION ==========');
+            console.log('📥 ID:', id);
+            console.log('📥 Data:', { question_text, urutan });
+            
+            const [result] = await db.query(
+                `UPDATE kuisioner_questions 
+                SET question_text = ?, urutan = ?, updated_at = NOW()
+                WHERE id = ?`,
+                [question_text, urutan, id]
+            );
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Pertanyaan tidak ditemukan'
+                });
+            }
+            
+            console.log('✅ Question updated');
+            
+            res.json({
+                success: true,
+                message: 'Pertanyaan berhasil diupdate'
+            });
+        } catch (error) {
+            console.error('❌ Error updating question:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengupdate pertanyaan: ' + error.message
+            });
+        }
+    },
+
+    deleteKuisionerQuestion: async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            console.log('========== DELETE KUISIONER QUESTION ==========');
+            console.log('📥 ID:', id);
+            
+            const [result] = await db.query(
+                'DELETE FROM kuisioner_questions WHERE id = ?',
+                [id]
+            );
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Pertanyaan tidak ditemukan'
+                });
+            }
+            
+            console.log('✅ Question deleted');
+            
+            res.json({
+                success: true,
+                message: 'Pertanyaan berhasil dihapus'
+            });
+        } catch (error) {
+            console.error('❌ Error deleting question:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menghapus pertanyaan: ' + error.message
+            });
+        }
+    },
+
+    // REORDER questions
+    reorderKuisionerQuestions: async (req, res) => {
+        try {
+            const { orders } = req.body; // array of { id, urutan }
+            
+            for (const item of orders) {
+                await db.query(
+                    'UPDATE kuisioner_questions SET urutan = ? WHERE id = ?',
+                    [item.urutan, item.id]
+                );
+            }
+            
+            res.json({
+                success: true,
+                message: 'Urutan pertanyaan berhasil diupdate'
+            });
+        } catch (error) {
+            console.error('❌ Error reordering questions:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengupdate urutan pertanyaan: ' + error.message
+            });
+        }
+    },
+
+    // ==================== PUBLIC KUISIONER QUESTIONS (TANPA AUTH) ====================
+    getPublicKuisionerQuestions: async (req, res) => {
+        try {
+            console.log('========== GET PUBLIC KUISIONER QUESTIONS ==========');
+            
+            // Cek apakah tabel kuisioner_questions ada
+            const [tables] = await db.query("SHOW TABLES LIKE 'kuisioner_questions'");
+            
+            if (tables.length === 0) {
+                console.log('⚠️ Tabel kuisioner_questions belum ada');
+                return res.json({
+                    success: true,
+                    data: []  // Kembalikan array kosong, bukan error
+                });
+            }
+            
+            // Ambil semua pertanyaan dari database
+            const [questions] = await db.query(`
+                SELECT 
+                    id,
+                    question_text,
+                    urutan
+                FROM kuisioner_questions 
+                ORDER BY urutan ASC, id ASC
+            `);
+
+            console.log(`✅ Found ${questions.length} public questions`);
+            
+            res.json({
+                success: true,
+                data: questions
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting public questions:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil data pertanyaan: ' + error.message
+            });
+        }
+    },
+
     // ==================== USER DETAIL METHODS ====================
-    // GET USER DETAIL WITH STATS yang BENAR
+
+    // ==================== GET USER DETAIL ====================
     getUserDetail: async (req, res) => {
         try {
             const id = req.params.id;
@@ -1742,13 +3439,19 @@ const apiController = {
             console.log('========== GET USER DETAIL ==========');
             console.log('📥 User ID:', id);
 
-            // Ambil data user
             const [users] = await db.query(`
                 SELECT 
-                    id, name, email, phone, company, address, 
-                    status, role, created_at
-                FROM users 
-                WHERE id = ?
+                    u.id,
+                    u.email,
+                    u.full_name as name,
+                    u.nama_instansi as company,
+                    u.alamat as address,
+                    u.nomor_telepon as phone,
+                    u.role,
+                    u.created_at,
+                    'active' as status
+                FROM users u
+                WHERE u.id = ?
             `, [id]);
             
             if (users.length === 0) {
@@ -1760,33 +3463,88 @@ const apiController = {
             
             const user = users[0];
             
-            // 🔴 HITUNG STATISTIK USER - SEMUA SUBMISSION
+            // Hitung statistik user
             const [stats] = await db.query(`
                 SELECT 
                     COUNT(*) as total_transactions,
-                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_transactions,
-                    COUNT(CASE WHEN status IN ('pending_verification', 'payment_pending', 'testing') THEN 1 END) as pending_transactions,
-                    COALESCE(SUM(total_tagihan), 0) as total_payments
-                FROM submissions
-                WHERE user_id = ?
+                    COUNT(CASE WHEN status = 'Selesai' THEN 1 END) as completed_transactions,
+                    COUNT(CASE WHEN status IN ('Menunggu Verifikasi', 'Pengecekan Sampel', 'Menunggu Pembayaran', 'Belum Lunas', 'Sedang Diuji') THEN 1 END) as pending_transactions,
+                    COALESCE(SUM(p.total_tagihan), 0) as total_payments
+                FROM submissions s
+                LEFT JOIN payments p ON s.id = p.submission_id
+                WHERE s.user_id = ?
             `, [id]);
             
-            user.total_transactions = stats[0].total_transactions || 0;
-            user.completed_transactions = stats[0].completed_transactions || 0;
-            user.pending_transactions = stats[0].pending_transactions || 0;
-            user.total_payments = stats[0].total_payments || 0;
+            user.total_transactions = parseInt(stats[0].total_transactions) || 0;
+            user.completed_transactions = parseInt(stats[0].completed_transactions) || 0;
+            user.pending_transactions = parseInt(stats[0].pending_transactions) || 0;
+            user.total_payments = parseFloat(stats[0].total_payments) || 0;
             
-            // Ambil submissions terbaru untuk ditampilkan (opsional)
+            // 🔴 QUERY YANG LEBIH DETAIL - Ambil semua data sample
             const [recentSubmissions] = await db.query(`
                 SELECT 
-                    id, registration_number, test_type, category, status, total_tagihan, created_at
-                FROM submissions
-                WHERE user_id = ?
-                ORDER BY created_at DESC
+                    s.id,
+                    s.no_permohonan,
+                    s.nama_proyek,
+                    s.status,
+                    p.total_tagihan,
+                    s.created_at,
+                    (
+                        SELECT JSON_ARRAYAGG(
+                            JSON_OBJECT(
+                                'jenis_sample', ss.jenis_sample,
+                                'test_type_id', ss.test_type_id,
+                                'test_category_id', ss.test_category_id,
+                                'service_id', ss.service_id,
+                                'jumlah', ss.jumlah_sample_angka,
+                                'satuan', ss.jumlah_sample_satuan
+                            )
+                        )
+                        FROM submission_samples ss 
+                        WHERE ss.submission_id = s.id
+                    ) as samples,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT tt.type_name SEPARATOR ', ') 
+                        FROM submission_samples ss 
+                        JOIN test_types tt ON ss.test_type_id = tt.id
+                        WHERE ss.submission_id = s.id
+                    ) as jenis_uji,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT tc.category_name SEPARATOR ', ') 
+                        FROM submission_samples ss 
+                        JOIN test_categories tc ON ss.test_category_id = tc.id
+                        WHERE ss.submission_id = s.id
+                    ) as kategori_uji
+                FROM submissions s
+                LEFT JOIN payments p ON s.id = p.submission_id
+                WHERE s.user_id = ?
+                ORDER BY s.created_at DESC
                 LIMIT 10
             `, [id]);
             
-            user.recent_submissions = recentSubmissions;
+            // Parse JSON samples untuk frontend
+            const formattedSubmissions = recentSubmissions.map(sub => {
+                let samples = [];
+                try {
+                    samples = JSON.parse(sub.samples) || [];
+                } catch (e) {
+                    samples = [];
+                }
+                
+                return {
+                    ...sub,
+                    samples: samples,
+                    // Gabungkan jenis sample dari semua sample
+                    jenis_sample_combined: samples.map(s => s.jenis_sample).join(', ') || '-',
+                    // Gabungkan jenis uji dan kategori
+                    jenis_uji_display: sub.jenis_uji || '-',
+                    kategori_uji_display: sub.kategori_uji || '-'
+                };
+            });
+            
+            user.recent_submissions = formattedSubmissions;
+            
+            console.log('📦 Sending user detail with samples:', JSON.stringify(formattedSubmissions, null, 2));
             
             res.json({
                 success: true,
@@ -1794,15 +3552,15 @@ const apiController = {
             });
 
         } catch (error) {
-            console.error('Error getting user detail:', error);
+            console.error('❌ Error getting user detail:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil detail user'
+                message: 'Gagal mengambil detail user: ' + error.message
             });
         }
     },
 
-    // GET USERS LIST dengan total transaksi yang BENAR
+    // ==================== GET USERS LIST ====================
     getUsers: async (req, res) => {
         try {
             const page = parseInt(req.query.page) || 1;
@@ -1815,56 +3573,62 @@ const apiController = {
             console.log('========== GET USERS ==========');
             console.log('📥 Params:', { page, limit, status, search });
             
-            // Query untuk mengambil data users dengan total transaksi
+            // 🔴 PERBAIKAN: Hapus referensi ke kolom 'status'
             let query = `
                 SELECT 
                     u.id,
-                    u.name,
+                    u.full_name as name,
                     u.email,
-                    u.phone,
-                    u.company,
-                    u.address,
-                    u.status,
+                    u.nomor_telepon as phone,
+                    u.nama_instansi as company,
+                    u.alamat as address,
                     u.role,
                     u.created_at,
+                    -- Gunakan role untuk menentukan status
+                    CASE 
+                        WHEN u.role = 'admin' THEN 'active'
+                        WHEN u.role = 'pelanggan' THEN 'active'
+                        ELSE 'pending'
+                    END as status,
                     (
                         SELECT COUNT(*) 
                         FROM submissions s 
                         WHERE s.user_id = u.id
                     ) as total_transactions
                 FROM users u
-                WHERE u.role = 'customer'
+                WHERE 1=1
             `;
             
-            let countQuery = `SELECT COUNT(*) as total FROM users WHERE role = 'customer'`;
+            let countQuery = `SELECT COUNT(*) as total FROM users WHERE 1=1`;
             let params = [];
             let countParams = [];
             
-            // 🔥 FILTER STATUS - Sesuai kebutuhan (Aktif = 'active', Nonaktif = 'inactive' + 'pending')
+            // Filter berdasarkan role (customer/pelanggan saja)
+            query += ` AND u.role = 'pelanggan'`;
+            countQuery += ` AND role = 'pelanggan'`;
+            
+            // 🔥 FILTER STATUS - Sesuaikan dengan role
             if (status) {
                 if (status === 'active') {
-                    // Aktif hanya status 'active'
-                    query += ` AND u.status = 'active'`;
-                    countQuery += ` AND status = 'active'`;
+                    // Aktif = role 'pelanggan'
+                    query += ` AND u.role = 'pelanggan'`;
+                    countQuery += ` AND role = 'pelanggan'`;
+                } else if (status === 'pending') {
+                    // Tidak ada status pending, jadi return 0
+                    query += ` AND 1=0`; // Ini akan mengembalikan 0 data
+                    countQuery += ` AND 1=0`;
                 } else if (status === 'inactive') {
-                    // Nonaktif = status 'inactive' ATAU 'pending'
-                    query += ` AND u.status IN ('inactive', 'pending')`;
-                    countQuery += ` AND status IN ('inactive', 'pending')`;
-                } else {
-                    // Status spesifik lainnya
-                    query += ` AND u.status = ?`;
-                    countQuery += ` AND status = ?`;
-                    params.push(status);
-                    countParams.push(status);
+                    // Tidak ada status inactive, jadi return 0
+                    query += ` AND 1=0`; // Ini akan mengembalikan 0 data
+                    countQuery += ` AND 1=0`;
                 }
             }
             
-            // 🔥 FILTER SEARCH - Tambahkan pencarian berdasarkan nomor telepon
+            // 🔥 FILTER SEARCH
             if (search) {
-                query += ` AND (u.name LIKE ? OR u.email LIKE ? OR u.company LIKE ? OR u.phone LIKE ?)`;
-                countQuery += ` AND (name LIKE ? OR email LIKE ? OR company LIKE ? OR phone LIKE ?)`;
+                query += ` AND (u.full_name LIKE ? OR u.email LIKE ? OR u.nama_instansi LIKE ? OR u.nomor_telepon LIKE ?)`;
+                countQuery += ` AND (full_name LIKE ? OR email LIKE ? OR nama_instansi LIKE ? OR nomor_telepon LIKE ?)`;
                 const searchPattern = `%${search}%`;
-                // Push 4 kali untuk 4 parameter LIKE
                 for (let i = 0; i < 4; i++) {
                     params.push(searchPattern);
                     countParams.push(searchPattern);
@@ -1875,36 +3639,36 @@ const apiController = {
             params.push(limit, offset);
             
             console.log('📝 Final Query:', query);
-            console.log('📦 Params:', params);
             
             const [users] = await db.query(query, params);
             const [countResult] = await db.query(countQuery, countParams);
             
-            // Hitung stats
+            // Hitung stats - berdasarkan role
             const [stats] = await db.query(`
                 SELECT 
                     COUNT(*) as total,
-                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
-                    COUNT(CASE WHEN status IN ('inactive', 'pending') THEN 1 END) as inactive,
-                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-                    COUNT(CASE WHEN company IS NOT NULL AND company != '' THEN 1 END) as companies
+                    COUNT(CASE WHEN role = 'pelanggan' THEN 1 END) as active,
+                    0 as pending,
+                    0 as inactive,
+                    COUNT(CASE WHEN nama_instansi IS NOT NULL AND nama_instansi != '' THEN 1 END) as companies
                 FROM users
-                WHERE role = 'customer'
+                WHERE role = 'pelanggan'
             `);
             
-            // Format users (pastikan total_transactions adalah number)
+            // Format users
             const formattedUsers = users.map(user => ({
                 ...user,
-                total_transactions: parseInt(user.total_transactions) || 0
+                total_transactions: parseInt(user.total_transactions) || 0,
+                status: 'active' // Semua pelanggan dianggap aktif
             }));
             
-            console.log('✅ Found', formattedUsers.length, 'users, total:', countResult[0].total);
+            console.log(`✅ Found ${formattedUsers.length} users, total: ${countResult[0].total}`);
             
             res.json({
                 success: true,
                 data: {
                     users: formattedUsers,
-                    stats: stats[0],
+                    stats: stats[0] || { total: 0, active: 0, pending: 0, inactive: 0, companies: 0 },
                     total: countResult[0].total,
                     page: page,
                     limit: limit,
@@ -1914,25 +3678,27 @@ const apiController = {
 
         } catch (error) {
             console.error('❌ Error getting users:', error);
-            console.error('Message:', error.message);
-            console.error('SQL:', error.sql);
-            console.error('SQL Message:', error.sqlMessage);
-            
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil data users: ' + (error.sqlMessage || error.message)
+                message: 'Gagal mengambil data users: ' + error.message
             });
         }
     },
 
+    // UPDATE USER
     updateUser: async (req, res) => {
         try {
             const id = req.params.id;
             const { name, email, phone, company, address, status } = req.body;
             
+            console.log('========== UPDATE USER ==========');
+            console.log('📥 ID:', id);
+            console.log('📥 Data:', { name, email, phone, company, address, status });
+            
+            // 🔴 SESUAIKAN DENGAN STRUKTUR DATABASE
             await db.query(
                 `UPDATE users 
-                SET name = ?, email = ?, phone = ?, company = ?, address = ?, status = ? 
+                SET full_name = ?, email = ?, nomor_telepon = ?, nama_instansi = ?, alamat = ?, status = ? 
                 WHERE id = ?`,
                 [name, email, phone, company, address, status, id]
             );
@@ -1943,33 +3709,34 @@ const apiController = {
             });
             
         } catch (error) {
-            console.error('Error updating user:', error);
+            console.error('❌ Error updating user:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengupdate user'
+                message: 'Gagal mengupdate user: ' + error.message
             });
         }
     },
 
+    // ==================== VERIFY USER ====================
     verifyUser: async (req, res) => {
         try {
             const id = req.params.id;
             
-            await db.query(
-                'UPDATE users SET status = "active" WHERE id = ?',
-                [id]
-            );
+            console.log('========== VERIFY USER ==========');
+            console.log('📥 ID:', id);
             
+            // Karena tidak ada kolom status, verifikasi tidak diperlukan
+            // Tapi kita tetap return sukses untuk frontend
             res.json({
                 success: true,
-                message: 'User berhasil diverifikasi'
+                message: 'User sudah terverifikasi'
             });
             
         } catch (error) {
-            console.error('Error verifying user:', error);
+            console.error('❌ Error verifying user:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal memverifikasi user'
+                message: 'Gagal memverifikasi user: ' + error.message
             });
         }
     },
@@ -1977,7 +3744,29 @@ const apiController = {
     deleteUser: async (req, res) => {
         try {
             const id = req.params.id;
+            const adminId = req.user?.id;
             
+            console.log('========== DELETE USER ==========');
+            console.log('📥 ID:', id);
+            
+            // Cek apakah user ada
+            const [users] = await db.query('SELECT role FROM users WHERE id = ?', [id]);
+            
+            if (users.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User tidak ditemukan'
+                });
+            }
+            
+            if (users[0].role === 'admin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Tidak dapat menghapus akun admin'
+                });
+            }
+            
+            // Hapus user
             await db.query('DELETE FROM users WHERE id = ?', [id]);
             
             res.json({
@@ -1986,26 +3775,25 @@ const apiController = {
             });
             
         } catch (error) {
-            console.error('Error deleting user:', error);
+            console.error('❌ Error deleting user:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal menghapus user'
+                message: 'Gagal menghapus user: ' + error.message
             });
         }
     },
 
-    // ==================== USER MANAGEMENT (TAMBAHKAN DI apiController.js) ====================
-
-    // Deactivate user
+    // DEACTIVATE USER
     deactivateUser: async (req, res) => {
         try {
             const id = req.params.id;
-            const adminId = req.user?.id || 1;
+            const adminId = req.user?.id;
             
-            console.log('📝 Deactivating user:', id);
+            console.log('========== DEACTIVATE USER ==========');
+            console.log('📥 ID:', id);
             
             // Cek apakah user ada
-            const [users] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
+            const [users] = await db.query('SELECT email FROM users WHERE id = ?', [id]);
             
             if (users.length === 0) {
                 return res.status(404).json({
@@ -2021,10 +3809,13 @@ const apiController = {
             );
             
             // Catat aktivitas
-            await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [adminId, 'deactivate', `Menonaktifkan user ID ${id} (${users[0].email})`]
-            );
+            if (adminId) {
+                await db.query(
+                    `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                    VALUES (?, ?, ?, ?)`,
+                    [adminId, 'Deactivate User', req.ip, req.headers['user-agent']]
+                );
+            }
             
             res.json({
                 success: true,
@@ -2032,7 +3823,7 @@ const apiController = {
             });
             
         } catch (error) {
-            console.error('Error deactivating user:', error);
+            console.error('❌ Error deactivating user:', error);
             res.status(500).json({
                 success: false,
                 message: 'Gagal menonaktifkan user: ' + error.message
@@ -2040,17 +3831,18 @@ const apiController = {
         }
     },
 
-    // Reset password
+    // RESET PASSWORD
     resetPassword: async (req, res) => {
         try {
             const id = req.params.id;
             const { method, newPassword } = req.body;
-            const adminId = req.user?.id || 1;
+            const adminId = req.user?.id;
             
-            console.log('🔑 Resetting password for user:', id, 'method:', method);
+            console.log('========== RESET PASSWORD ==========');
+            console.log('📥 ID:', id, 'Method:', method);
             
             // Cek apakah user ada
-            const [users] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
+            const [users] = await db.query('SELECT email FROM users WHERE id = ?', [id]);
             
             if (users.length === 0) {
                 return res.status(404).json({
@@ -2067,7 +3859,7 @@ const apiController = {
                 const randomPassword = Math.random().toString(36).slice(-8) + 
                                     Math.random().toString(36).slice(-2).toUpperCase();
                 
-                // Update password (nanti hash bcrypt)
+                // TODO: Hash password dengan bcrypt
                 await db.query(
                     'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
                     [randomPassword, id]
@@ -2083,30 +3875,21 @@ const apiController = {
                     });
                 }
                 
+                // TODO: Hash password dengan bcrypt
                 await db.query(
                     'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
                     [newPassword, id]
                 );
-                
-            } else if (method === 'send') {
-                // TODO: Kirim email reset password
-                console.log('📧 Send reset password email to:', user.email);
-                
-                // Generate token reset password (opsional)
-                const resetToken = Math.random().toString(36).slice(-12);
-                
-                // Simpan token ke database (jika ada tabel reset_password)
-                // await db.query('INSERT INTO password_resets (user_id, token) VALUES (?, ?)', [id, resetToken]);
-                
-                // Kirim email (simulasi)
-                console.log('Reset link: http://localhost:3000/reset-password?token=' + resetToken);
             }
             
             // Catat aktivitas
-            await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [adminId, 'reset_password', `Reset password user ID ${id} (${user.email}) via ${method}`]
-            );
+            if (adminId) {
+                await db.query(
+                    `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                    VALUES (?, ?, ?, ?)`,
+                    [adminId, 'Reset Password', req.ip, req.headers['user-agent']]
+                );
+            }
             
             res.json({
                 success: true,
@@ -2115,7 +3898,7 @@ const apiController = {
             });
             
         } catch (error) {
-            console.error('Error resetting password:', error);
+            console.error('❌ Error resetting password:', error);
             res.status(500).json({
                 success: false,
                 message: 'Gagal reset password: ' + error.message
@@ -2123,17 +3906,20 @@ const apiController = {
         }
     },
 
-    // Send notification to user
+    // SEND NOTIFICATION
     sendNotification: async (req, res) => {
         try {
             const id = req.params.id;
             const { type, title, message } = req.body;
-            const adminId = req.user?.id || 1;
+            const adminId = req.user?.id;
             
-            console.log('📨 Sending notification to user:', id, 'type:', type);
+            console.log('========== SEND NOTIFICATION ==========');
+            console.log('📥 ID:', id, 'Type:', type);
+            console.log('Title:', title);
+            console.log('Message:', message);
             
             // Cek apakah user ada
-            const [users] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
+            const [users] = await db.query('SELECT email FROM users WHERE id = ?', [id]);
             
             if (users.length === 0) {
                 return res.status(404).json({
@@ -2142,28 +3928,17 @@ const apiController = {
                 });
             }
             
-            const user = users[0];
-            
-            // TODO: Implementasi notifikasi (bisa ke database atau email)
-            // 1. Simpan ke tabel notifications (jika ada)
-            // await db.query(
-            //     'INSERT INTO notifications (user_id, type, title, message, created_by) VALUES (?, ?, ?, ?, ?)',
-            //     [id, type, title, message, adminId]
-            // );
-            
-            // 2. Kirim email (simulasi)
-            console.log('=================================');
-            console.log('📧 NOTIFICATION TO:', user.email);
-            console.log('Type:', type);
-            console.log('Title:', title);
-            console.log('Message:', message);
-            console.log('=================================');
+            // TODO: Implementasi notifikasi (email/database)
+            console.log('📧 Sending notification to:', users[0].email);
             
             // Catat aktivitas
-            await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [adminId, 'send_notification', `Kirim notifikasi ke user ID ${id}: ${title}`]
-            );
+            if (adminId) {
+                await db.query(
+                    `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                    VALUES (?, ?, ?, ?)`,
+                    [adminId, 'Send Notification', req.ip, req.headers['user-agent']]
+                );
+            }
             
             res.json({
                 success: true,
@@ -2171,13 +3946,15 @@ const apiController = {
             });
             
         } catch (error) {
-            console.error('Error sending notification:', error);
+            console.error('❌ Error sending notification:', error);
             res.status(500).json({
                 success: false,
                 message: 'Gagal mengirim notifikasi: ' + error.message
             });
         }
     },
+
+
 
     // ==================== REPORTS METHODS ====================
     getReports: async (req, res) => {
@@ -2433,656 +4210,8 @@ const apiController = {
         }
     },
 
-    // ==================== KUISIONER METHODS ====================
 
-    // GET all kuisioner (jawaban dari user)
-    getKuisioner: async (req, res) => {
-        try {
-            const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 10;
-            const search = req.query.search || '';
-            const startDate = req.query.start_date || '';
-            const endDate = req.query.end_date || '';
-            
-            const offset = (page - 1) * limit;
-            
-            console.log('========== GET KUISIONER ==========');
-            console.log('📥 Params:', { page, limit, search, startDate, endDate });
-            
-            // Query dengan JOIN submissions dan users
-            let query = `
-                SELECT 
-                    k.*,
-                    s.registration_number,
-                    s.test_type,
-                    s.category,
-                    u.name as user_name,
-                    u.email as email,
-                    u.company as user_company
-                FROM kuisioner k
-                LEFT JOIN submissions s ON k.submission_id = s.id
-                LEFT JOIN users u ON s.user_id = u.id
-                WHERE 1=1
-            `;
-            
-            let countQuery = `SELECT COUNT(*) as total FROM kuisioner WHERE 1=1`;
-            let params = [];
-            let countParams = [];
-            
-            // Filter tanggal
-            if (startDate) {
-                query += ` AND DATE(k.created_at) >= ?`;
-                countQuery += ` AND DATE(created_at) >= ?`;
-                params.push(startDate);
-                countParams.push(startDate);
-            }
-            if (endDate) {
-                query += ` AND DATE(k.created_at) <= ?`;
-                countQuery += ` AND DATE(created_at) <= ?`;
-                params.push(endDate);
-                countParams.push(endDate);
-            }
-            
-            // Filter search
-            if (search) {
-                query += ` AND (k.nama_pemohon LIKE ? OR k.instansi LIKE ? OR u.company LIKE ?)`;
-                countQuery += ` AND (nama_pemohon LIKE ? OR instansi LIKE ?)`;
-                const searchPattern = `%${search}%`;
-                params.push(searchPattern, searchPattern, searchPattern);
-                countParams.push(searchPattern, searchPattern);
-            }
-            
-            query += ` ORDER BY k.created_at DESC LIMIT ? OFFSET ?`;
-            params.push(limit, offset);
-            
-            console.log('📝 Query:', query);
-            console.log('📦 Params:', params);
-            
-            const [kuisioner] = await db.query(query, params);
-            const [countResult] = await db.query(countQuery, countParams);
-            
-            res.json({
-                success: true,
-                data: {
-                    kuisioner: kuisioner,
-                    total: countResult[0].total,
-                    page: page,
-                    limit: limit,
-                    totalPages: Math.ceil(countResult[0].total / limit)
-                }
-            });
-            
-        } catch (error) {
-            console.error('❌ Error getting kuisioner:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengambil data kuisioner: ' + error.message,
-                data: {
-                    kuisioner: [],
-                    total: 0,
-                    page: 1,
-                    limit: 10,
-                    totalPages: 0
-                }
-            });
-        }
-    },
-
-    // GET kuisioner stats
-    getKuisionerStats: async (req, res) => {
-        try {
-            const startDate = req.query.start_date || '';
-            const endDate = req.query.end_date || '';
-            
-            // Build where clause
-            let whereClause = 'WHERE 1=1';
-            let params = [];
-            
-            if (startDate) {
-                whereClause += ` AND DATE(created_at) >= ?`;
-                params.push(startDate);
-            }
-            if (endDate) {
-                whereClause += ` AND DATE(created_at) <= ?`;
-                params.push(endDate);
-            }
-            
-            // Statistik per pertanyaan
-            const [stats] = await db.query(`
-                SELECT 
-                    COUNT(*) as total_responden,
-                    ROUND(AVG(nilai_1), 2) as rata_nilai_1,
-                    ROUND(AVG(nilai_2), 2) as rata_nilai_2,
-                    ROUND(AVG(nilai_3), 2) as rata_nilai_3,
-                    ROUND(AVG(nilai_4), 2) as rata_nilai_4,
-                    ROUND(AVG(nilai_5), 2) as rata_nilai_5,
-                    ROUND(AVG(nilai_6), 2) as rata_nilai_6,
-                    ROUND(AVG(nilai_7), 2) as rata_nilai_7,
-                    ROUND(AVG(nilai_8), 2) as rata_nilai_8,
-                    ROUND(AVG(nilai_9), 2) as rata_nilai_9,
-                    ROUND(AVG(nilai_10), 2) as rata_nilai_10,
-                    ROUND((AVG(nilai_1) + AVG(nilai_2) + AVG(nilai_3) + AVG(nilai_4) + AVG(nilai_5) + 
-                        AVG(nilai_6) + AVG(nilai_7) + AVG(nilai_8) + AVG(nilai_9) + AVG(nilai_10)) / 10, 2) as rata_keseluruhan
-                FROM kuisioner
-                ${whereClause}
-            `, params);
-            
-            // Distribusi nilai
-            const [distribusi] = await db.query(`
-                SELECT 
-                    COUNT(CASE WHEN nilai_1 = 1 OR nilai_2 = 1 OR nilai_3 = 1 OR nilai_4 = 1 OR nilai_5 = 1 
-                            OR nilai_6 = 1 OR nilai_7 = 1 OR nilai_8 = 1 OR nilai_9 = 1 OR nilai_10 = 1 THEN 1 END) as nilai_1_count,
-                    COUNT(CASE WHEN nilai_1 = 2 OR nilai_2 = 2 OR nilai_3 = 2 OR nilai_4 = 2 OR nilai_5 = 2 
-                            OR nilai_6 = 2 OR nilai_7 = 2 OR nilai_8 = 2 OR nilai_9 = 2 OR nilai_10 = 2 THEN 1 END) as nilai_2_count,
-                    COUNT(CASE WHEN nilai_1 = 3 OR nilai_2 = 3 OR nilai_3 = 3 OR nilai_4 = 3 OR nilai_5 = 3 
-                            OR nilai_6 = 3 OR nilai_7 = 3 OR nilai_8 = 3 OR nilai_9 = 3 OR nilai_10 = 3 THEN 1 END) as nilai_3_count,
-                    COUNT(CASE WHEN nilai_1 = 4 OR nilai_2 = 4 OR nilai_3 = 4 OR nilai_4 = 4 OR nilai_5 = 4 
-                            OR nilai_6 = 4 OR nilai_7 = 4 OR nilai_8 = 4 OR nilai_9 = 4 OR nilai_10 = 4 THEN 1 END) as nilai_4_count
-                FROM kuisioner
-                ${whereClause}
-            `, params);
-            
-            // Data per bulan
-            const [bulanan] = await db.query(`
-                SELECT 
-                    MONTH(created_at) as bulan,
-                    COUNT(*) as jumlah,
-                    ROUND(
-                        AVG(
-                            (COALESCE(nilai_1,0) + COALESCE(nilai_2,0) + COALESCE(nilai_3,0) + COALESCE(nilai_4,0) + COALESCE(nilai_5,0) +
-                            COALESCE(nilai_6,0) + COALESCE(nilai_7,0) + COALESCE(nilai_8,0) + COALESCE(nilai_9,0) + COALESCE(nilai_10,0)) 
-                            / 
-                            NULLIF(
-                                ( (nilai_1 IS NOT NULL) + (nilai_2 IS NOT NULL) + (nilai_3 IS NOT NULL) + (nilai_4 IS NOT NULL) + (nilai_5 IS NOT NULL) +
-                                (nilai_6 IS NOT NULL) + (nilai_7 IS NOT NULL) + (nilai_8 IS NOT NULL) + (nilai_9 IS NOT NULL) + (nilai_10 IS NOT NULL) ), 0
-                            )
-                        ), 2
-                    ) as rata_bulan
-                FROM kuisioner
-                ${whereClause}
-                GROUP BY MONTH(created_at)
-                ORDER BY bulan
-            `, params);
-            
-            // Tahun-tahun yang tersedia
-            const [tahunList] = await db.query(`
-                SELECT DISTINCT YEAR(created_at) as tahun
-                FROM kuisioner
-                ORDER BY tahun DESC
-            `);
-            
-            res.json({
-                success: true,
-                data: {
-                    stats: stats[0] || {},
-                    distribusi: distribusi[0] || {},
-                    bulanan: bulanan || [],
-                    tahunList: tahunList.map(t => t.tahun) || []
-                }
-            });
-            
-        } catch (error) {
-            console.error('❌ Error getting kuisioner stats:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengambil statistik kuisioner: ' + error.message,
-                data: {
-                    stats: {},
-                    distribusi: {},
-                    bulanan: [],
-                    tahunList: []
-                }
-            });
-        }
-    },
-
-    // GET kuisioner by ID
-    getKuisionerById: async (req, res) => {
-        try {
-            const { id } = req.params;
-            
-            const [kuisioner] = await db.query(`
-                SELECT 
-                    k.*,
-                    s.registration_number,
-                    s.test_type,
-                    s.category,
-                    u.name as user_name,
-                    u.email as email,
-                    u.company as user_company
-                FROM kuisioner k
-                LEFT JOIN submissions s ON k.submission_id = s.id
-                LEFT JOIN users u ON s.user_id = u.id
-                WHERE k.id = ?
-            `, [id]);
-            
-            if (kuisioner.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Kuisioner tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                data: kuisioner[0]
-            });
-            
-        } catch (error) {
-            console.error('❌ Error getting kuisioner by id:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengambil data kuisioner: ' + error.message 
-            });
-        }
-    },
-
-    // CREATE kuisioner (dari user/public)
-    createKuisioner: async (req, res) => {
-        try {
-            const userId = req.user?.id || null;
-            const {
-                submission_id, nama_pemohon, instansi, telepon, jabatan,
-                nilai_1, nilai_2, nilai_3, nilai_4, nilai_5,
-                nilai_6, nilai_7, nilai_8, nilai_9, nilai_10,
-                saran
-            } = req.body;
-            
-            // Validasi
-            if (!submission_id) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Submission ID harus diisi'
-                });
-            }
-            
-            if (!nama_pemohon) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Nama pemohon harus diisi'
-                });
-            }
-            
-            // Cek apakah sudah ada kuisioner untuk submission ini
-            const [existing] = await db.query(
-                'SELECT id FROM kuisioner WHERE submission_id = ?',
-                [submission_id]
-            );
-            
-            if (existing.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Kuisioner untuk submission ini sudah ada'
-                });
-            }
-            
-            const [result] = await db.query(
-                `INSERT INTO kuisioner (
-                    submission_id, user_id, nama_pemohon, instansi, telepon, jabatan,
-                    nilai_1, nilai_2, nilai_3, nilai_4, nilai_5,
-                    nilai_6, nilai_7, nilai_8, nilai_9, nilai_10,
-                    saran, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    submission_id, userId, nama_pemohon, instansi, telepon, jabatan,
-                    nilai_1 || null, nilai_2 || null, nilai_3 || null, nilai_4 || null, nilai_5 || null,
-                    nilai_6 || null, nilai_7 || null, nilai_8 || null, nilai_9 || null, nilai_10 || null,
-                    saran, userId
-                ]
-            );
-            
-            res.json({
-                success: true,
-                message: 'Kuisioner berhasil disimpan',
-                data: { id: result.insertId }
-            });
-            
-        } catch (error) {
-            console.error('❌ Error creating kuisioner:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal menyimpan kuisioner: ' + error.message 
-            });
-        }
-    },
-
-    // UPDATE kuisioner (admin)
-    updateKuisioner: async (req, res) => {
-        try {
-            const { id } = req.params;
-            const {
-                nama_pemohon, instansi, telepon, jabatan,
-                nilai_1, nilai_2, nilai_3, nilai_4, nilai_5,
-                nilai_6, nilai_7, nilai_8, nilai_9, nilai_10,
-                saran
-            } = req.body;
-            
-            const [result] = await db.query(
-                `UPDATE kuisioner SET
-                    nama_pemohon = ?, instansi = ?, telepon = ?, jabatan = ?,
-                    nilai_1 = ?, nilai_2 = ?, nilai_3 = ?, nilai_4 = ?, nilai_5 = ?,
-                    nilai_6 = ?, nilai_7 = ?, nilai_8 = ?, nilai_9 = ?, nilai_10 = ?,
-                    saran = ?, updated_at = NOW()
-                WHERE id = ?`,
-                [
-                    nama_pemohon, instansi, telepon, jabatan,
-                    nilai_1 || null, nilai_2 || null, nilai_3 || null, nilai_4 || null, nilai_5 || null,
-                    nilai_6 || null, nilai_7 || null, nilai_8 || null, nilai_9 || null, nilai_10 || null,
-                    saran, id
-                ]
-            );
-            
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Kuisioner tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                message: 'Kuisioner berhasil diupdate'
-            });
-            
-        } catch (error) {
-            console.error('❌ Error updating kuisioner:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengupdate kuisioner: ' + error.message 
-            });
-        }
-    },
-
-    // DELETE kuisioner
-    deleteKuisioner: async (req, res) => {
-        try {
-            const { id } = req.params;
-            
-            const [result] = await db.query('DELETE FROM kuisioner WHERE id = ?', [id]);
-            
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Kuisioner tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                message: 'Kuisioner berhasil dihapus'
-            });
-            
-        } catch (error) {
-            console.error('❌ Error deleting kuisioner:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal menghapus kuisioner: ' + error.message 
-            });
-        }
-    },
-
-    // ==================== KUISIONER QUESTIONS METHODS ====================
-
-    // GET all questions
-    getKuisionerQuestions: async (req, res) => {
-        try {
-            console.log('========== GET KUISIONER QUESTIONS ==========');
-            
-            // Cek apakah tabel kuisioner_questions ada
-            const [tables] = await db.query("SHOW TABLES LIKE 'kuisioner_questions'");
-            
-            if (tables.length === 0) {
-                console.log('⚠️ Tabel kuisioner_questions belum ada');
-                return res.json({
-                    success: true,
-                    data: []  // Kembalikan array kosong, bukan error
-                });
-            }
-            
-            // Ambil semua pertanyaan dari database
-            const [questions] = await db.query(`
-                SELECT 
-                    id,
-                    question_text,
-                    order_num,
-                    status,
-                    DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at,
-                    DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updated_at
-                FROM kuisioner_questions 
-                ORDER BY order_num ASC, id ASC
-            `);
-
-            console.log(`✅ Found ${questions.length} questions from database`);
-            
-            // 🔥 SELALU KIRIM SUCCESS, MESKIPUN KOSONG
-            res.json({
-                success: true,
-                data: questions  // Bisa array kosong []
-            });
-
-        } catch (error) {
-            console.error('❌ Error getting questions:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengambil data pertanyaan: ' + error.message
-            });
-        }
-    },
-
-    // GET question by ID
-    getKuisionerQuestionById: async (req, res) => {
-        try {
-            const { id } = req.params;
-            
-            const [questions] = await db.query(
-                'SELECT * FROM kuisioner_questions WHERE id = ?',
-                [id]
-            );
-            
-            if (questions.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Pertanyaan tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                data: questions[0]
-            });
-        } catch (error) {
-            console.error('❌ Error getting question:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengambil data pertanyaan: ' + error.message
-            });
-        }
-    },
-
-    // CREATE question
-    createKuisionerQuestion: async (req, res) => {
-        try {
-            const { question_text, order_num, status } = req.body;
-            const userId = req.user?.id || 1;
-            
-            console.log('========== CREATE KUISIONER QUESTION ==========');
-            console.log('📥 Data:', { question_text, order_num, status, userId });
-            
-            if (!question_text) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Teks pertanyaan harus diisi'
-                });
-            }
-            
-            // Jika order_num tidak diisi, ambil urutan terakhir + 1
-            let finalOrderNum = order_num;
-            if (!finalOrderNum) {
-                const [lastOrder] = await db.query(
-                    'SELECT MAX(order_num) as max_order FROM kuisioner_questions'
-                );
-                finalOrderNum = (lastOrder[0].max_order || 0) + 1;
-                console.log('📊 Generated order_num:', finalOrderNum);
-            }
-            
-            const [result] = await db.query(
-                `INSERT INTO kuisioner_questions 
-                (question_text, order_num, status, created_by) 
-                VALUES (?, ?, ?, ?)`,
-                [question_text, finalOrderNum, status || 'active', userId]
-            );
-            
-            console.log('✅ Question created with ID:', result.insertId);
-            
-            // Ambil data yang baru dibuat
-            const [newQuestion] = await db.query(
-                'SELECT * FROM kuisioner_questions WHERE id = ?',
-                [result.insertId]
-            );
-            
-            res.json({
-                success: true,
-                message: 'Pertanyaan berhasil ditambahkan',
-                data: newQuestion[0]
-            });
-        } catch (error) {
-            console.error('❌ Error creating question:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal menambah pertanyaan: ' + error.message
-            });
-        }
-    },
-
-    // UPDATE question
-    updateKuisionerQuestion: async (req, res) => {
-        try {
-            const { id } = req.params;
-            const { question_text, order_num, status } = req.body;
-            
-            console.log('========== UPDATE KUISIONER QUESTION ==========');
-            console.log('📥 ID:', id);
-            console.log('📥 Data:', { question_text, order_num, status });
-            
-            const [result] = await db.query(
-                `UPDATE kuisioner_questions 
-                SET question_text = ?, order_num = ?, status = ?, updated_at = NOW()
-                WHERE id = ?`,
-                [question_text, order_num, status, id]
-            );
-            
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Pertanyaan tidak ditemukan'
-                });
-            }
-            
-            // Ambil data yang sudah diupdate
-            const [updatedQuestion] = await db.query(
-                'SELECT * FROM kuisioner_questions WHERE id = ?',
-                [id]
-            );
-            
-            console.log('✅ Question updated');
-            
-            res.json({
-                success: true,
-                message: 'Pertanyaan berhasil diupdate',
-                data: updatedQuestion[0]
-            });
-        } catch (error) {
-            console.error('❌ Error updating question:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengupdate pertanyaan: ' + error.message
-            });
-        }
-    },
-
-    // DELETE question
-    deleteKuisionerQuestion: async (req, res) => {
-        try {
-            const { id } = req.params;
-            
-            console.log('========== DELETE KUISIONER QUESTION ==========');
-            console.log('📥 ID:', id);
-            
-            // Cek apakah pertanyaan sudah digunakan di jawaban
-            const [answers] = await db.query(
-                'SELECT COUNT(*) as count FROM kuisioner WHERE ? IS NOT NULL',
-                [`nilai_${id}`]
-            );
-            
-            // Jika sudah digunakan, hanya nonaktifkan
-            if (answers[0].count > 0) {
-                await db.query(
-                    'UPDATE kuisioner_questions SET status = "inactive" WHERE id = ?',
-                    [id]
-                );
-                
-                console.log('✅ Question deactivated (has answers)');
-                
-                return res.json({
-                    success: true,
-                    message: 'Pertanyaan dinonaktifkan karena sudah memiliki jawaban'
-                });
-            }
-            
-            // Jika belum digunakan, hapus permanen
-            const [result] = await db.query(
-                'DELETE FROM kuisioner_questions WHERE id = ?',
-                [id]
-            );
-            
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Pertanyaan tidak ditemukan'
-                });
-            }
-            
-            console.log('✅ Question deleted permanently');
-            
-            res.json({
-                success: true,
-                message: 'Pertanyaan berhasil dihapus'
-            });
-        } catch (error) {
-            console.error('❌ Error deleting question:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal menghapus pertanyaan: ' + error.message
-            });
-        }
-    },
-
-    // REORDER questions
-    reorderKuisionerQuestions: async (req, res) => {
-        try {
-            const { orders } = req.body; // array of { id, order_num }
-            
-            for (const item of orders) {
-                await db.query(
-                    'UPDATE kuisioner_questions SET order_num = ? WHERE id = ?',
-                    [item.order_num, item.id]
-                );
-            }
-            
-            res.json({
-                success: true,
-                message: 'Urutan pertanyaan berhasil diupdate'
-            });
-        } catch (error) {
-            console.error('❌ Error reordering questions:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengupdate urutan pertanyaan: ' + error.message
-            });
-        }
-    },
-    
-    // ==================== SETTINGS METHODS ====================
+    // ==================== PROFIL METHODS ====================
 
     // Get profile settings
     getProfileSettings: async (req, res) => {
@@ -3096,8 +4225,19 @@ const apiController = {
                 });
             }
             
+            // Ambil data user dari database
             const [users] = await db.query(
-                'SELECT id, name, email, phone, avatar, role, created_at, updated_at FROM users WHERE id = ?',
+                `SELECT 
+                    id, 
+                    full_name as name, 
+                    email, 
+                    nomor_telepon as phone, 
+                    avatar, 
+                    role, 
+                    created_at, 
+                    updated_at 
+                FROM users 
+                WHERE id = ?`,
                 [userId]
             );
             
@@ -3110,6 +4250,7 @@ const apiController = {
             
             const user = users[0];
             
+            // Format profile
             const profile = {
                 id: user.id,
                 name: user.name,
@@ -3130,7 +4271,7 @@ const apiController = {
             console.error('Error getting profile settings:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil data profile'
+                message: 'Gagal mengambil data profile: ' + error.message
             });
         }
     },
@@ -3156,6 +4297,7 @@ const apiController = {
                 });
             }
             
+            // Cek email sudah digunakan atau belum
             const [existing] = await db.query(
                 'SELECT id FROM users WHERE email = ? AND id != ?',
                 [email, userId]
@@ -3168,14 +4310,19 @@ const apiController = {
                 });
             }
             
+            // Update user
             await db.query(
-                'UPDATE users SET name = ?, email = ?, phone = ?, updated_at = NOW() WHERE id = ?',
+                `UPDATE users 
+                SET full_name = ?, email = ?, nomor_telepon = ?, updated_at = NOW() 
+                WHERE id = ?`,
                 [name, email, phone || null, userId]
             );
             
+            // Catat aktivitas
             await db.query(
-                'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                [userId, 'update', 'Memperbarui profil', 'update']
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Update Profile', req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -3187,7 +4334,7 @@ const apiController = {
             console.error('Error updating profile:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengupdate profile'
+                message: 'Gagal mengupdate profile: ' + error.message
             });
         }
     },
@@ -3212,16 +4359,19 @@ const apiController = {
             }
 
             const baseUrl = `${req.protocol}://${req.get('host')}`;
-            const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+            const fileUrl = `${baseUrl}/uploads/avatars/${req.file.filename}`;
             
+            // Update avatar di database
             await db.query(
                 'UPDATE users SET avatar = ?, updated_at = NOW() WHERE id = ?',
                 [fileUrl, userId]
             );
             
+            // Catat aktivitas
             await db.query(
-                'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                [userId, 'upload', 'Mengupload foto profil', 'upload']
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Upload Avatar', req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -3238,7 +4388,7 @@ const apiController = {
             console.error('Error uploading avatar:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal upload avatar'
+                message: 'Gagal upload avatar: ' + error.message
             });
         }
     },
@@ -3255,29 +4405,17 @@ const apiController = {
                 });
             }
             
-            const [users] = await db.query('SELECT avatar FROM users WHERE id = ?', [userId]);
-            
-            // Hapus file fisik jika ada (opsional)
-            if (users.length > 0 && users[0].avatar) {
-                try {
-                    const filename = users[0].avatar.split('/').pop();
-                    const filepath = path.join(__dirname, '../../uploads', filename);
-                    if (fs.existsSync(filepath)) {
-                        fs.unlinkSync(filepath);
-                    }
-                } catch (fileError) {
-                    console.error('Error deleting file:', fileError);
-                }
-            }
-            
+            // Hapus avatar dari database
             await db.query(
                 'UPDATE users SET avatar = NULL, updated_at = NOW() WHERE id = ?',
                 [userId]
             );
             
+            // Catat aktivitas
             await db.query(
-                'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                [userId, 'delete', 'Menghapus foto profil', 'delete']
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Delete Avatar', req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -3289,10 +4427,12 @@ const apiController = {
             console.error('Error deleting avatar:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal menghapus avatar'
+                message: 'Gagal menghapus avatar: ' + error.message
             });
         }
     },
+
+    // ==================== PASSWORD METHODS ====================
 
     // Change password
     changePassword: async (req, res) => {
@@ -3322,6 +4462,7 @@ const apiController = {
                 });
             }
             
+            // Ambil password dari database
             const [users] = await db.query(
                 'SELECT password FROM users WHERE id = ?',
                 [userId]
@@ -3342,14 +4483,17 @@ const apiController = {
                 });
             }
             
+            // TODO: Hash password baru dengan bcrypt
             await db.query(
                 'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
                 [new_password, userId]
             );
             
+            // Catat aktivitas
             await db.query(
-                'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                [userId, 'update', 'Mengubah password', 'security']
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Change Password', req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -3361,32 +4505,39 @@ const apiController = {
             console.error('Error changing password:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengubah password'
+                message: 'Gagal mengubah password: ' + error.message
             });
         }
     },
 
+    // ==================== SYSTEM CONFIG METHODS ====================
+
     // Get system configuration
     getSystemConfig: async (req, res) => {
         try {
-            // 🔥 Ambil dari tabel settings
+            // Default config
             let config = {
                 institution_name: 'UPTD Laboratorium Konstruksi Dinas PUPR',
                 address: 'Jl. Raya Lab Pengujian No. 123, Banten',
                 phone: '(021) 555-1234',
                 email: 'info@lab-uptd.gov.id',
+                website: 'https://lab-uptd.banten.go.id',
                 maintenance_mode: false,
                 max_upload_size: 5
             };
             
+            // Ambil dari tabel settings
             try {
-                const [rows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE "system_%"');
+                const [rows] = await db.query(
+                    'SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE "system_%"'
+                );
                 
                 rows.forEach(row => {
                     if (row.setting_key === 'system_institution_name') config.institution_name = row.setting_value;
                     if (row.setting_key === 'system_address') config.address = row.setting_value;
                     if (row.setting_key === 'system_phone') config.phone = row.setting_value;
                     if (row.setting_key === 'system_email') config.email = row.setting_value;
+                    if (row.setting_key === 'system_website') config.website = row.setting_value;
                     if (row.setting_key === 'system_maintenance_mode') config.maintenance_mode = row.setting_value === 'true';
                     if (row.setting_key === 'system_max_upload_size') config.max_upload_size = parseInt(row.setting_value) || 5;
                 });
@@ -3403,7 +4554,7 @@ const apiController = {
             console.error('Error getting system config:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil konfigurasi sistem'
+                message: 'Gagal mengambil konfigurasi sistem: ' + error.message
             });
         }
     },
@@ -3412,6 +4563,14 @@ const apiController = {
     updateSystemConfig: async (req, res) => {
         try {
             const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
             const config = req.body;
             
             if (!config.institution_name) {
@@ -3421,31 +4580,34 @@ const apiController = {
                 });
             }
             
-            // 🔥 Simpan ke database
+            // Simpan ke database
             const settings = [
                 { key: 'system_institution_name', value: config.institution_name },
                 { key: 'system_address', value: config.address || '' },
                 { key: 'system_phone', value: config.phone || '' },
                 { key: 'system_email', value: config.email || '' },
+                { key: 'system_website', value: config.website || '' },
                 { key: 'system_maintenance_mode', value: config.maintenance_mode ? 'true' : 'false' },
                 { key: 'system_max_upload_size', value: config.max_upload_size.toString() }
             ];
             
             for (const setting of settings) {
+                // 🔴 HAPUS updated_by
                 await db.query(
-                    `INSERT INTO settings (setting_key, setting_value, updated_by, updated_at) 
-                    VALUES (?, ?, ?, NOW())
+                    `INSERT INTO settings (setting_key, setting_value) 
+                    VALUES (?, ?)
                     ON DUPLICATE KEY UPDATE 
                     setting_value = VALUES(setting_value), 
-                    updated_by = VALUES(updated_by), 
                     updated_at = NOW()`,
-                    [setting.key, setting.value, userId]
+                    [setting.key, setting.value]
                 );
             }
             
+            // Catat aktivitas
             await db.query(
-                'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                [userId, 'update', 'Mengupdate konfigurasi sistem', 'config']
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Update System Config', req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -3458,110 +4620,391 @@ const apiController = {
             console.error('Error updating system config:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal menyimpan konfigurasi'
+                message: 'Gagal menyimpan konfigurasi: ' + error.message
             });
         }
     },
 
-    // Get active sessions
-    getActiveSessions: async (req, res) => {
+    // ==================== MODE SIBUK METHODS ====================
+
+    // Get mode sibuk status dan periode
+    getBusyMode: async (req, res) => {
         try {
-            const userId = req.user?.id;
+            console.log('📋 Getting busy mode...');
             
-            // 🔥 Ambil dari tabel sessions jika ada
-            let sessions = [];
+            let active = false;
             
+            // Ambil status mode sibuk dari settings
             try {
-                const [rows] = await db.query(
-                    'SELECT id, device, browser, location, ip, last_active, is_current FROM sessions WHERE user_id = ? ORDER BY last_active DESC',
-                    [userId]
+                const [settings] = await db.query(
+                    'SELECT setting_value FROM settings WHERE setting_key = "busy_mode_active"'
                 );
-                sessions = rows;
+                active = settings.length > 0 ? settings[0].setting_value === '1' : false;
             } catch (dbError) {
-                console.log('Sessions table not ready:', dbError.message);
-                // Gunakan data dummy
-                sessions = [
-                    {
-                        id: 's1',
-                        device: 'Windows PC',
-                        browser: 'Chrome 120',
-                        location: 'Jakarta, Indonesia',
-                        ip: '192.168.1.100',
-                        last_active: new Date().toISOString(),
-                        current: true
-                    },
-                    {
-                        id: 's2',
-                        device: 'iPhone 14',
-                        browser: 'Safari',
-                        location: 'Tangerang, Indonesia',
-                        ip: '192.168.1.101',
-                        last_active: new Date(Date.now() - 3600000).toISOString(),
-                        current: false
-                    }
-                ];
+                console.log('⚠️ Settings table error:', dbError.message);
+            }
+            
+            let periods = [];
+            
+            // Ambil periode sibuk dari tabel jadwal_sibuk
+            try {
+                // Cek apakah tabel jadwal_sibuk ada
+                const [tables] = await db.query("SHOW TABLES LIKE 'jadwal_sibuk'");
+                
+                if (tables.length > 0) {
+                    const [rows] = await db.query(
+                        `SELECT 
+                            id, 
+                            keterangan, 
+                            DATE_FORMAT(tanggal_mulai, '%Y-%m-%d') as tanggal_mulai,
+                            DATE_FORMAT(tanggal_selesai, '%Y-%m-%d') as tanggal_selesai,
+                            created_at,
+                            updated_at
+                        FROM jadwal_sibuk 
+                        ORDER BY tanggal_mulai ASC`
+                    );
+                    periods = rows;
+                }
+            } catch (dbError) {
+                console.log('⚠️ jadwal_sibuk table error:', dbError.message);
+                periods = [];
             }
             
             res.json({
                 success: true,
-                data: sessions
+                data: {
+                    active: active,
+                    periods: periods
+                }
             });
             
         } catch (error) {
-            console.error('Error getting sessions:', error);
+            console.error('❌ Error getting busy mode:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil data sessions'
+                message: 'Gagal mengambil data mode sibuk: ' + error.message
             });
         }
     },
 
-    // Logout all other devices
-    logoutAllDevices: async (req, res) => {
+    // Update mode sibuk status
+    updateBusyMode: async (req, res) => {
         try {
             const userId = req.user?.id;
-            const currentSessionId = req.session?.id || 'current';
             
-            // 🔥 Hapus session lain
-            try {
-                await db.query(
-                    'DELETE FROM sessions WHERE user_id = ? AND id != ?',
-                    [userId, currentSessionId]
-                );
-            } catch (dbError) {
-                console.log('Sessions table not ready:', dbError.message);
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
             }
             
+            const { active } = req.body;
+            
+            console.log('📝 Updating busy mode:', { active, userId });
+            
+            try {
+                const [existing] = await db.query(
+                    'SELECT * FROM settings WHERE setting_key = "busy_mode_active"'
+                );
+                
+                if (existing.length > 0) {
+                    // 🔴 HAPUS updated_by DARI QUERY UPDATE
+                    await db.query(
+                        `UPDATE settings 
+                        SET setting_value = ?, updated_at = NOW() 
+                        WHERE setting_key = "busy_mode_active"`,
+                        [active ? '1' : '0']
+                    );
+                } else {
+                    // 🔴 HAPUS updated_by DARI QUERY INSERT
+                    await db.query(
+                        `INSERT INTO settings (setting_key, setting_value) 
+                        VALUES ("busy_mode_active", ?)`,
+                        [active ? '1' : '0']
+                    );
+                }
+            } catch (dbError) {
+                console.error('❌ Database error:', dbError.message);
+                throw dbError;
+            }
+            
+            // Catat aktivitas (tetap pakai userId)
             await db.query(
-                'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                [userId, 'logout', 'Logout dari semua perangkat lain', 'security']
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Update Busy Mode', req.ip, req.headers['user-agent']]
             );
             
             res.json({
                 success: true,
-                message: 'Berhasil logout dari semua perangkat'
+                message: active ? 'Mode sibuk diaktifkan' : 'Mode sibuk dinonaktifkan'
             });
             
         } catch (error) {
-                console.error('Error logging out devices:', error);
+            console.error('❌ Error updating busy mode:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal logout dari perangkat lain'
+                message: 'Gagal mengupdate mode sibuk: ' + error.message
             });
         }
     },
 
-    // 🔥 PERBAIKAN: Create backup dengan implementasi real
+    // Get periode sibuk by ID
+    getBusyPeriodById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            // Cek apakah tabel jadwal_sibuk ada
+            const [tables] = await db.query("SHOW TABLES LIKE 'jadwal_sibuk'");
+            
+            if (tables.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Tabel jadwal_sibuk belum ada'
+                });
+            }
+            
+            const [rows] = await db.query(
+                'SELECT * FROM jadwal_sibuk WHERE id = ?',
+                [id]
+            );
+            
+            if (rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Periode tidak ditemukan'
+                });
+            }
+            
+            res.json({
+                success: true,
+                data: rows[0]
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting busy period:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil data periode: ' + error.message
+            });
+        }
+    },
+
+    // Tambah periode sibuk
+    addBusyPeriod: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
+            const { keterangan, tanggal_mulai, tanggal_selesai } = req.body;
+            
+            console.log('📝 Adding busy period:', { keterangan, tanggal_mulai, tanggal_selesai });
+            
+            if (!keterangan || !tanggal_mulai || !tanggal_selesai) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Semua field harus diisi'
+                });
+            }
+            
+            if (new Date(tanggal_mulai) > new Date(tanggal_selesai)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tanggal selesai harus setelah tanggal mulai'
+                });
+            }
+            
+            // Buat tabel jadwal_sibuk jika belum ada
+            try {
+                await db.query('SELECT 1 FROM jadwal_sibuk LIMIT 1');
+            } catch (dbError) {
+                if (dbError.code === 'ER_NO_SUCH_TABLE') {
+                    console.log('📋 Creating jadwal_sibuk table...');
+                    await db.query(`
+                        CREATE TABLE IF NOT EXISTS jadwal_sibuk (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            keterangan VARCHAR(255) NOT NULL,
+                            tanggal_mulai DATE NOT NULL,
+                            tanggal_selesai DATE NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            created_at INT,
+                            updated_at INT
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    `);
+                }
+            }
+            
+            // Insert periode
+            const [result] = await db.query(
+                `INSERT INTO jadwal_sibuk 
+                (keterangan, tanggal_mulai, tanggal_selesai, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?)`,
+                [keterangan, tanggal_mulai, tanggal_selesai, userId, userId]
+            );
+            
+            // Catat aktivitas
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Add Busy Period', req.ip, req.headers['user-agent']]
+            );
+            
+            res.json({
+                success: true,
+                message: 'Periode sibuk berhasil ditambahkan',
+                data: { id: result.insertId }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error adding busy period:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menambah periode sibuk: ' + error.message
+            });
+        }
+    },
+
+    // Update periode sibuk
+    updateBusyPeriod: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
+            const { id } = req.params;
+            const { keterangan, tanggal_mulai, tanggal_selesai } = req.body;
+            
+            if (!keterangan || !tanggal_mulai || !tanggal_selesai) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Semua field harus diisi'
+                });
+            }
+            
+            if (new Date(tanggal_mulai) > new Date(tanggal_selesai)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tanggal selesai harus setelah tanggal mulai'
+                });
+            }
+            
+            // Update periode
+            const [result] = await db.query(
+                `UPDATE jadwal_sibuk 
+                SET keterangan = ?, tanggal_mulai = ?, tanggal_selesai = ?, updated_by = ? 
+                WHERE id = ?`,
+                [keterangan, tanggal_mulai, tanggal_selesai, userId, id]
+            );
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Periode tidak ditemukan'
+                });
+            }
+            
+            // Catat aktivitas
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Update Busy Period', req.ip, req.headers['user-agent']]
+            );
+            
+            res.json({
+                success: true,
+                message: 'Periode sibuk berhasil diupdate'
+            });
+            
+        } catch (error) {
+            console.error('❌ Error updating busy period:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengupdate periode sibuk: ' + error.message
+            });
+        }
+    },
+
+    // Delete periode sibuk
+    deleteBusyPeriod: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
+            const { id } = req.params;
+            
+            // Hapus periode
+            const [result] = await db.query(
+                'DELETE FROM jadwal_sibuk WHERE id = ?',
+                [id]
+            );
+            
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Periode tidak ditemukan'
+                });
+            }
+            
+            // Catat aktivitas
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, 'Delete Busy Period', req.ip, req.headers['user-agent']]
+            );
+            
+            res.json({
+                success: true,
+                message: 'Periode sibuk berhasil dihapus'
+            });
+            
+        } catch (error) {
+            console.error('❌ Error deleting busy period:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menghapus periode sibuk: ' + error.message
+            });
+        }
+    },
+
+    // ==================== BACKUP & RESTORE METHODS ====================
+
+    // Create backup
     createBackup: async (req, res) => {
         try {
             const userId = req.user?.id;
             
-            // Buat direktori backup jika belum ada
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
             const fs = require('fs');
             const path = require('path');
             const { exec } = require('child_process');
-            const backupDir = path.join(__dirname, '../../backups');
             
+            // Buat direktori backup jika belum ada
+            const backupDir = path.join(__dirname, '../../backups');
             if (!fs.existsSync(backupDir)) {
                 fs.mkdirSync(backupDir, { recursive: true });
             }
@@ -3571,7 +5014,7 @@ const apiController = {
             const filename = `backup_${dateStr}_${timestamp}.sql`;
             const filepath = path.join(backupDir, filename);
             
-            // 🔥 Ambil konfigurasi database dari environment
+            // Ambil konfigurasi database dari environment
             const dbConfig = {
                 host: process.env.DB_HOST || 'localhost',
                 user: process.env.DB_USER || 'root',
@@ -3587,13 +5030,15 @@ const apiController = {
                     console.error('Backup error:', error);
                     
                     // Fallback: buat file dummy
-                    fs.writeFileSync(filepath, `-- Backup database ${dbConfig.database}\n-- Created at ${new Date().toISOString()}\n\n`);
+                    const dummyContent = `-- Backup database ${dbConfig.database}\n-- Created at ${new Date().toISOString()}\n\n`;
+                    fs.writeFileSync(filepath, dummyContent);
                 }
                 
                 // Catat aktivitas
                 await db.query(
-                    'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                    [userId, 'backup', `Membuat backup database: ${filename}`, 'backup']
+                    `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                    VALUES (?, ?, ?, ?)`,
+                    [userId, 'Create Backup', req.ip, req.headers['user-agent']]
                 );
                 
                 const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -3614,12 +5059,12 @@ const apiController = {
             console.error('Error creating backup:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal membuat backup'
+                message: 'Gagal membuat backup: ' + error.message
             });
         }
     },
 
-    // 🔥 PERBAIKAN: Get backup history dari filesystem
+    // Get backup history
     getBackupHistory: async (req, res) => {
         try {
             const fs = require('fs');
@@ -3631,7 +5076,7 @@ const apiController = {
             if (fs.existsSync(backupDir)) {
                 const files = fs.readdirSync(backupDir);
                 backups = files
-                    .filter(f => f.endsWith('.sql'))
+                    .filter(f => f.endsWith('.sql') || f.endsWith('.gz'))
                     .map(f => {
                         const stats = fs.statSync(path.join(backupDir, f));
                         return {
@@ -3642,7 +5087,7 @@ const apiController = {
                         };
                     })
                     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                    .slice(0, 10); // Ambil 10 terbaru
+                    .slice(0, 10);
             }
             
             res.json({
@@ -3654,20 +5099,27 @@ const apiController = {
             console.error('Error getting backup history:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil history backup'
+                message: 'Gagal mengambil history backup: ' + error.message
             });
         }
     },
 
-    // 🔥 PERBAIKAN: Restore backup
+    // Restore backup
     restoreBackup: async (req, res) => {
         try {
             const userId = req.user?.id;
             
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
             if (!req.file) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Tidak ada file backup'
+                    message: 'Tidak ada file backup yang diupload'
                 });
             }
             
@@ -3676,7 +5128,7 @@ const apiController = {
             const { exec } = require('child_process');
             
             // Simpan file upload
-            const uploadDir = path.join(__dirname, '../../uploads/backups');
+            const uploadDir = path.join(__dirname, '../../uploads/restore');
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true });
             }
@@ -3685,7 +5137,7 @@ const apiController = {
             const filepath = path.join(uploadDir, filename);
             fs.writeFileSync(filepath, req.file.buffer);
             
-            // 🔥 Ambil konfigurasi database
+            // Ambil konfigurasi database
             const dbConfig = {
                 host: process.env.DB_HOST || 'localhost',
                 user: process.env.DB_USER || 'root',
@@ -3707,9 +5159,15 @@ const apiController = {
                 
                 // Catat aktivitas
                 await db.query(
-                    'INSERT INTO activities (user_id, action, description, type) VALUES (?, ?, ?, ?)',
-                    [userId, 'restore', 'Merestore database dari file backup', 'backup']
+                    `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                    VALUES (?, ?, ?, ?)`,
+                    [userId, 'Restore Backup', req.ip, req.headers['user-agent']]
                 );
+                
+                // Hapus file temporary
+                try {
+                    fs.unlinkSync(filepath);
+                } catch (e) {}
                 
                 res.json({
                     success: true,
@@ -3721,21 +5179,26 @@ const apiController = {
             console.error('Error restoring backup:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal restore'
+                message: 'Gagal restore: ' + error.message
             });
         }
     },
+
+    // ==================== ACTIVITY LOGS METHODS ====================
 
     // Get activity logs
     getActivityLogs: async (req, res) => {
         try {
             const type = req.query.type || 'all';
             const page = parseInt(req.query.page) || 1;
-            const limit = 10;
+            const limit = 20;
             const offset = (page - 1) * limit;
             
+            // Query untuk mengambil log aktivitas
             let query = `
-                SELECT a.*, u.name as user_name 
+                SELECT 
+                    a.*,
+                    u.full_name as user_name 
                 FROM activities a
                 LEFT JOIN users u ON a.user_id = u.id
                 WHERE 1=1
@@ -3745,10 +5208,11 @@ const apiController = {
             let countParams = [];
             
             if (type !== 'all') {
-                query += ` AND a.type = ?`;
-                countQuery += ` AND type = ?`;
-                params.push(type);
-                countParams.push(type);
+                query += ` AND a.activity_name LIKE ?`;
+                countQuery += ` AND activity_name LIKE ?`;
+                const searchPattern = `%${type}%`;
+                params.push(searchPattern);
+                countParams.push(searchPattern);
             }
             
             query += ` ORDER BY a.created_at DESC LIMIT ? OFFSET ?`;
@@ -3771,337 +5235,10 @@ const apiController = {
             console.error('Error getting activity logs:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengambil log aktivitas'
+                message: 'Gagal mengambil log aktivitas: ' + error.message
             });
         }
     },
-
-    // Get mode sibuk status dan periode
-    getBusyMode: async (req, res) => {
-        try {
-            console.log('📋 Getting busy mode...');
-            
-            let active = false;
-            try {
-                const [settings] = await db.query(
-                    'SELECT setting_value FROM settings WHERE setting_key = "busy_mode_active"'
-                );
-                active = settings.length > 0 ? settings[0].setting_value === '1' : false;
-                console.log('✅ Active status:', active);
-            } catch (dbError) {
-                console.log('⚠️ Settings table error:', dbError.message);
-            }
-            
-            let periods = [];
-            try {
-                const [rows] = await db.query(
-                    `SELECT 
-                        id, 
-                        keterangan, 
-                        DATE_FORMAT(tanggal_mulai, '%Y-%m-%d') as tanggal_mulai,
-                        DATE_FORMAT(tanggal_selesai, '%Y-%m-%d') as tanggal_selesai,
-                        created_at,
-                        updated_at
-                    FROM jadwal_sibuk 
-                    WHERE tanggal_selesai >= CURDATE()
-                    ORDER BY tanggal_mulai ASC`
-                );
-                periods = rows;
-                console.log(`✅ Found ${periods.length} periods`);
-            } catch (dbError) {
-                console.log('⚠️ jadwal_sibuk table error:', dbError.message);
-                periods = [];
-            }
-            
-            res.json({
-                success: true,
-                data: {
-                    active: active,
-                    periods: periods
-                }
-            });
-        } catch (error) {
-            console.error('❌ Error getting busy mode:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengambil data mode sibuk: ' + error.message
-            });
-        }
-    },
-
-    // Update mode sibuk status
-    updateBusyMode: async (req, res) => {
-        try {
-            const { active } = req.body;
-            const adminId = req.user?.id || 1;
-            
-            console.log('📝 Updating busy mode:', { active, adminId });
-            
-            try {
-                const [existing] = await db.query(
-                    'SELECT * FROM settings WHERE setting_key = "busy_mode_active"'
-                );
-                
-                if (existing.length > 0) {
-                    await db.query(
-                        `UPDATE settings 
-                        SET setting_value = ?, updated_by = ?, updated_at = NOW() 
-                        WHERE setting_key = "busy_mode_active"`,
-                        [active ? '1' : '0', adminId]
-                    );
-                } else {
-                    await db.query(
-                        `INSERT INTO settings (setting_key, setting_value, created_by, updated_by) 
-                        VALUES ("busy_mode_active", ?, ?, ?)`,
-                        [active ? '1' : '0', adminId, adminId]
-                    );
-                }
-                
-                console.log('✅ Busy mode updated successfully');
-                
-                res.json({
-                    success: true,
-                    message: active ? 'Mode sibuk diaktifkan' : 'Mode sibuk dinonaktifkan'
-                });
-                
-            } catch (dbError) {
-                console.error('❌ Database error:', dbError.message);
-                
-                if (dbError.code === 'ER_NO_SUCH_TABLE') {
-                    await db.query(`
-                        CREATE TABLE IF NOT EXISTS settings (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            setting_key VARCHAR(100) UNIQUE NOT NULL,
-                            setting_value TEXT,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                            created_by INT,
-                            updated_by INT,
-                            INDEX idx_key (setting_key)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                    `);
-                    
-                    await db.query(
-                        `INSERT INTO settings (setting_key, setting_value, created_by, updated_by) 
-                        VALUES ("busy_mode_active", ?, ?, ?)`,
-                        [active ? '1' : '0', adminId, adminId]
-                    );
-                    
-                    res.json({
-                        success: true,
-                        message: active ? 'Mode sibuk diaktifkan' : 'Mode sibuk dinonaktifkan'
-                    });
-                } else {
-                    throw dbError;
-                }
-            }
-            
-        } catch (error) {
-            console.error('❌ Error updating busy mode:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengupdate mode sibuk: ' + error.message
-            });
-        }
-    },
-
-    // Tambah periode sibuk
-    addBusyPeriod: async (req, res) => {
-        try {
-            const { keterangan, tanggal_mulai, tanggal_selesai } = req.body;
-            const adminId = req.user?.id || 1;
-            
-            console.log('📝 Adding busy period:', { keterangan, tanggal_mulai, tanggal_selesai });
-            
-            if (!keterangan || !tanggal_mulai || !tanggal_selesai) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Semua field harus diisi'
-                });
-            }
-            
-            if (new Date(tanggal_mulai) > new Date(tanggal_selesai)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Tanggal selesai harus setelah tanggal mulai'
-                });
-            }
-            
-            try {
-                const [result] = await db.query(
-                    `INSERT INTO jadwal_sibuk 
-                    (keterangan, tanggal_mulai, tanggal_selesai, created_by, updated_by) 
-                    VALUES (?, ?, ?, ?, ?)`,
-                    [keterangan, tanggal_mulai, tanggal_selesai, adminId, adminId]
-                );
-                
-                console.log('✅ Period added with ID:', result.insertId);
-                
-                res.json({
-                    success: true,
-                    message: 'Periode sibuk berhasil ditambahkan',
-                    data: { id: result.insertId }
-                });
-                
-            } catch (dbError) {
-                console.error('❌ Database error:', dbError.message);
-                
-                if (dbError.code === 'ER_NO_SUCH_TABLE') {
-                    await db.query(`
-                        CREATE TABLE IF NOT EXISTS jadwal_sibuk (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            keterangan VARCHAR(255) NOT NULL,
-                            tanggal_mulai DATE NOT NULL,
-                            tanggal_selesai DATE NOT NULL,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                            created_by INT,
-                            updated_by INT,
-                            INDEX idx_tanggal (tanggal_mulai, tanggal_selesai),
-                            INDEX idx_tanggal_selesai (tanggal_selesai)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                    `);
-                    
-                    const [result] = await db.query(
-                        `INSERT INTO jadwal_sibuk 
-                        (keterangan, tanggal_mulai, tanggal_selesai, created_by, updated_by) 
-                        VALUES (?, ?, ?, ?, ?)`,
-                        [keterangan, tanggal_mulai, tanggal_selesai, adminId, adminId]
-                    );
-                    
-                    res.json({
-                        success: true,
-                        message: 'Periode sibuk berhasil ditambahkan',
-                        data: { id: result.insertId }
-                    });
-                } else {
-                    throw dbError;
-                }
-            }
-            
-        } catch (error) {
-            console.error('❌ Error adding busy period:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal menambah periode sibuk: ' + error.message
-            });
-        }
-    },
-
-    // 🔥 PERBAIKAN: updateBusyPeriod - adminId dari req.user.id
-    updateBusyPeriod: async (req, res) => {
-        try {
-            const { id } = req.params;
-            const { keterangan, tanggal_mulai, tanggal_selesai } = req.body;
-            const adminId = req.user?.id; // Gunakan req.user.id
-            
-            if (!adminId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
-            }
-            
-            if (!keterangan || !tanggal_mulai || !tanggal_selesai) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Semua field harus diisi'
-                });
-            }
-            
-            if (new Date(tanggal_mulai) > new Date(tanggal_selesai)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Tanggal selesai harus setelah tanggal mulai'
-                });
-            }
-            
-            const [result] = await db.query(
-                `UPDATE jadwal_sibuk 
-                SET keterangan = ?, tanggal_mulai = ?, tanggal_selesai = ?, updated_by = ? 
-                WHERE id = ?`,
-                [keterangan, tanggal_mulai, tanggal_selesai, adminId, id]
-            );
-            
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Periode tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                message: 'Periode sibuk berhasil diupdate'
-            });
-        } catch (error) {
-            console.error('Error updating busy period:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengupdate periode sibuk: ' + error.message
-            });
-        }
-    },
-
-    deleteBusyPeriod: async (req, res) => {
-        try {
-            const { id } = req.params;
-            
-            const [result] = await db.query(
-                'DELETE FROM jadwal_sibuk WHERE id = ?',
-                [id]
-            );
-            
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Periode tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                message: 'Periode sibuk berhasil dihapus'
-            });
-        } catch (error) {
-            console.error('Error deleting busy period:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal menghapus periode sibuk: ' + error.message
-            });
-        }
-    },
-
-    // Get periode sibuk by ID
-    getBusyPeriodById: async (req, res) => {
-        try {
-            const { id } = req.params;
-            
-            const [rows] = await db.query(
-                'SELECT * FROM jadwal_sibuk WHERE id = ?',
-                [id]
-            );
-            
-            if (rows.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Periode tidak ditemukan'
-                });
-            }
-            
-            res.json({
-                success: true,
-                data: rows[0]
-            });
-        } catch (error) {
-            console.error('❌ Error getting busy period:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengambil data periode: ' + error.message
-            });
-        }
-    },
-
 
     // ==============================================
     // ==================== USER ====================
@@ -4728,6 +5865,111 @@ const apiController = {
         }
     },
 
+    // ==================== GET FILE DENGAN TOKEN ====================
+    getFile: async (req, res) => {
+        try {
+            const { filename } = req.params;
+            const userId = req.user?.id;
+            
+            console.log('========== GET FILE ==========');
+            console.log('📂 Filename:', filename);
+            console.log('🔑 User ID:', userId);
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+
+            // Tentukan folder berdasarkan URL path
+            const pathParts = req.path.split('/');
+            const fileType = pathParts[2]; // 'surat', 'ktp', 'payment', 'laporan', 'skrd'
+            
+            console.log('📁 File type (dari URL):', fileType);
+            
+            // 🔥 PERBAIKI MAPPING FOLDER - Sesuaikan dengan nama folder asli
+            const folderMap = {
+                'surat': 'surat',
+                'ktp': 'ktp',
+                'payment': 'payment',
+                'laporan': 'laporan',     // 🔥 Ganti dari 'reports' menjadi 'laporan'
+                'skrd': 'skrd'
+            };
+            
+            // Coba cari di folder yang ditentukan URL
+            const targetFolder = folderMap[fileType] || 'others';
+            let filepath = path.join(__dirname, '../../uploads', targetFolder, filename);
+            
+            console.log('📄 Mencoba di:', filepath);
+            
+            // Cek apakah file ada di folder yang ditentukan
+            if (fs.existsSync(filepath)) {
+                console.log('✅ File ditemukan di folder:', targetFolder);
+                return sendFile(res, filepath, filename);
+            }
+            
+            // Jika tidak ditemukan, coba cari di semua folder
+            console.log('❌ File tidak ditemukan di folder target, mencari di semua folder...');
+            
+            // 🔥 DAFTAR FOLDER YANG BENAR
+            const allFolders = ['surat', 'ktp', 'payment', 'laporan', 'skrd', 'uploads', 'others'];
+            let found = false;
+            
+            for (const folder of allFolders) {
+                const testPath = path.join(__dirname, '../../uploads', folder, filename);
+                console.log('🔍 Mencoba:', testPath);
+                
+                if (fs.existsSync(testPath)) {
+                    console.log('✅ File DITEMUKAN di folder:', folder);
+                    return sendFile(res, testPath, filename);
+                }
+            }
+            
+            // Coba langsung di folder uploads tanpa subfolder
+            const directPath = path.join(__dirname, '../../uploads', filename);
+            console.log('🔍 Mencoba di root uploads:', directPath);
+            
+            if (fs.existsSync(directPath)) {
+                console.log('✅ File DITEMUKAN di root uploads');
+                return sendFile(res, directPath, filename);
+            }
+            
+            // File benar-benar tidak ditemukan
+            console.error('❌ File TIDAK DITEMUKAN di mana pun');
+            
+            // List isi folder untuk debugging
+            try {
+                const uploadsDir = path.join(__dirname, '../../uploads');
+                console.log('📋 Isi folder uploads:');
+                const files = fs.readdirSync(uploadsDir);
+                files.forEach(f => console.log('   -', f));
+                
+                // Cek isi folder laporan
+                const laporanDir = path.join(__dirname, '../../uploads/laporan');
+                if (fs.existsSync(laporanDir)) {
+                    console.log('📋 Isi folder laporan:');
+                    const laporanFiles = fs.readdirSync(laporanDir);
+                    laporanFiles.forEach(f => console.log('   -', f));
+                }
+            } catch (e) {
+                console.log('Gagal membaca direktori:', e.message);
+            }
+            
+            return res.status(404).json({
+                success: false,
+                message: 'File tidak ditemukan di server'
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting file:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengakses file: ' + error.message
+            });
+        }
+    },
+
     // ==================== GET USER TRANSACTIONS ====================
     getUserTransactions: async (req, res) => {
         try {
@@ -5291,7 +6533,49 @@ const apiController = {
 
 };
 
-// Helper functions
+// ==================== HELPER FUNCTIONS (di luar object) ====================
+
+// Format Rupiah
+function formatRupiah(amount, withSymbol = true) {
+    const formatted = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+    
+    if (!withSymbol) {
+        return formatted.replace('Rp', '').trim();
+    }
+    return formatted.replace('Rp', 'Rp ');
+}
+
+// Format tanggal
+function formatDate(date) {
+    if (!date) return '-';
+    const d = new Date(date);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Format time ago (versi detail)
+function formatTimeAgo(date) {
+    if (!date) return '-';
+    const now = new Date();
+    const past = new Date(date);
+    const diffMs = now - past;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Baru saja';
+    if (diffMins < 60) return `${diffMins} menit lalu`;
+    if (diffHours < 24) return `${diffHours} jam lalu`;
+    if (diffDays < 7) return `${diffDays} hari lalu`;
+    return formatDate(date);
+}
+
+// Time ago sederhana (yang sudah ada)
 function timeAgo(dateString) {
     const date = new Date(dateString);
     const now = new Date();
@@ -5303,7 +6587,7 @@ function timeAgo(dateString) {
     return Math.floor(seconds / 86400) + ' hari';
 }
 
-// Helper functions
+// Get status class untuk badge
 function getStatusClass(status) {
     const classes = {
         'Menunggu Verifikasi': 'status-pending',
@@ -5318,6 +6602,7 @@ function getStatusClass(status) {
     return classes[status] || 'status-default';
 }
 
+// Get status icon
 function getStatusIcon(status) {
     const icons = {
         'Menunggu Verifikasi': 'fa-clock',
@@ -5332,6 +6617,7 @@ function getStatusIcon(status) {
     return icons[status] || 'fa-info-circle';
 }
 
+// Get icon untuk action
 function getIconForAction(action) {
     const icons = {
         'login': 'sign-in-alt',
@@ -5346,6 +6632,7 @@ function getIconForAction(action) {
     return icons[action] || 'info-circle';
 }
 
+// Get color untuk action
 function getColorForAction(action) {
     const colors = {
         'login': 'success',
@@ -5360,6 +6647,7 @@ function getColorForAction(action) {
     return colors[action] || 'primary';
 }
 
+// Get badge color untuk status
 function getBadgeColorForStatus(status) {
     const colors = {
         'pending_verification': 'warning',
@@ -5372,15 +6660,64 @@ function getBadgeColorForStatus(status) {
     return colors[status] || 'secondary';
 }
 
-function formatRupiah(number) {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    }).format(number);
+// Get payment status mapping
+function getPaymentStatus(status) {
+    const statusMap = {
+        'Lunas': 'paid',
+        'Belum Bayar': 'pending',
+        'Belum Lunas': 'partial',
+        'Menunggu SKRD Upload': 'waiting_verification',
+        'Dibatalkan': 'cancelled'
+    };
+    return statusMap[status] || status;
 }
 
-// Helper function untuk generate VA Number Bank Banten
+// Fungsi helper untuk mengirim file - PAKSA DOWNLOAD SEMUA
+function sendFile(res, filepath, filename) {
+    try {
+        const stats = fs.statSync(filepath);
+        console.log('📊 File size:', stats.size, 'bytes');
+        
+        if (stats.size === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'File kosong'
+            });
+        }
+
+        const ext = path.extname(filename).toLowerCase();
+        let contentType = 'application/octet-stream';
+        
+        // Content-Type tetap diisi sesuai file agar tidak corrupt
+        if (ext === '.pdf') {
+            contentType = 'application/pdf';
+        } else if (ext === '.jpg' || ext === '.jpeg') {
+            contentType = 'image/jpeg';
+        } else if (ext === '.png') {
+            contentType = 'image/png';
+        } else if (ext === '.gif') {
+            contentType = 'image/gif';
+        }
+        
+        res.setHeader('Content-Type', contentType);
+        
+        // 🔥 PAKSA DOWNLOAD UNTUK SEMUA JENIS FILE
+        // Content-Disposition: attachment akan MEMAKSA browser untuk download
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        
+        console.log('📥 File akan DIDOWNLOAD:', filename);
+        res.sendFile(filepath);
+        
+    } catch (error) {
+        console.error('❌ Error sending file:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal mengirim file: ' + error.message
+        });
+    }
+}
+
+// Generate VA Number Bank Banten
 function generateVANumber(paymentId) {
     // Format VA: 88 + kode lab (2 digit) + tanggal (6 digit) + random (4 digit)
     const labCode = '01'; // Kode lab

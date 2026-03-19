@@ -3,7 +3,6 @@ const router = express.Router();
 const apiController = require('../controllers/apiController');
 const upload = require('../config/multer');
 const authMiddleware = require('../middleware/auth');
-// Tambahkan ini untuk akses file
 const path = require('path');
 const fs = require('fs');
 
@@ -18,81 +17,131 @@ router.post('/auth/register', apiController.register);
 router.post('/auth/login', apiController.login);
 router.post('/login', apiController.login);
 
-// ==================== DASHBOARD API ====================
-router.get('/dashboard/stats', authMiddleware, apiController.getDashboardStats);
+// ==================== ADMIN DASHBOARD API ====================
+router.get('/admin/dashboard/stats', authMiddleware, apiController.getAdminDashboardStats);
 router.get('/dashboard/complete', authMiddleware, apiController.getDashboardData);
 
-// ==================== SUBMISSIONS API ====================
+// ==================== SUBMISSIONS API (ADMIN) ====================
 router.get('/submissions', authMiddleware, apiController.getSubmissions);
 router.get('/submissions/:id', authMiddleware, apiController.getSubmissionDetail);
+router.put('/submissions/:id', authMiddleware, apiController.updateSubmission);
+router.get('/submissions/:id/documents', authMiddleware, apiController.getSubmissionDocuments);
+router.post('/submissions/:id/cancel', authMiddleware, apiController.cancelSubmission);
+
+// Route untuk create submission (user)
 router.post('/submissions', authMiddleware, upload.fields([
     { name: 'surat_permohonan', maxCount: 1 },
     { name: 'ktp', maxCount: 1 }
 ]), apiController.createSubmission);
-// COMMENT DULU YANG BELUM ADA
-// router.put('/submissions/:id', authMiddleware, apiController.updateSubmission);
-// router.get('/submissions/:id/documents', authMiddleware, apiController.getSubmissionDocuments);
-// router.post('/submissions/:id/cancel', authMiddleware, apiController.cancelSubmission);
+
+// ==================== SUBMISSION REPORTS API ====================
+// Upload laporan hasil pengujian
+router.post('/submissions/:id/report', 
+    authMiddleware, 
+    upload.single('laporan'), 
+    apiController.uploadSubmissionReport
+);
+
+// Download laporan hasil pengujian
+router.get('/submissions/:id/report', 
+    authMiddleware, 
+    apiController.downloadSubmissionReport
+);
 
 // ==================== SKRD API ====================
 router.get('/skrd', authMiddleware, apiController.getSKRD);
 router.get('/skrd/:id', authMiddleware, apiController.getSKRDDetail);
 router.post('/skrd', authMiddleware, apiController.createSKRD);
-// COMMENT DULU YANG BELUM ADA
-// router.post('/skrd/:id/verify-payment', authMiddleware, apiController.verifyPayment);
-// router.post('/skrd/:id/upload-skrd', authMiddleware, upload.single('skrd_file'), apiController.uploadSkrd);
-// router.post('/skrd/:id/reject-proof', authMiddleware, apiController.rejectProof);
-// router.post('/skrd/:id/remind', authMiddleware, apiController.sendPaymentReminder);
-// router.post('/skrd/:id/verify', authMiddleware, apiController.verifyPayment);
-// router.post('/skrd/:id/cancel', authMiddleware, apiController.cancelInvoice);
-// router.put('/skrd/:id/status', authMiddleware, apiController.updateSKRDStatus);
+router.put('/skrd/:id/status', authMiddleware, apiController.updateSKRDStatus);
+router.post('/skrd/:id/verify-payment', authMiddleware, apiController.verifyPayment);
+router.post('/skrd/:id/upload-skrd', authMiddleware, upload.single('skrd_file'), apiController.uploadSkrd);
+router.post('/skrd/:id/reject-proof', authMiddleware, apiController.rejectProof);
+router.post('/skrd/:id/remind', authMiddleware, apiController.sendPaymentReminder);
+router.post('/skrd/:id/cancel', authMiddleware, apiController.cancelInvoice);
+
+// ==================== SKRD API ====================
+// Upload SKRD file
+router.post('/skrd/:id/upload-skrd', 
+    authMiddleware, 
+    upload.single('skrd'), 
+    apiController.uploadSkrd
+);
+
+// Download SKRD file
+router.get('/skrd/:id/download-skrd', 
+    authMiddleware, 
+    apiController.downloadSkrd
+);
+
+// ==================== KUISIONER API ====================
+// PENTING: URUTKAN DARI YANG PALING SPESIFIK
+
+// 1. QUESTIONS ROUTES (PALING ATAS - PALING SPESIFIK)
+router.get('/kuisioner/questions', authMiddleware, apiController.getKuisionerQuestions);
+router.get('/kuisioner/questions/:id', authMiddleware, apiController.getKuisionerQuestionById);
+router.post('/kuisioner/questions', authMiddleware, apiController.createKuisionerQuestion);
+router.put('/kuisioner/questions/:id', authMiddleware, apiController.updateKuisionerQuestion);
+router.delete('/kuisioner/questions/:id', authMiddleware, apiController.deleteKuisionerQuestion);
+router.post('/kuisioner/questions/reorder', authMiddleware, apiController.reorderKuisionerQuestions);
+
+// 2. BARU ROUTES GENERIK
+router.get('/kuisioner', authMiddleware, apiController.getKuisioner);
+router.get('/kuisioner/stats', authMiddleware, apiController.getKuisionerStats);
+router.get('/kuisioner/:id', authMiddleware, apiController.getKuisionerById);
+router.post('/kuisioner', apiController.createKuisioner);
+router.put('/kuisioner/:id', authMiddleware, apiController.updateKuisioner);
+router.delete('/kuisioner/:id', authMiddleware, apiController.deleteKuisioner);
+
+// 3. ADMIN ROUTES
+router.get('/admin/kuisioner', authMiddleware, apiController.getAdminKuisioner);
+router.get('/admin/kuisioner/stats', authMiddleware, apiController.getAdminKuisionerStats);
+router.get('/admin/kuisioner/:id', authMiddleware, apiController.getAdminKuisionerById);
 
 // ==================== USERS API (ADMIN) ====================
-router.get('/users', authMiddleware, apiController.getUsers);
-router.get('/users/:id', authMiddleware, apiController.getUserDetail);
-// COMMENT DULU YANG BELUM ADA
-// router.get('/users/:id/detail', authMiddleware, apiController.getUserDetail);
-// router.put('/users/:id', authMiddleware, apiController.updateUser);
-// router.post('/users/:id/verify', authMiddleware, apiController.verifyUser);
-// router.delete('/users/:id', authMiddleware, apiController.deleteUser);
-// router.post('/users/:id/deactivate', authMiddleware, apiController.deactivateUser);
-// router.post('/users/:id/reset-password', authMiddleware, apiController.resetPassword);
-// router.post('/users/:id/notify', authMiddleware, apiController.sendNotification);
+// Urutkan dari yang paling spesifik ke generik
+
+// 1. DETAIL USER (spesifik dengan /detail)
+router.get('/admin/users/:id/detail', authMiddleware, apiController.getUserDetail);
+
+// 2. USER ACTIONS
+router.post('/admin/users/:id/verify', authMiddleware, apiController.verifyUser);
+router.post('/admin/users/:id/deactivate', authMiddleware, apiController.deactivateUser);
+router.post('/admin/users/:id/reset-password', authMiddleware, apiController.resetPassword);
+router.post('/admin/users/:id/notify', authMiddleware, apiController.sendNotification);
+router.put('/admin/users/:id', authMiddleware, apiController.updateUser);
+router.delete('/admin/users/:id', authMiddleware, apiController.deleteUser);
+
+// 3. LIST USERS (paling generik)
+router.get('/admin/users', authMiddleware, apiController.getUsers);
 
 // ==================== REPORTS API ====================
 router.get('/reports', authMiddleware, apiController.getReports);
 
-// ==================== KUISIONER API ====================
-router.get('/kuisioner', authMiddleware, apiController.getKuisioner);
-router.get('/kuisioner/stats', authMiddleware, apiController.getKuisionerStats);
-router.get('/kuisioner/:id', authMiddleware, apiController.getKuisionerById);
-router.post('/kuisioner', apiController.createKuisioner); // Public
-// COMMENT DULU YANG BELUM ADA
-// router.put('/kuisioner/:id', authMiddleware, apiController.updateKuisioner);
-// router.delete('/kuisioner/:id', authMiddleware, apiController.deleteKuisioner);
-
-router.get('/kuisioner/questions', authMiddleware, apiController.getKuisionerQuestions);
-router.get('/kuisioner/questions/:id', authMiddleware, apiController.getKuisionerQuestionById);
-router.post('/kuisioner/questions', authMiddleware, apiController.createKuisionerQuestion);
-// COMMENT DULU YANG BELUM ADA
-// router.put('/kuisioner/questions/:id', authMiddleware, apiController.updateKuisionerQuestion);
-// router.delete('/kuisioner/questions/:id', authMiddleware, apiController.deleteKuisionerQuestion);
-// router.post('/kuisioner/questions/reorder', authMiddleware, apiController.reorderKuisionerQuestions);
-
 // ==================== SETTINGS API ====================
+// Profile settings
 router.get('/settings/profile', authMiddleware, apiController.getProfileSettings);
-// COMMENT DULU YANG BELUM ADA
-// router.put('/settings/profile', authMiddleware, apiController.updateProfile);
-// router.post('/settings/profile/avatar', authMiddleware, upload.single('avatar'), apiController.uploadAvatar);
-// router.delete('/settings/profile/avatar', authMiddleware, apiController.deleteAvatar);
-// router.put('/settings/password', authMiddleware, apiController.changePassword);
-// router.get('/settings/system', authMiddleware, apiController.getSystemConfig);
-// router.put('/settings/system', authMiddleware, apiController.updateSystemConfig);
+router.put('/settings/profile', authMiddleware, apiController.updateProfile);
+router.post('/settings/profile/avatar', authMiddleware, upload.single('avatar'), apiController.uploadAvatar);
+router.delete('/settings/profile/avatar', authMiddleware, apiController.deleteAvatar);
+
+// Password
+router.put('/settings/password', authMiddleware, apiController.changePassword);
+
+// System configuration
+router.get('/settings/system', authMiddleware, apiController.getSystemConfig);
+router.put('/settings/system', authMiddleware, apiController.updateSystemConfig);
+
+// 🔴 COMMENT DULU YANG PAKAI TABEL SESSIONS (KARENA TABELNYA TIDAK ADA)
 // router.get('/settings/sessions', authMiddleware, apiController.getActiveSessions);
 // router.post('/settings/sessions/logout-all', authMiddleware, apiController.logoutAllDevices);
-// router.post('/settings/backup', authMiddleware, apiController.createBackup);
-// router.get('/settings/backups', authMiddleware, apiController.getBackupHistory);
-// router.get('/settings/logs', authMiddleware, apiController.getActivityLogs);
+
+// Backup & Restore
+router.get('/settings/backups', authMiddleware, apiController.getBackupHistory);
+router.post('/settings/backup', authMiddleware, apiController.createBackup);
+router.post('/settings/restore', authMiddleware, upload.single('backup_file'), apiController.restoreBackup);
+
+// Activity logs
+router.get('/settings/logs', authMiddleware, apiController.getActivityLogs);
 
 // ==================== MODE SIBUK ROUTES ====================
 router.get('/settings/busy-mode', authMiddleware, apiController.getBusyMode);
@@ -121,6 +170,22 @@ router.get('/user/history', authMiddleware, apiController.getUserHistory);
 
 // History Detail (detail satu pengajuan)
 router.get('/user/history/:id', authMiddleware, apiController.getUserHistoryDetail);
+
+// ==================== FILE ACCESS API (dengan token) ====================
+// Akses file surat permohonan
+router.get('/file/surat/:filename', authMiddleware, apiController.getFile);
+
+// Akses file KTP
+router.get('/file/ktp/:filename', authMiddleware, apiController.getFile);
+
+// Akses file bukti pembayaran
+router.get('/file/payment/:filename', authMiddleware, apiController.getFile);
+
+// Akses file laporan
+router.get('/file/laporan/:filename', authMiddleware, apiController.getFile);
+
+// Akses file SKRD
+router.get('/file/skrd/:filename', authMiddleware, apiController.getFile);
 
 // Transactions (daftar transaksi)
 router.get('/user/transactions', authMiddleware, apiController.getUserTransactions);
