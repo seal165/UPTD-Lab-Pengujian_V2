@@ -270,104 +270,70 @@ const pageController = {
 
     postLogin: async (req, res) => {
         console.log('➡️ Form login submitted:', { email: req.body.email });
-        
+
         const { email, password } = req.body;
-        
+
         if (!email || !password) {
             return res.json({
                 success: false,
                 message: 'Email dan password wajib diisi!'
             });
         }
-        
+
         try {
             const axios = require('axios');
             const API_URL = process.env.API_URL || 'http://localhost:5000/api';
-            
+
             const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-            
-<<<<<<< HEAD
-            if (response.data.success) {
-                const userData = response.data.data.user || response.data.data;
-                const token = response.data.data.token || response.data.data;
 
-                return req.session.regenerate((regenerateError) => {
-                    if (regenerateError) {
-                        console.error('❌ Failed to regenerate session on login:', regenerateError);
-                        return res.json({ success: false, message: 'Gagal membuat sesi login baru' });
-                    }
-
-                    req.session.user = {
-                        id: userData.id,
-                        email: userData.email,
-                        full_name: userData.full_name,
-                        role: userData.role
-                    };
-                    req.session.token = token;
-
-                    return req.session.save((saveError) => {
-                        if (saveError) {
-                            console.error('❌ Failed to save login session:', saveError);
-                            return res.json({ success: false, message: 'Gagal menyimpan sesi login' });
-                        }
-
-                        return res.json({
-                            success: true,
-                            data: {
-                                id: userData.id,
-                                email: userData.email,
-                                full_name: userData.full_name,
-                                role: userData.role,
-                                token: token
-                            }
-                        });
-                    });
-=======
-            console.log('✅ Login response:', response.data);
-            
-            if (response.data.success && response.data.data) {
-                const userData = response.data.data;
-                const userObj = userData.user || userData;
-                
-                // Simpan di session
-                req.session.user = {
-                    id: userObj.id,
-                    email: userObj.email,
-                    full_name: userObj.full_name,
-                    role: userObj.role
-                };
-                req.session.token = userData.token;
-                
-                // Save session
-                req.session.save((err) => {
-                    if (err) {
-                        console.error('❌ Session save error:', err);
-                    }
-                    console.log('✅ Session saved:', req.session.user);
-                });
-                
-                // 🔴 KIRIM RESPONSE SAMA SEPERTI DI ATAS
-                res.json({
-                    success: true,
-                    data: {
-                        id: userObj.id,
-                        email: userObj.email,
-                        full_name: userObj.full_name,
-                        role: userObj.role,
-                        token: userData.token
-                    },
-                    redirect: userObj.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'
->>>>>>> 397ed93fdfdffdb5e31032da63f52a4b539cffad
-                });
-            } else {
-                res.json({
+            if (!response.data.success) {
+                return res.json({
                     success: false,
                     message: response.data.message || 'Login gagal'
                 });
             }
+
+            const userData = response.data.data.user || response.data.data;
+            const token = response.data.data.token || response.data.token || response.data.data;
+
+            return req.session.regenerate((regenerateError) => {
+                if (regenerateError) {
+                    console.error('❌ Failed to regenerate session on login:', regenerateError);
+                    return res.json({ success: false, message: 'Gagal membuat sesi login baru' });
+                }
+
+                req.session.user = {
+                    id: userData.id,
+                    email: userData.email,
+                    full_name: userData.full_name || userData.name,
+                    role: userData.role || 'pelanggan'
+                };
+                req.session.token = token;
+
+                return req.session.save((saveError) => {
+                    if (saveError) {
+                        console.error('❌ Failed to save login session:', saveError);
+                        return res.json({ success: false, message: 'Gagal menyimpan sesi login' });
+                    }
+
+                    return res.json({
+                        success: true,
+                        data: {
+                            id: userData.id,
+                            email: userData.email,
+                            full_name: userData.full_name || userData.name,
+                            role: userData.role || 'pelanggan',
+                            token: token
+                        },
+                        redirect: (userData.role === 'admin' || userData.role === 'petugas')
+                            ? '/admin/dashboard'
+                            : '/user/dashboard'
+                    });
+                });
+            });
         } catch (error) {
             console.error('❌ Login error:', error);
-            res.json({
+            return res.json({
                 success: false,
                 message: error.response?.data?.message || 'Terjadi kesalahan'
             });

@@ -223,7 +223,6 @@ router.post('/auth/login', async (req, res) => {
         
         if (response.data.success) {
             const userData = response.data.data.user || response.data.data;
-<<<<<<< HEAD
             const token = response.data.data.token || response.data.data;
 
             return req.session.regenerate((regenerateError) => {
@@ -236,9 +235,9 @@ router.post('/auth/login', async (req, res) => {
                 req.session.user = {
                     id: userData.id,
                     email: userData.email,
-                    full_name: userData.full_name,
-                    nama_instansi: userData.nama_instansi,
-                    role: userData.role,
+                    full_name: userData.full_name || userData.name,
+                    nama_instansi: userData.nama_instansi || null,
+                    role: userData.role || 'pelanggan',
                     avatar: userData.avatar || null
                 };
 
@@ -253,49 +252,16 @@ router.post('/auth/login', async (req, res) => {
                         data: {
                             id: userData.id,
                             email: userData.email,
-                            full_name: userData.full_name,
+                            full_name: userData.full_name || userData.name,
                             nama_instansi: userData.nama_instansi || null,
-                            role: userData.role,
+                            role: userData.role || 'pelanggan',
                             avatar: userData.avatar || null,
                             token: token
-                        }
+                        },
+                        redirect: (userData.role === 'admin' || userData.role === 'petugas')
+                            ? '/admin/dashboard'
+                            : '/user/dashboard'
                     });
-=======
-            const token = response.data.data.token || response.data.token;
-            
-            // Simpan di session
-            req.session.token = token;
-            req.session.user = {
-                id: userData.id,
-                email: userData.email,
-                full_name: userData.full_name || userData.name,
-                role: userData.role || 'pelanggan'
-            };
-            
-            // Save session
-            req.session.save((err) => {
-                if (err) {
-                    console.error('❌ Session save error:', err);
-                    return res.json({
-                        success: false,
-                        message: 'Gagal menyimpan session'
-                    });
-                }
-                
-                console.log('✅ Login success, role:', userData.role);
-                
-                // 🔴 KIRIM RESPONSE JSON YANG LENGKAP
-                res.json({
-                    success: true,
-                    data: {
-                        id: userData.id,
-                        email: userData.email,
-                        full_name: userData.full_name || userData.name,
-                        role: userData.role || 'pelanggan',
-                        token: token
-                    },
-                    redirect: userData.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'
->>>>>>> 397ed93fdfdffdb5e31032da63f52a4b539cffad
                 });
             });
         } else {

@@ -190,18 +190,11 @@
                     }));
                     
                     console.log('✅ Login berhasil sebagai:', latestUserData.role);
-                    
-<<<<<<< HEAD
-                    // Redirect berdasarkan role
-                    if (latestUserData.role === 'admin' || latestUserData.role === 'petugas') {
-=======
-                    // 🔴 GUNAKAN REDIRECT DARI SERVER JIKA ADA
+
+                    // Gunakan redirect dari server jika tersedia.
                     if (result.redirect) {
                         window.location.href = result.redirect;
-                    } 
-                    // ATAU REDIRECT BERDASARKAN ROLE
-                    else if (userData.role === 'admin' || userData.role === 'petugas') {
->>>>>>> 397ed93fdfdffdb5e31032da63f52a4b539cffad
+                    } else if (latestUserData.role === 'admin' || latestUserData.role === 'petugas') {
                         window.location.href = '/admin/dashboard';
                     } else {
                         window.location.href = '/user/dashboard';
