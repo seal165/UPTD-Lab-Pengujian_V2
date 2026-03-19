@@ -235,13 +235,44 @@ const apiController = {
     // ==================== REGISTER ====================
     register: async (req, res) => {
         try {
-            const { email, password, company_name, phone } = req.body;
+            const { 
+                email, 
+                password, 
+                confirm_password, 
+                full_name, 
+                company_name, 
+                phone,
+                nama_instansi,
+                alamat,
+                nomor_telepon
+            } = req.body;
+            
+            console.log('📝 [REGISTER] Request Body:', {
+                email,
+                password_length: password ? password.length : 0,
+                full_name,
+                company_name,
+                nama_instansi,
+                alamat,
+                nomor_telepon,
+                has_confirm_password: !!confirm_password
+            });
             
             // Validasi input
             if (!email || !password) {
+                console.log('❌ [REGISTER] Email atau password kosong');
                 return res.status(400).json({
                     success: false,
                     message: 'Email dan password harus diisi'
+                });
+            }
+
+            // Validasi password match jika ada confirm_password
+            if (confirm_password && password !== confirm_password) {
+                console.log('❌ [REGISTER] Password tidak cocok');
+                return res.status(400).json({
+                    success: false,
+                    message: 'Password dan konfirmasi password tidak cocok'
                 });
             }
 
@@ -252,6 +283,7 @@ const apiController = {
             );
             
             if (existing.length > 0) {
+                console.log('❌ [REGISTER] Email sudah terdaftar');
                 return res.status(400).json({
                     success: false,
                     message: 'Email sudah terdaftar'
@@ -261,18 +293,39 @@ const apiController = {
             // Hash password
             const saltRounds = 10;
             const hashedPassword = await bcrypt.hash(password, saltRounds);
+            console.log('✅ Password hashed');
 
-            // Insert user baru
+            // Tentukan nama user: prioritas full_name → company_name → email prefix
+            const userName = full_name || company_name || email.split('@')[0];
+            console.log('📝 [REGISTER] Final userName:', userName);
+
+            // Tentukan instansi: prioritas nama_instansi → company_name
+            const userInstansi = nama_instansi || company_name || null;
+            
+            // Insert user baru dengan semua field optional
+            console.log('💾 [REGISTER] Attempting INSERT dengan values:', { 
+                email, 
+                userName,
+                userInstansi,
+                alamat,
+                nomor_telepon
+            });
+            
             const [result] = await db.query(
                 `INSERT INTO users (
                     email, 
                     password, 
                     full_name, 
+                    nama_instansi,
+                    alamat,
+                    nomor_telepon,
                     role,
                     created_at
-                ) VALUES (?, ?, ?, 'pelanggan', NOW())`,
-                [email, hashedPassword, company_name || email.split('@')[0]]
+                ) VALUES (?, ?, ?, ?, ?, ?, 'pelanggan', NOW())`,
+                [email, hashedPassword, userName, userInstansi, alamat || null, nomor_telepon || null]
             );
+
+            console.log('✅ [REGISTER] INSERT SUCCESS! ID:', result.insertId);
 
             // Catat aktivitas register
             await db.query(
@@ -285,7 +338,11 @@ const apiController = {
                 message: 'Registrasi berhasil',
                 data: {
                     id: result.insertId,
-                    email: email
+                    email: email,
+                    full_name: userName,
+                    nama_instansi: userInstansi,
+                    alamat: alamat || null,
+                    nomor_telepon: nomor_telepon || null
                 }
             });
 
