@@ -8,7 +8,11 @@ const authMiddleware = {
         
         if (req.session && req.session.user) {
             console.log('✅ User sudah login, redirect ke dashboard sesuai role');
-            if (req.session.user.role === 'admin' || req.session.user.role === 'superadmin') {
+            if (
+                req.session.user.role === 'admin' ||
+                req.session.user.role === 'superadmin' ||
+                req.session.user.role === 'petugas'
+            ) {
                 return res.redirect('/admin/dashboard');
             } else if (req.session.user.role === 'pelanggan') {
                 return res.redirect('/user/dashboard');
@@ -31,8 +35,12 @@ const authMiddleware = {
             return res.redirect('/admin/login');
         }
         
-        // CEK ROLE - HARUS admin atau superadmin
-        if (req.session.user.role !== 'admin' && req.session.user.role !== 'superadmin') {
+        // CEK ROLE - HARUS admin/superadmin/petugas
+        if (
+            req.session.user.role !== 'admin' &&
+            req.session.user.role !== 'superadmin' &&
+            req.session.user.role !== 'petugas'
+        ) {
             console.log('❌ Role tidak sesuai:', req.session.user.role);
             
             // Jika user biasa (pelanggan) coba akses halaman admin, redirect ke dashboard user

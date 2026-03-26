@@ -160,26 +160,26 @@
         
         if (statsCards) {
             statsCards.innerHTML = `
-                <div class="col-md-3">
-                    <div class="card-custom">
+                <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col">
+                    <div class="card-custom admin-kpi-card">
                         <div class="loading-skeleton skeleton-text mb-2"></div>
                         <div class="loading-skeleton skeleton-text w-75"></div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card-custom">
+                <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col">
+                    <div class="card-custom admin-kpi-card">
                         <div class="loading-skeleton skeleton-text mb-2"></div>
                         <div class="loading-skeleton skeleton-text w-75"></div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card-custom">
+                <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col">
+                    <div class="card-custom admin-kpi-card">
                         <div class="loading-skeleton skeleton-text mb-2"></div>
                         <div class="loading-skeleton skeleton-text w-75"></div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card-custom">
+                <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col">
+                    <div class="card-custom admin-kpi-card">
                         <div class="loading-skeleton skeleton-text mb-2"></div>
                         <div class="loading-skeleton skeleton-text w-75"></div>
                     </div>
@@ -214,62 +214,62 @@
     // ==================== UPDATE STATS CARDS ====================
     function updateStatsCards(stats) {
         const statsHtml = `
-            <div class="col-md-3 fade-in">
-                <div class="card-custom d-flex flex-row justify-content-between align-items-center h-100">
+            <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
+                <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
                     <div>
-                        <p class="text-muted mb-1 small fw-bold text-uppercase">Total Pendapatan</p>
-                        <h2 class="fw-bold m-0 text-dark">${stats.income || 'Rp 0'}</h2>
-                        <span class="badge badge-soft-success mt-2">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Total Pendapatan</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.income || 'Rp 0'}</h2>
+                        <span class="badge badge-soft-success mt-2 admin-kpi-chip">
                             <i class="fas fa-chart-line me-1"></i>Bulan ini
                         </span>
                     </div>
-                    <div class="bg-success-subtle p-3 rounded-circle text-success">
+                    <div class="bg-success-subtle rounded-circle text-success admin-kpi-icon-wrap">
                         <i class="fas fa-rupiah-sign fa-lg"></i>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-3 fade-in">
-                <div class="card-custom d-flex flex-row justify-content-between align-items-center h-100">
+            <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
+                <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
                     <div>
-                        <p class="text-muted mb-1 small fw-bold text-uppercase">Menunggu Verifikasi</p>
-                        <h2 class="fw-bold m-0 text-dark">${stats.pending || 0}</h2>
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Menunggu Verifikasi</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.pending || 0}</h2>
                         ${stats.pending > 0 ? 
-                            '<span class="badge badge-soft-warning mt-2"><i class="fas fa-exclamation-circle me-1"></i>Perlu Tindakan</span>' : 
-                            '<span class="badge badge-soft-success mt-2"><i class="fas fa-check me-1"></i>Tidak Ada</span>'
+                            '<span class="badge badge-soft-warning mt-2 admin-kpi-chip"><i class="fas fa-exclamation-circle me-1"></i>Perlu Tindakan</span>' : 
+                            '<span class="badge badge-soft-success mt-2 admin-kpi-chip"><i class="fas fa-check me-1"></i>Tidak Ada</span>'
                         }
                     </div>
-                    <div class="bg-warning-subtle p-3 rounded-circle text-warning">
+                    <div class="bg-warning-subtle rounded-circle text-warning admin-kpi-icon-wrap">
                         <i class="far fa-clock fa-lg"></i>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-3 fade-in">
-                <div class="card-custom d-flex flex-row justify-content-between align-items-center h-100">
+            <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
+                <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
                     <div>
-                        <p class="text-muted mb-1 small fw-bold text-uppercase">Pengujian Selesai</p>
-                        <h2 class="fw-bold m-0 text-dark">${stats.completed || 0}</h2>
-                        <span class="badge badge-soft-primary mt-2">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Pengujian Selesai</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.completed || 0}</h2>
+                        <span class="badge badge-soft-primary mt-2 admin-kpi-chip">
                             <i class="fas fa-flask me-1"></i>Total
                         </span>
                     </div>
-                    <div class="bg-primary-subtle p-3 rounded-circle text-primary">
+                    <div class="bg-primary-subtle rounded-circle text-primary admin-kpi-icon-wrap">
                         <i class="fas fa-check-double fa-lg"></i>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-3 fade-in">
-                <div class="card-custom d-flex flex-row justify-content-between align-items-center h-100">
+            <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
+                <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
                     <div>
-                        <p class="text-muted mb-1 small fw-bold text-uppercase">Menunggu Bayar</p>
-                        <h2 class="fw-bold m-0 text-dark">${stats.awaitingPayment || 0}</h2>
-                        <span class="badge badge-soft-danger mt-2">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Menunggu Bayar</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.awaitingPayment || 0}</h2>
+                        <span class="badge badge-soft-danger mt-2 admin-kpi-chip">
                             <i class="fas fa-credit-card me-1"></i>Belum Lunas
                         </span>
                     </div>
-                    <div class="bg-danger-subtle p-3 rounded-circle text-danger">
+                    <div class="bg-danger-subtle rounded-circle text-danger admin-kpi-icon-wrap">
                         <i class="far fa-credit-card fa-lg"></i>
                     </div>
                 </div>
@@ -286,24 +286,29 @@
         if (!activitiesEl) return;
         
         if (!activities || activities.length === 0) {
-            activitiesEl.innerHTML = '<p class="text-muted text-center py-3">Tidak ada aktivitas terbaru</p>';
+            activitiesEl.innerHTML = `
+                <div class="dashboard-activity-empty">
+                    <i class="far fa-clock"></i>
+                    <p>Tidak ada aktivitas terbaru</p>
+                </div>
+            `;
             return;
         }
 
         const activitiesHtml = activities.map(activity => `
-            <div class="d-flex gap-3 mb-3 pb-3 border-bottom border-light fade-in">
-                <div class="bg-${activity.color}-subtle p-2 rounded-3 text-${activity.color} h-auto d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                    <i class="fas fa-${activity.icon}"></i>
+            <article class="dashboard-activity-item fade-in">
+                <div class="dashboard-activity-icon bg-${activity.color}-subtle text-${activity.color}">
+                    <i class="fas fa-${activity.icon}" aria-hidden="true"></i>
                 </div>
-                <div class="w-100">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <p class="mb-0 fw-bold small text-dark">${activity.company}</p>
-                        <small class="text-muted" style="font-size: 0.7rem;">${activity.time}</small>
+                <div class="dashboard-activity-content">
+                    <div class="dashboard-activity-top">
+                        <p class="dashboard-activity-company">${activity.company}</p>
+                        <small class="dashboard-activity-time">${activity.time}</small>
                     </div>
-                    <p class="text-muted small mb-1">${activity.description}</p>
-                    <span class="badge badge-soft-${activity.badgeColor} py-1 px-2" style="font-size: 0.7rem;">${activity.status}</span>
+                    <p class="dashboard-activity-desc">${activity.description}</p>
+                    <span class="badge badge-soft-${activity.badgeColor} dashboard-activity-status">${activity.status}</span>
                 </div>
-            </div>
+            </article>
         `).join('');
 
         activitiesEl.innerHTML = activitiesHtml;
@@ -404,6 +409,17 @@
                     }
                 },
                 scales: {
+                    x: {
+                        ticks: {
+                            autoSkip: true,
+                            maxTicksLimit: 8,
+                            maxRotation: 0,
+                            minRotation: 0
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
                     y: {
                         beginAtZero: true,
                         ticks: {

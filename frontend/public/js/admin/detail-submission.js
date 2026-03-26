@@ -5,6 +5,7 @@
 
     // ==================== KONFIGURASI ====================
     const API_BASE_URL = 'http://localhost:5000/api';
+    const BACKEND_BASE_URL = 'http://localhost:5000';
     const LOAD_TIMEOUT = 5000;
     
     // Ambil ID dari data attribute
@@ -94,6 +95,20 @@ III. **KAJI ULANG PERMINTAAN**
     // ==================== CEK TOKEN ====================
     function getToken() {
         return localStorage.getItem('token');
+    }
+
+    function normalizeFilename(filename) {
+        if (!filename || typeof filename !== 'string') return '';
+        return filename.split('/').pop().split('\\').pop().trim();
+    }
+
+    function buildProtectedFileUrl(fileType, filename) {
+        const safeFilename = normalizeFilename(filename);
+        const token = getToken();
+
+        if (!safeFilename || !token) return '#';
+
+        return `${BACKEND_BASE_URL}/api/file/${fileType}/${encodeURIComponent(safeFilename)}?token=${encodeURIComponent(token)}`;
     }
 
     if (!getToken()) {
@@ -236,9 +251,10 @@ III. **KAJI ULANG PERMINTAAN**
             
             // Surat Permohonan
             if (data.file_surat_permohonan) {
-                const fileUrl = `http://localhost:5000/uploads/surat/${data.file_surat_permohonan}`;
+                const fileName = normalizeFilename(data.file_surat_permohonan);
+                const fileUrl = buildProtectedFileUrl('surat', data.file_surat_permohonan);
                 document.getElementById('suratPermohonanInfo').innerHTML = `
-                    <i class="fas fa-check-circle text-success me-1"></i> Terupload: ${data.file_surat_permohonan}
+                    <i class="fas fa-check-circle text-success me-1"></i> Terupload: ${fileName}
                 `;
                 document.getElementById('suratPermohonanActions').innerHTML = `
                     <a href="${fileUrl}" download class="btn btn-sm btn-outline-primary me-1">
@@ -257,9 +273,10 @@ III. **KAJI ULANG PERMINTAAN**
             
             // Scan KTP
             if (data.file_ktp) {
-                const fileUrl = `http://localhost:5000/uploads/ktp/${data.file_ktp}`;
+                const fileName = normalizeFilename(data.file_ktp);
+                const fileUrl = buildProtectedFileUrl('ktp', data.file_ktp);
                 document.getElementById('scanKTPInfo').innerHTML = `
-                    <i class="fas fa-check-circle text-success me-1"></i> Terupload: ${data.file_ktp}
+                    <i class="fas fa-check-circle text-success me-1"></i> Terupload: ${fileName}
                 `;
                 document.getElementById('scanKTPActions').innerHTML = `
                     <a href="${fileUrl}" download class="btn btn-sm btn-outline-primary me-1">
@@ -362,11 +379,12 @@ III. **KAJI ULANG PERMINTAAN**
         
         // 🔥 Tampilkan file laporan jika sudah ada
         if (data.report && data.report.file_laporan) {
-            const reportUrl = `http://localhost:5000/uploads/reports/${data.report.file_laporan}`;
+            const reportName = normalizeFilename(data.report.file_laporan);
+            const reportUrl = buildProtectedFileUrl('laporan', data.report.file_laporan);
             const reportInfo = `
                 <div class="alert alert-success mt-2">
                     <i class="fas fa-check-circle me-2"></i>
-                    Laporan sudah diupload: ${data.report.file_laporan}
+                    Laporan sudah diupload: ${reportName}
                     <div class="mt-2">
                         <a href="${reportUrl}" download class="btn btn-sm btn-primary me-1">
                             <i class="fas fa-download"></i> Download

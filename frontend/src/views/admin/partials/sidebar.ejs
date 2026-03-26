@@ -1,10 +1,10 @@
-<div class="sidebar bg-white p-3 border-end" style="width: 250px; min-height: 100vh;">
-    <div class="d-flex align-items-center mb-4 text-success">
-        <img src="/img/logo-banten.png" alt="Logo Banten" style="height: 40px; width: auto;" class="me-2">
-        <span class="fw-bold fs-4">UPTD Pengujian Bahan Kontruksi Bangunan dan Informasi Kontruksi</span>
+<aside class="sidebar admin-sidebar">
+    <div class="brand-logo text-success">
+        <img src="/img/logo-banten.png" alt="Logo Banten" class="brand-logo-image">
+        <span class="brand-logo-text">UPTD PBKBIK</span>
     </div>
 
-    <ul class="nav flex-column gap-2">
+    <ul class="nav flex-column gap-2 admin-nav">
         <li class="nav-item">
             <a href="/admin/dashboard" class="nav-link <%= page === 'dashboard' ? 'active' : '' %>">
                 <i class="fas fa-th-large me-2"></i> Dashboard
@@ -37,12 +37,12 @@
         </li>
     </ul>
 
-    <div class="mt-auto pt-5">
-        <a href="#" onclick="handleLogout(); return false;" class="nav-link text-danger">
+    <div class="admin-sidebar-footer">
+        <a href="#" onclick="handleLogout(); return false;" class="nav-link text-danger admin-logout-link">
             <i class="fas fa-sign-out-alt me-2"></i> Logout
         </a>
     </div>
-</div>
+</aside>
 
 <script>
     function handleLogout() {

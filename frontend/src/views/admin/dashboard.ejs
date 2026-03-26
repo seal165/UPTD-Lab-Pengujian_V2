@@ -28,85 +28,88 @@
         }
     </style>
 </head>
-<body>
+<body class="admin-dashboard-page">
 
     <%- include('partials/sidebar', { page: 'dashboard' }) %>
 
-    <div class="main-content">
-        <%- include('partials/header', { title: 'Dashboard Summary' }) %>
+    <div class="main-content admin-dashboard-content">
+        <div class="dashboard-shell">
+            <%- include('partials/header', { title: 'Dashboard Summary' }) %>
 
-        <div class="mb-4">
-            <h5 class="fw-bold text-dark">Selamat Datang, <span id="adminName"><%= user?.full_name || 'Admin' %></span></h5>
-            <p class="text-muted">Ringkasan aktivitas laboratorium dan status pembayaran terkini.</p>
-        </div>
-
-        <!-- Toast Container -->
-        <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
-
-        <!-- Kartu Statistik -->
-        <div class="row g-4 mb-4 align-items-stretch" id="stats-cards">
-            <!-- Akan diisi oleh JavaScript -->
-        </div>
-
-        <div class="row g-4 mb-4 align-items-start">
-            <!-- Grafik -->
-            <div class="col-md-8">
-                <div class="card-custom">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h6 class="fw-bold m-0">Tren Pendapatan (6 Bulan Terakhir)</h6>
-                        <select class="form-select form-select-sm w-auto shadow-none border-0 bg-light fw-bold text-muted" id="chart-year">
-                            <option value="2024">2024</option>
-                            <option value="2023">2023</option>
-                        </select>
-                    </div>
-                    
-                    <div class="w-100 position-relative" style="height: 300px;">
-                        <div id="chartSkeleton" class="loading-skeleton" style="width: 100%; height: 100%; border-radius: 8px;"></div>
-                        <canvas id="revenueChart" style="display: none; width: 100%; height: 100%;"></canvas>
-                    </div>
-                </div>
+            <div class="dashboard-intro mb-4">
+                <h5 class="fw-bold text-dark mb-1">Selamat Datang, <span id="adminName"><%= user?.full_name || 'Admin' %></span></h5>
+                <p class="text-muted mb-0">Ringkasan aktivitas laboratorium dan status pembayaran terkini.</p>
             </div>
 
-            <!-- Aktivitas Terbaru -->
-            <div class="col-md-4">
-                <div class="card-custom">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h6 class="fw-bold m-0">Aktivitas Terbaru</h6>
-                        <a href="/admin/settings#logs" class="small text-decoration-none fw-bold text-primary">Lihat Semua</a>
-                    </div>
-                    
-                    <div id="recent-activities">
-                        <!-- Akan diisi oleh JavaScript -->
+            <!-- Toast Container -->
+            <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
+            <!-- Kartu Statistik -->
+            <div class="row g-3 g-xxl-4 mb-4 align-items-stretch" id="stats-cards">
+                <!-- Akan diisi oleh JavaScript -->
+            </div>
+
+            <div class="row g-3 g-xxl-4 mb-4 align-items-stretch">
+                <!-- Grafik -->
+                <div class="col-12">
+                    <div class="card-custom dashboard-chart-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3 dashboard-chart-header">
+                            <h6 class="fw-bold m-0">Tren Pendapatan (6 Bulan Terakhir)</h6>
+                            <div class="dashboard-chart-filter">
+                                <label for="chart-year" class="dashboard-chart-filter-label">Tahun</label>
+                                <select class="form-select form-select-sm dashboard-chart-filter-select shadow-none border-0 bg-light fw-bold text-muted" id="chart-year">
+                                    <option value="2024">2024</option>
+                                    <option value="2023">2023</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="w-100 position-relative dashboard-chart-wrap">
+                            <div id="chartSkeleton" class="loading-skeleton" style="width: 100%; height: 100%; border-radius: 8px;"></div>
+                            <canvas id="revenueChart" style="display: none; width: 100%; height: 100%;"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Tabel Permohonan -->
-        <div class="card-custom p-0 overflow-hidden">
-            <div class="p-4 pb-2">
-                <h6 class="fw-bold m-0">Permohonan Masuk Terkini</h6>
+
+            <!-- Tabel Permohonan -->
+            <div class="card-custom p-0 overflow-hidden dashboard-table-card">
+                <div class="p-4 pb-2">
+                    <h6 class="fw-bold m-0">Permohonan Masuk Terkini</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover mb-0">
+                        <thead class="bg-light">
+                            <tr class="text-muted small text-uppercase fw-bold">
+                                <th class="ps-4 py-3">ID Registrasi</th>
+                                <th class="py-3">Perusahaan</th>
+                                <th class="py-3">Jenis Uji</th>
+                                <th class="py-3">Tanggal</th>
+                                <th class="py-3">Status</th>
+                                <th class="pe-4 py-3 text-end">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="submissions-table-body">
+                            <!-- Akan diisi oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-white border-top-0 py-3 text-center">
+                    <a href="/admin/submissions" class="text-decoration-none fw-bold small text-muted">Lihat Semua Data <i class="fas fa-chevron-down ms-1"></i></a>
+                </div>
             </div>
-            <div class="table-responsive">
-                <table class="table align-middle table-hover mb-0">
-                    <thead class="bg-light">
-                        <tr class="text-muted small text-uppercase fw-bold">
-                            <th class="ps-4 py-3">ID Registrasi</th>
-                            <th class="py-3">Perusahaan</th>
-                            <th class="py-3">Jenis Uji</th>
-                            <th class="py-3">Tanggal</th>
-                            <th class="py-3">Status</th>
-                            <th class="pe-4 py-3 text-end">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="submissions-table-body">
-                        <!-- Akan diisi oleh JavaScript -->
-                    </tbody>
-                </table>
+
+            <div class="card-custom dashboard-activity-card mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 dashboard-activity-header">
+                    <h6 class="fw-bold m-0">Aktivitas Terbaru</h6>
+                    <a href="/admin/settings#logs" class="small text-decoration-none fw-bold text-primary">Lihat Semua</a>
+                </div>
+
+                <div id="recent-activities" class="dashboard-activity-list">
+                    <!-- Akan diisi oleh JavaScript -->
+                </div>
             </div>
-            <div class="card-footer bg-white border-top-0 py-3 text-center">
-                <a href="/admin/submissions" class="text-decoration-none fw-bold small text-muted">Lihat Semua Data <i class="fas fa-chevron-down ms-1"></i></a>
-            </div>
+
         </div>
     </div>
 

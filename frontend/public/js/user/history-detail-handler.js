@@ -52,6 +52,17 @@
         return metaToken ? metaToken.getAttribute('content') : null;
     }
 
+    function normalizeFilename(filename) {
+        if (!filename || typeof filename !== 'string') return '';
+        return filename.split('/').pop().split('\\').pop().trim();
+    }
+
+    function buildProtectedFileUrl(fileType, filename, token) {
+        const safeFilename = normalizeFilename(filename);
+        if (!safeFilename || !token) return '#';
+        return `http://localhost:5000/api/file/${fileType}/${encodeURIComponent(safeFilename)}?token=${encodeURIComponent(token)}`;
+    }
+
     async function loadSubmissionDetail(id, token) {
         console.log('🔄 Loading detail for ID:', id);
         
@@ -231,7 +242,6 @@
     }
 
     function renderPaymentProofs(payment, token) {
-        const BACKEND_URL = 'http://localhost:5000';
         const section = document.getElementById('payment-proof-section');
         const list = document.getElementById('payment-proof-list');
         
@@ -242,7 +252,7 @@
         
         if (payment.bukti_pembayaran_1) {
             hasProofs = true;
-            const fileUrl = `${BACKEND_URL}/api/file/payment/${payment.bukti_pembayaran_1}?token=${token}`;
+            const fileUrl = buildProtectedFileUrl('payment', payment.bukti_pembayaran_1, token);
             html += `
                 <div class="document-item d-flex align-items-center p-2 mb-2 border rounded">
                     <div class="doc-icon me-2">
@@ -254,6 +264,10 @@
                             `<small class="text-muted d-block">Catatan: ${payment.bukti_pembayaran_notes}</small>` : ''}
                     </div>
                     <div class="doc-action">
+                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
+                           class="btn btn-sm btn-outline-primary me-1">
+                            <i class="fas fa-eye"></i> Buka
+                        </a>
                         <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
                            class="btn btn-sm btn-primary">
                             <i class="fas fa-download"></i> Download
@@ -265,7 +279,7 @@
         
         if (payment.bukti_pembayaran_2) {
             hasProofs = true;
-            const fileUrl = `${BACKEND_URL}/api/file/payment/${payment.bukti_pembayaran_2}?token=${token}`;
+            const fileUrl = buildProtectedFileUrl('payment', payment.bukti_pembayaran_2, token);
             html += `
                 <div class="document-item d-flex align-items-center p-2 mb-2 border rounded">
                     <div class="doc-icon me-2">
@@ -275,6 +289,10 @@
                         <small>Bukti Pembayaran 2</small>
                     </div>
                     <div class="doc-action">
+                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
+                           class="btn btn-sm btn-outline-primary me-1">
+                            <i class="fas fa-eye"></i> Buka
+                        </a>
                         <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
                            class="btn btn-sm btn-primary">
                             <i class="fas fa-download"></i> Download
@@ -291,14 +309,16 @@
     }
 
     function renderDocuments(data, token) {
-        const BACKEND_URL = 'http://localhost:5000';
-        
         // Surat Permohonan - 1 TOMBOL DOWNLOAD SAJA
         if (data.file_surat_permohonan) {
             setText('status-doc-permohonan', '✅ Terupload');
-            const fileUrl = `${BACKEND_URL}/api/file/surat/${data.file_surat_permohonan}?token=${token}`;
+            const fileUrl = buildProtectedFileUrl('surat', data.file_surat_permohonan, token);
             document.getElementById('action-doc-permohonan').innerHTML = 
-                `<a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
+                `<a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
+                    class="btn btn-sm btn-outline-primary me-1">
+                    <i class="fas fa-eye"></i> Buka
+                </a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
                     class="btn btn-sm btn-primary">
                     <i class="fas fa-download"></i> Download
                 </a>`;
@@ -310,9 +330,13 @@
         // Scan KTP - 1 TOMBOL DOWNLOAD SAJA
         if (data.file_ktp) {
             setText('status-doc-ktp', '✅ Terupload');
-            const fileUrl = `${BACKEND_URL}/api/file/ktp/${data.file_ktp}?token=${token}`;
+            const fileUrl = buildProtectedFileUrl('ktp', data.file_ktp, token);
             document.getElementById('action-doc-ktp').innerHTML = 
-                `<a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
+                `<a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
+                    class="btn btn-sm btn-outline-primary me-1">
+                    <i class="fas fa-eye"></i> Buka
+                </a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
                     class="btn btn-sm btn-primary">
                     <i class="fas fa-download"></i> Download
                 </a>`;
@@ -326,7 +350,6 @@
         const statusLaporan = document.getElementById('status-laporan');
         const actionLaporan = document.getElementById('action-laporan');
         const laporanDate = document.getElementById('laporan-date');
-        const BACKEND_URL = 'http://localhost:5000';
         
         if (!statusLaporan || !actionLaporan) return;
         
@@ -336,9 +359,13 @@
                 laporanDate.innerHTML = `Diterbitkan: ${formatDate(data.report.tanggal_selesai || data.report.created_at)}`;
             }
             
-            const fileUrl = `${BACKEND_URL}/api/file/laporan/${data.report.file_laporan}?token=${token}`;
+            const fileUrl = buildProtectedFileUrl('laporan', data.report.file_laporan, token);
             
             actionLaporan.innerHTML = `
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
+                   class="btn btn-sm btn-outline-success me-1">
+                    <i class="fas fa-eye"></i> Buka
+                </a>
                 <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
                    class="btn btn-sm btn-success">
                     <i class="fas fa-download"></i> Download Laporan
@@ -391,43 +418,71 @@
         timelineEl.innerHTML = html;
     }
 
-    // 🔥 FUNGSI DOWNLOAD FILE DENGAN TOKEN - SEMUA FILE DI-DOWNLOAD
+    async function fetchProtectedFileBlob(url, token) {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        console.log('📡 Response status:', response.status);
+
+        if (response.status === 401) {
+            alert('Sesi habis. Silakan login ulang.');
+            window.location.href = '/login';
+            return null;
+        }
+
+        if (response.status === 404) {
+            alert('File tidak ditemukan di server');
+            return null;
+        }
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        console.log('📦 Blob size:', blob.size, 'bytes');
+
+        if (blob.size === 0) {
+            alert('File kosong');
+            return null;
+        }
+
+        return blob;
+    }
+
+    window.openFileWithToken = async function(url, token) {
+        try {
+            console.log('👁️ Opening file:', url);
+
+            const blob = await fetchProtectedFileBlob(url, token);
+            if (!blob) return;
+
+            const blobUrl = window.URL.createObjectURL(blob);
+            const opened = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+
+            if (!opened) {
+                alert('Popup diblokir browser. Izinkan popup untuk membuka dokumen.');
+            }
+
+            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60 * 1000);
+        } catch (error) {
+            console.error('❌ Error membuka file:', error);
+            alert('Gagal membuka file: ' + error.message);
+        }
+    };
+
+    // 🔥 FUNGSI DOWNLOAD FILE DENGAN TOKEN
     window.downloadFileWithToken = async function(url, token) {
         try {
             console.log('📥 Downloading file:', url);
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            console.log('📡 Response status:', response.status);
-            
-            if (response.status === 401) {
-                alert('Sesi habis. Silakan login ulang.');
-                window.location.href = '/login';
-                return;
-            }
-            
-            if (response.status === 404) {
-                alert('File tidak ditemukan di server');
-                return;
-            }
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const blob = await response.blob();
-            console.log('📦 Blob size:', blob.size, 'bytes');
-            
-            if (blob.size === 0) {
-                alert('File kosong');
-                return;
-            }
-            
+
+            const blob = await fetchProtectedFileBlob(url, token);
+            if (!blob) return;
+
             // 🔥 SEMUA FILE DI-DOWNLOAD, TIDAK ADA YANG DITAMPILKAN
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -435,7 +490,7 @@
             
             // Ambil nama file dari URL
             const urlParts = url.split('/');
-            const filename = urlParts[urlParts.length - 1].split('?')[0];
+            const filename = decodeURIComponent(urlParts[urlParts.length - 1].split('?')[0]);
             link.download = filename;
             
             document.body.appendChild(link);
