@@ -4,6 +4,7 @@
     'use strict';
 
     let isSubmitting = false; // Flag untuk mencegah double submit
+    let selectedFile = null; // Simpan file yang dipilih
 
     document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Transaction Detail Handler initialized');
@@ -77,7 +78,7 @@
                 // Setup upload form AFTER data loaded
                 setupUploadForm();
             } else {
-                throw new Error(result.message || 'Gagal memuat data');
+                throw new Error(result.message || 'Gagal memuat数据');
             }
 
         } catch (error) {
@@ -137,31 +138,104 @@
         const hargaSatuan = total / (data.total_samples || 1);
         setText('service-price', formatRupiah(hargaSatuan));
         
-        // ========== BUKTI PEMBAYARAN ==========
+        // ========== SKRD SECTION ==========
+        const skrdSection = document.getElementById('skrd-section');
+        const skrdInfo = document.getElementById('skrd-info');
+        const skrdAction = document.getElementById('skrd-action');
         const token = localStorage.getItem('token');
-        const proofSection = document.getElementById('proof-section');
-        const proofStatus = document.getElementById('proof-status');
-        const proofAction = document.getElementById('proof-action');
         
-        if (proofStatus && proofAction && proofSection) {
-            if (data.bukti_pembayaran_1 || data.bukti_pembayaran_2) {
-                const bukti = data.bukti_pembayaran_2 || data.bukti_pembayaran_1;
-                proofSection.style.display = 'block';
-                proofStatus.innerHTML = '<i class="fas fa-check-circle text-success"></i> Bukti pembayaran telah diupload';
-                proofAction.innerHTML = `
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <a href="http://localhost:5000/api/file/payment/${bukti}?token=${token}" target="_blank" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-eye"></i> Lihat Bukti
-                        </a>
-                        <a href="http://localhost:5000/api/file/payment/${bukti}?token=${token}" download class="btn btn-sm btn-outline-success">
-                            <i class="fas fa-download"></i> Download
-                        </a>
-                    </div>
+        if (skrdSection && skrdInfo && skrdAction) {
+            if (data.skrd_file) {
+                const fileUrl = `http://localhost:5000/api/file/skrd/${data.skrd_file}?token=${token}`;
+                skrdInfo.innerHTML = '<i class="fas fa-check-circle text-success"></i> SKRD telah diupload';
+                skrdAction.innerHTML = `
+                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
+                        <i class="fas fa-eye"></i> Lihat SKRD
+                    </a>
+                    <a href="${fileUrl}" download class="btn btn-sm btn-primary">
+                        <i class="fas fa-download"></i> Download SKRD
+                    </a>
                 `;
             } else {
+                skrdInfo.innerHTML = '<i class="fas fa-hourglass-half text-warning"></i> SKRD sedang diproses oleh admin';
+                skrdAction.innerHTML = '';
+            }
+        }
+        
+        // ========== 🔥 BUKTI PEMBAYARAN - TAMPILKAN KEDUA BUKTI ==========
+        const proofSection = document.getElementById('proof-section');
+        const proofContainer = document.getElementById('proof-container');
+        
+        if (proofSection && proofContainer) {
+            let hasProof = false;
+            let proofHtml = '<div class="proof-list">';
+            
+            // Bukti Pembayaran 1
+            if (data.bukti_pembayaran_1) {
+                hasProof = true;
+                const fileUrl = `http://localhost:5000/api/file/payment/${data.bukti_pembayaran_1}?token=${token}`;
+                proofHtml += `
+                    <div class="proof-item border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-receipt text-primary"></i>
+                                    <strong>Bukti Pembayaran 1</strong>
+                                </div>
+                                <div class="text-muted small">
+                                    ${data.bukti_pembayaran_1_uploaded_at ? `Diunggah: ${formatDate(data.bukti_pembayaran_1_uploaded_at)}` : ''}
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> Lihat
+                                </a>
+                                <a href="${fileUrl}" download class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Bukti Pembayaran 2
+            if (data.bukti_pembayaran_2) {
+                hasProof = true;
+                const fileUrl = `http://localhost:5000/api/file/payment/${data.bukti_pembayaran_2}?token=${token}`;
+                proofHtml += `
+                    <div class="proof-item border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-receipt text-primary"></i>
+                                    <strong>Bukti Pembayaran 2</strong>
+                                </div>
+                                <div class="text-muted small">
+                                    ${data.bukti_pembayaran_2_uploaded_at ? `Diunggah: ${formatDate(data.bukti_pembayaran_2_uploaded_at)}` : ''}
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> Lihat
+                                </a>
+                                <a href="${fileUrl}" download class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            proofHtml += '</div>';
+            
+            if (hasProof) {
                 proofSection.style.display = 'block';
-                proofStatus.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Belum ada bukti pembayaran yang diupload';
-                proofAction.innerHTML = '';
+                proofContainer.innerHTML = proofHtml;
+            } else {
+                proofSection.style.display = 'block';
+                proofContainer.innerHTML = '<div class="text-center py-3 text-muted"><i class="fas fa-info-circle"></i> Belum ada bukti pembayaran yang diupload</div>';
             }
         }
         
@@ -173,23 +247,34 @@
         
         if (uploadSection && showUploadBtn && uploadTitle && uploadDesc) {
             const status = data.status_pembayaran || 'Belum Bayar';
+            const hasProof1 = data.bukti_pembayaran_1;
+            const hasProof2 = data.bukti_pembayaran_2;
             
-            if (status === 'Lunas') {
+            // Jika sudah ada 2 bukti pembayaran, sembunyikan tombol upload
+            if (hasProof1 && hasProof2) {
                 showUploadBtn.style.display = 'none';
                 uploadSection.style.display = 'none';
-            } else if (status === 'Belum Lunas') {
-                // Belum Lunas - bisa upload bukti kedua
+            }
+            // Jika status Lunas, sembunyikan tombol upload
+            else if (status === 'Lunas') {
+                showUploadBtn.style.display = 'none';
+                uploadSection.style.display = 'none';
+            }
+            // Jika sudah ada bukti 1 (belum Lunas) -> upload bukti 2
+            else if (hasProof1 && !hasProof2) {
                 uploadTitle.innerHTML = '<i class="fas fa-cloud-upload-alt text-primary me-2"></i>Upload Bukti Pelunasan';
                 uploadDesc.innerHTML = `Sisa tagihan: ${formatRupiah(sisa)}`;
                 showUploadBtn.style.display = 'block';
                 uploadSection.style.display = 'none';
-            } else if (status === 'Belum Bayar' || status === 'Menunggu SKRD Upload') {
-                // Belum Bayar - bisa upload bukti pertama
+            }
+            // Belum ada bukti sama sekali
+            else if (!hasProof1 && !hasProof2) {
                 uploadTitle.innerHTML = '<i class="fas fa-cloud-upload-alt text-primary me-2"></i>Upload Bukti Pembayaran';
                 uploadDesc.innerHTML = `Total tagihan: ${formatRupiah(total)}`;
                 showUploadBtn.style.display = 'block';
                 uploadSection.style.display = 'none';
-            } else {
+            }
+            else {
                 showUploadBtn.style.display = 'none';
                 uploadSection.style.display = 'none';
             }
@@ -211,61 +296,56 @@
         console.log('✅ Rendering selesai');
     }
 
-    // Setup upload form dengan flag untuk mencegah double submit
-    // Setup upload form dengan flag untuk mencegah double submit
+    // Setup upload form
     function setupUploadForm() {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('proofFile');
         const form = document.getElementById('uploadProofForm');
         const preview = document.getElementById('filePreview');
-        const fileName = document.getElementById('fileName');
-        const removeBtn = document.querySelector('[onclick="removeFile()"]');
         
-        if (uploadArea && fileInput) {
-            // Hapus event listener lama
-            const newUploadArea = uploadArea.cloneNode(true);
-            uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
-            
-            const newFileInput = document.getElementById('proofFile');
-            const newUploadAreaElement = document.getElementById('uploadArea');
-            
-            // Klik area upload untuk memilih file
-            newUploadAreaElement.addEventListener('click', () => newFileInput.click());
-            
-            // Drag & drop
-            newUploadAreaElement.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                newUploadAreaElement.style.borderColor = '#4361ee';
-                newUploadAreaElement.style.backgroundColor = '#f0f7ff';
-            });
-            
-            newUploadAreaElement.addEventListener('dragleave', () => {
-                newUploadAreaElement.style.borderColor = '#dee2e6';
-                newUploadAreaElement.style.backgroundColor = 'transparent';
-            });
-            
-            newUploadAreaElement.addEventListener('drop', (e) => {
-                e.preventDefault();
-                newUploadAreaElement.style.borderColor = '#dee2e6';
-                newUploadAreaElement.style.backgroundColor = 'transparent';
-                
-                if (e.dataTransfer.files.length) {
-                    newFileInput.files = e.dataTransfer.files;
-                    handleFileSelect(e.dataTransfer.files[0]);
-                }
-            });
-            
-            // Event ketika file dipilih
-            newFileInput.addEventListener('change', function() {
-                if (this.files.length) {
-                    handleFileSelect(this.files[0]);
-                }
-            });
+        if (!uploadArea || !fileInput || !form) {
+            console.log('⚠️ Upload elements not found');
+            return;
         }
+        
+        // Klik area upload untuk memilih file
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        // Drag & drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#4361ee';
+            uploadArea.style.backgroundColor = '#f0f7ff';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#dee2e6';
+            uploadArea.style.backgroundColor = 'transparent';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#dee2e6';
+            uploadArea.style.backgroundColor = 'transparent';
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Event ketika file dipilih
+        fileInput.addEventListener('change', function() {
+            if (this.files.length) {
+                handleFileSelect(this.files[0]);
+            }
+        });
         
         // Fungsi untuk handle file yang dipilih
         function handleFileSelect(file) {
             console.log('📁 File selected:', file.name, 'size:', file.size, 'type:', file.type);
+            
+            selectedFile = file;
             
             const preview = document.getElementById('filePreview');
             const fileName = document.getElementById('fileName');
@@ -274,36 +354,25 @@
             const fileType = document.getElementById('fileType');
             
             if (preview && fileName) {
-                // Tampilkan nama file
                 fileName.textContent = file.name;
                 
-                // Tampilkan ukuran file dalam format yang mudah dibaca
+                // Tampilkan ukuran file
                 const sizeInKB = (file.size / 1024).toFixed(2);
-                const fileSizeText = document.createElement('small');
-                fileSizeText.className = 'text-muted d-block';
-                fileSizeText.textContent = `Ukuran: ${sizeInKB} KB`;
+                if (fileSize) fileSize.textContent = `${sizeInKB} KB`;
                 
-                // Tampilkan icon berdasarkan tipe file
-                const iconElement = document.querySelector('#filePreview i');
-                if (iconElement) {
-                    if (file.type.includes('pdf')) {
-                        iconElement.className = 'fas fa-file-pdf text-danger';
-                    } else if (file.type.includes('image')) {
-                        iconElement.className = 'fas fa-file-image text-primary';
-                    } else {
-                        iconElement.className = 'fas fa-file text-secondary';
-                    }
+                // Tampilkan tipe file
+                if (fileType) {
+                    if (file.type.includes('pdf')) fileType.textContent = 'PDF Document';
+                    else if (file.type.includes('image')) fileType.textContent = 'Image';
+                    else fileType.textContent = 'File';
                 }
                 
-                // Hapus file size lama jika ada
-                const oldSize = preview.querySelector('.file-size');
-                if (oldSize) oldSize.remove();
-                
-                // Tambah file size baru
-                const sizeSpan = document.createElement('span');
-                sizeSpan.className = 'file-size text-muted small ms-2';
-                sizeSpan.textContent = `(${sizeInKB} KB)`;
-                document.getElementById('fileName').appendChild(sizeSpan);
+                // Tampilkan icon berdasarkan tipe file
+                if (fileIcon) {
+                    if (file.type.includes('pdf')) fileIcon.className = 'fas fa-file-pdf text-danger fa-2x';
+                    else if (file.type.includes('image')) fileIcon.className = 'fas fa-file-image text-primary fa-2x';
+                    else fileIcon.className = 'fas fa-file text-secondary fa-2x';
+                }
                 
                 preview.style.display = 'block';
                 
@@ -311,22 +380,19 @@
                 if (file.type.includes('image')) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        const imgPreview = document.getElementById('imagePreview');
+                        let imgPreview = document.getElementById('imagePreview');
                         if (!imgPreview) {
-                            const img = document.createElement('img');
-                            img.id = 'imagePreview';
-                            img.className = 'img-thumbnail mt-2';
-                            img.style.maxWidth = '200px';
-                            img.style.maxHeight = '150px';
-                            img.src = e.target.result;
-                            preview.appendChild(img);
-                        } else {
-                            imgPreview.src = e.target.result;
+                            imgPreview = document.createElement('img');
+                            imgPreview.id = 'imagePreview';
+                            imgPreview.className = 'img-thumbnail mt-2';
+                            imgPreview.style.maxWidth = '200px';
+                            imgPreview.style.maxHeight = '150px';
+                            preview.appendChild(imgPreview);
                         }
+                        imgPreview.src = e.target.result;
                     };
                     reader.readAsDataURL(file);
                 } else {
-                    // Hapus preview gambar jika ada
                     const imgPreview = document.getElementById('imagePreview');
                     if (imgPreview) imgPreview.remove();
                 }
@@ -335,101 +401,94 @@
         
         // Fungsi untuk remove file
         window.removeFile = function() {
-            const fileInput = document.getElementById('proofFile');
+            fileInput.value = '';
+            selectedFile = null;
             const preview = document.getElementById('filePreview');
-            const fileName = document.getElementById('fileName');
             const imgPreview = document.getElementById('imagePreview');
-            
-            if (fileInput) fileInput.value = '';
             if (preview) preview.style.display = 'none';
-            if (fileName) fileName.innerHTML = '';
             if (imgPreview) imgPreview.remove();
-            
             console.log('🗑️ File removed');
         };
         
-        if (form) {
-            // Hapus event listener lama
-            const newForm = form.cloneNode(true);
-            form.parentNode.replaceChild(newForm, form);
+        // Handle form submit
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            const newFormElement = document.getElementById('uploadProofForm');
+            // Cegah double submit
+            if (isSubmitting) {
+                console.log('⏳ Submit sedang berlangsung...');
+                return;
+            }
             
-            newFormElement.addEventListener('submit', async function(e) {
-                e.preventDefault();
+            const notes = document.getElementById('paymentNotes').value;
+            const transactionId = document.getElementById('transactionId').value;
+            const token = localStorage.getItem('token');
+            const submitBtn = document.getElementById('submitProofBtn');
+            
+            console.log('📤 Uploading file:', selectedFile?.name);
+            console.log('📤 Transaction ID:', transactionId);
+            
+            if (!selectedFile) {
+                alert('Pilih file bukti pembayaran terlebih dahulu');
+                return;
+            }
+            
+            // Validasi ukuran file (maks 2MB)
+            if (selectedFile.size > 2 * 1024 * 1024) {
+                alert('Ukuran file terlalu besar. Maksimal 2MB');
+                return;
+            }
+            
+            if (!token) {
+                alert('Token tidak ditemukan. Silakan login ulang.');
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Set flag submitting
+            isSubmitting = true;
+            
+            const formData = new FormData();
+            formData.append('payment_proof', selectedFile);
+            formData.append('notes', notes || '');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
+            
+            try {
+                const API_URL = 'http://localhost:5000/api';
+                const url = `${API_URL}/user/transactions/${transactionId}/upload`;
+                console.log('📡 Uploading to:', url);
                 
-                // Cegah double submit
-                if (isSubmitting) {
-                    console.log('⏳ Submit sedang berlangsung...');
-                    return;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                console.log('📡 Response status:', response.status);
+                
+                const result = await response.json();
+                console.log('📦 Response:', result);
+                
+                if (result.success) {
+                    alert('✅ Bukti pembayaran berhasil diupload');
+                    location.reload();
+                } else {
+                    alert('❌ ' + (result.message || 'Gagal upload bukti pembayaran'));
                 }
                 
-                const fileInput = document.getElementById('proofFile');
-                const notes = document.getElementById('paymentNotes').value;
-                const transactionId = document.getElementById('transactionId').value;
-                const token = localStorage.getItem('token');
-                const submitBtn = document.getElementById('submitProofBtn');
-                
-                console.log('📤 Uploading file:', fileInput.files[0]?.name);
-                console.log('📤 Transaction ID:', transactionId);
-                
-                if (!fileInput.files.length) {
-                    alert('Pilih file bukti pembayaran terlebih dahulu');
-                    return;
-                }
-                
-                if (!token) {
-                    alert('Token tidak ditemukan. Silakan login ulang.');
-                    window.location.href = '/login';
-                    return;
-                }
-                
-                // Set flag submitting
-                isSubmitting = true;
-                
-                const formData = new FormData();
-                formData.append('payment_proof', fileInput.files[0]);
-                formData.append('notes', notes);
-                
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
-                
-                try {
-                    const API_URL = 'http://localhost:5000/api';
-                    const url = `${API_URL}/user/transactions/${transactionId}/upload`;
-                    console.log('📡 Uploading to:', url);
-                    
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: formData
-                    });
-                    
-                    console.log('📡 Response status:', response.status);
-                    
-                    const result = await response.json();
-                    console.log('📦 Response:', result);
-                    
-                    if (result.success) {
-                        alert('✅ Bukti pembayaran berhasil diupload');
-                        location.reload();
-                    } else {
-                        alert('❌ ' + (result.message || 'Gagal upload bukti pembayaran'));
-                        isSubmitting = false;
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Upload error:', error);
-                    alert('❌ Gagal upload bukti pembayaran: ' + error.message);
-                    isSubmitting = false;
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload Bukti';
-                }
-            });
-        }
+            } catch (error) {
+                console.error('❌ Upload error:', error);
+                alert('❌ Gagal upload bukti pembayaran: ' + error.message);
+            } finally {
+                isSubmitting = false;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload Bukti';
+            }
+        });
     }
 
     // Helper functions
@@ -504,10 +563,16 @@
         document.getElementById('show-upload-btn').style.display = 'block';
         document.getElementById('uploadProofForm').reset();
         document.getElementById('filePreview').style.display = 'none';
+        selectedFile = null;
     };
 
     window.removeFile = function() {
-        document.getElementById('proofFile').value = '';
-        document.getElementById('filePreview').style.display = 'none';
+        const fileInput = document.getElementById('proofFile');
+        if (fileInput) fileInput.value = '';
+        selectedFile = null;
+        const preview = document.getElementById('filePreview');
+        const imgPreview = document.getElementById('imagePreview');
+        if (preview) preview.style.display = 'none';
+        if (imgPreview) imgPreview.remove();
     };
 })();

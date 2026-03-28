@@ -44,22 +44,24 @@
                             <label class="form-label">Nama Pengujian</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-flask icon-start"></i>
-                                <select id="itemSelect" class="form-input" style="padding-left: 40px;" onchange="hitungEstimasi()">
+                                <select id="itemSelect" class="form-input" style="padding-left: 40px;" onchange="onItemChange()">
                                     <% if (services && services.length > 0) { 
-                                        let totalItems = 0;
                                         services.forEach(type => { 
                                             if (type.categories && type.categories.length > 0) { 
                                                 type.categories.forEach(category => { 
                                                     if (category.items && category.items.length > 0) { 
-                                                        totalItems += category.items.length;
                                     %>
                                                         <optgroup label="<%= category.categoryName %>">
                                                             <% category.items.forEach(item => { %>
+                                                                <!-- 🔥 FORMAT: nama - min. xx satuan - Rp harga/satuan -->
                                                                 <option value="<%= item.price %>" 
                                                                         data-type="<%= type.typeName %>"
                                                                         data-duration="<%= item.duration %>"
-                                                                        data-name="<%= item.name %>">
-                                                                    <%= item.name %> - <%= item.sample %> - Rp <%= (item.price || 0).toLocaleString('id-ID') %>
+                                                                        data-name="<%= item.name %>"
+                                                                        data-min-sample="<%= item.sample_value %>"
+                                                                        data-min-sample-text="<%= item.sample_text %>"
+                                                                        data-unit="<%= item.unit %>">
+                                                                    <%= item.name %> - min. <%= item.sample_text %> - Rp <%= (item.price || 0).toLocaleString('id-ID') %>/<%= item.unit %>
                                                                 </option>
                                                             <% }); %>
                                                         </optgroup>
@@ -68,7 +70,7 @@
                                             } 
                                         }); 
                                     } else { %>
-                                        <option value="0" data-type="PENGUJIAN BAHAN" data-duration="7">Data tidak tersedia</option>
+                                        <option value="0" data-type="PENGUJIAN BAHAN" data-duration="7" data-min-sample="1" data-unit="sample">Data tidak tersedia</option>
                                     <% } %>
                                 </select>
                             </div>
@@ -79,6 +81,7 @@
                                 <i class="fas fa-calculator icon-start"></i>
                                 <input type="number" id="qtyInput" class="form-input" style="padding-left: 40px;" value="1" min="1" oninput="hitungEstimasi()">
                             </div>
+                            <small id="minSampleInfo" class="text-muted" style="font-size: 0.75rem; display: block; margin-top: 5px;"></small>
                         </div>
                     </div>
                 </div>
@@ -160,12 +163,10 @@
     
     // Fungsi untuk mengecek apakah hari libur
     function isHariLibur(date) {
-        const day = date.getDay(); // 0 = Minggu, 6 = Sabtu
+        const day = date.getDay();
         const month = ('0' + (date.getMonth() + 1)).slice(-2);
         const dayOfMonth = ('0' + date.getDate()).slice(-2);
         const monthDay = month + '-' + dayOfMonth;
-        
-        // Sabtu atau Minggu atau hari libur nasional
         return day === 0 || day === 6 || hariLibur.includes(monthDay);
     }
 
@@ -176,7 +177,6 @@
         
         while (addedDays < days) {
             result.setDate(result.getDate() + 1);
-            // Hanya hitung jika bukan hari libur
             if (!isHariLibur(result)) {
                 addedDays++;
             }
@@ -189,12 +189,10 @@
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Jika mode sibuk tidak aktif, mulai dari hari ini + 1 hari admin
         if (!modeSibuk.active || modeSibuk.periods.length === 0) {
             return addWorkingDays(today, 1);
         }
         
-        // Cari periode sibuk terakhir
         let lastSibukDate = new Date(today);
         modeSibuk.periods.forEach(periode => {
             const selesai = new Date(periode.tanggal_selesai);
@@ -203,23 +201,18 @@
             }
         });
         
-        // Jika periode sibuk masih berlangsung atau sudah lewat
         if (lastSibukDate >= today) {
-            // Mulai dari hari setelah periode sibuk terakhir + 1 hari admin
             const nextDay = new Date(lastSibukDate);
             nextDay.setDate(nextDay.getDate() + 1);
             return addWorkingDays(nextDay, 1);
         } else {
-            // Jika semua periode sibuk sudah lewat, mulai dari hari ini
             return addWorkingDays(today, 1);
         }
     }
 
     // Fungsi untuk mengkonversi string durasi ke hari
     function parseDurasi(durasiStr) {
-        if (!durasiStr) return 7; // default 7 hari
-        
-        // Ambil angka pertama dari string (misal "14 Hari Kerja" -> 14)
+        if (!durasiStr) return 7;
         const match = durasiStr.match(/\d+/);
         if (match) {
             return parseInt(match[0]) || 7;
@@ -234,52 +227,63 @@
         
         while (sisaHari > 0) {
             currentDate.setDate(currentDate.getDate() + 1);
-            
-            // Skip jika hari libur
             if (isHariLibur(currentDate)) {
                 continue;
             }
-            
-            // Kurangi sisa hari (hari kerja efektif)
             sisaHari--;
         }
-
         return currentDate;
     }
 
     // ==================== FUNGSI UTAMA ====================
+    
+    function onItemChange() {
+        const select = document.getElementById('itemSelect');
+        const selectedOption = select.options[select.selectedIndex];
+        
+        let minSample = parseInt(selectedOption.getAttribute('data-min-sample')) || 1;
+        const minSampleText = selectedOption.getAttribute('data-min-sample-text') || minSample + ' sample';
+        const unit = selectedOption.getAttribute('data-unit') || 'sample';
+        
+        const qtyInput = document.getElementById('qtyInput');
+        if (qtyInput) {
+            qtyInput.min = minSample;
+            qtyInput.value = minSample;
+            
+            const minSampleInfo = document.getElementById('minSampleInfo');
+            if (minSampleInfo) {
+                minSampleInfo.innerHTML = `Minimal: ${minSampleText}`;
+            }
+        }
+        
+        hitungEstimasi();
+    }
     
     function hitungEstimasi() {
         const select = document.getElementById('itemSelect');
         const qty = parseInt(document.getElementById('qtyInput').value) || 1;
         
         if (!select || select.selectedIndex === -1) {
-            console.log('❌ No item selected');
             return;
         }
         
         const selectedOption = select.options[select.selectedIndex];
         const price = parseInt(selectedOption.value) || 0;
         const durasiStr = selectedOption?.getAttribute('data-duration') || "7";
+        const minSample = parseInt(selectedOption.getAttribute('data-min-sample')) || 1;
+        const unit = selectedOption.getAttribute('data-unit') || 'sample';
         const itemName = selectedOption?.text || '';
         
-        console.log('✅ Selected:', {
-            name: itemName,
-            price: price,
-            duration: durasiStr,
-            qty: qty
-        });
+        const finalQty = Math.max(qty, minSample);
+        if (qty < minSample) {
+            document.getElementById('qtyInput').value = minSample;
+        }
         
-        const total = price * qty;
+        const total = price * finalQty;
         const durasiHari = parseDurasi(durasiStr);
-        
-        // Dapatkan tanggal mulai berdasarkan mode sibuk
         const startDate = getStartDate();
-        
-        // Hitung tanggal selesai
         const finishDate = hitungEstimasiSelesai(startDate, durasiHari);
         
-        // Format tanggal
         const options = { day: 'numeric', month: 'long', year: 'numeric' };
         const startDateStr = startDate.toLocaleDateString('id-ID', options);
         const finishDateStr = finishDate.toLocaleDateString('id-ID', options);
@@ -291,7 +295,6 @@
         
         if (jadwalInfo && jadwalText && jadwalTitle) {
             if (modeSibuk.active && modeSibuk.periods.length > 0) {
-                // Cari periode sibuk terakhir
                 let lastPeriod = modeSibuk.periods[0];
                 modeSibuk.periods.forEach(p => {
                     if (new Date(p.tanggal_selesai) > new Date(lastPeriod.tanggal_selesai)) {
@@ -310,30 +313,24 @@
             }
         }
         
-        // Hitung total hari kalender
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const totalHariKalender = Math.ceil((finishDate - today) / (1000 * 60 * 60 * 24));
-        
-        // Update tampilan
         document.getElementById('totalDisplay').innerText = 'Rp ' + total.toLocaleString('id-ID');
         document.getElementById('timeDisplay').innerHTML = durasiHari + ' hari kerja';
         document.getElementById('finishDateDisplay').innerText = finishDateStr;
         
-        // Simpan ke session storage
         try {
             sessionStorage.setItem('estimasi_total', total);
             sessionStorage.setItem('estimasi_durasi', durasiHari);
             sessionStorage.setItem('estimasi_mulai', startDateStr);
             sessionStorage.setItem('estimasi_selesai', finishDateStr);
             sessionStorage.setItem('estimasi_item', selectedOption?.text || '');
+            sessionStorage.setItem('estimasi_qty', finalQty);
+            sessionStorage.setItem('estimasi_unit', unit);
         } catch (e) {
             console.log('Session storage error:', e);
         }
     }
 
     function filterLayanan(type, element) {
-        // Update active class
         document.querySelectorAll('.service-option').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
 
@@ -344,10 +341,7 @@
         let firstVisibleSet = false;
         let visibleCount = 0;
 
-        console.log('🔍 Filtering by type:', type);
-
         if (type === 'SEMUA') {
-            // Tampilkan SEMUA option
             options.forEach(opt => {
                 opt.style.display = '';
                 opt.disabled = false;
@@ -357,19 +351,16 @@
                     firstVisibleSet = true;
                 }
             });
-            
             optgroups.forEach(group => {
                 group.style.display = 'block';
             });
         } else {
-            // Filter berdasarkan type
             options.forEach(opt => {
                 const optType = opt.getAttribute('data-type');
                 if (optType === type) {
                     opt.style.display = '';
                     opt.disabled = false;
                     visibleCount++;
-                    
                     if (!firstVisibleSet) {
                         opt.selected = true;
                         firstVisibleSet = true;
@@ -380,74 +371,61 @@
                 }
             });
 
-            // Tampilkan/sembunyikan optgroup
             optgroups.forEach(group => {
                 const hasVisible = Array.from(group.querySelectorAll('option')).some(opt => opt.style.display !== 'none');
                 group.style.display = hasVisible ? 'block' : 'none';
             });
         }
-
-        console.log(`✅ Total visible: ${visibleCount} items`);
         
-        // Trigger hitung estimasi
-        hitungEstimasi();
+        onItemChange();
     }
 
     // ==================== INISIALISASI ====================
     
     window.addEventListener('DOMContentLoaded', () => {
-        console.log('🚀 Page loaded, services data:', services);
+        console.log('🚀 Page loaded');
         
-        // Load mode sibuk dari API
         loadModeSibuk();
         
-        // TAMPILKAN SEMUA ITEM DI AWAL
         const select = document.getElementById('itemSelect');
         const options = select.querySelectorAll('option');
         const optgroups = select.querySelectorAll('optgroup');
         
-        // Tampilkan semua option
         options.forEach(opt => {
             opt.style.display = '';
             opt.disabled = false;
         });
         
-        // Tampilkan semua optgroup
         optgroups.forEach(group => {
             group.style.display = 'block';
         });
         
-        // Set option pertama sebagai selected
         if (options.length > 0) {
             options[0].selected = true;
         }
         
-        // Hitung estimasi awal
+        onItemChange();
         hitungEstimasi();
     });
 </script>
 
 <style>
     #itemSelect {
-    height: auto;
-    max-height: 300px;
-    overflow-y: auto;
+        height: auto;
+        max-height: 300px;
+        overflow-y: auto;
     }
-
     #itemSelect optgroup {
         font-weight: bold;
         color: var(--primary);
     }
-
     #itemSelect option {
         padding: 8px 12px;
         border-bottom: 1px solid #f0f0f0;
     }
-
     #itemSelect option:hover {
         background-color: #f8f9fa;
     }
-    
     .service-option {
         background: white;
         border: 2px solid #e2e8f0;
@@ -457,30 +435,25 @@
         transition: all 0.3s;
         text-align: center;
     }
-    
     .service-option.active {
         border-color: var(--primary);
         background: rgba(67, 97, 238, 0.05);
         transform: translateY(-3px);
         box-shadow: 0 10px 25px rgba(67, 97, 238, 0.1);
     }
-    
     .icon-circle {
         font-size: 2rem;
         margin-bottom: 10px;
     }
-    
     .service-option h4 {
         font-size: 1rem;
         font-weight: 600;
         margin-bottom: 5px;
         color: var(--dark);
     }
-    
     .jadwal-sibuk-info {
         animation: slideDown 0.3s ease;
     }
-    
     @keyframes slideDown {
         from {
             opacity: 0;
@@ -491,10 +464,11 @@
             transform: translateY(0);
         }
     }
-    
-    /* Nonaktifkan loading overlay */
     #loadingOverlay, .loading-overlay, .skeleton-loader {
         display: none !important;
+    }
+    .text-muted {
+        color: #6c757d;
     }
 </style>
 

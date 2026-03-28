@@ -34,7 +34,7 @@ const storage = multer.diskStorage({
     }
 });
 
-// Filter file yang diizinkan
+// Di mainroutes.js, cek konfigurasi multer
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|pdf|gif/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -279,8 +279,5 @@ router.post('/auth/login', async (req, res) => {
         });
     }
 });
-
-// Route untuk submission (form) - handle POST
-router.post('/user/submission', authMiddleware.verifyUserAccess, pageController.postSubmission);
 
 module.exports = router;

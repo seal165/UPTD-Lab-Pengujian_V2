@@ -3,10 +3,13 @@
 (function() {
     'use strict';
 
+    // State untuk data submission
+    let currentSubmissionData = null;
+    let hasKuisioner = false;
+
     document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ History Detail Handler initialized');
         
-        // CEK TOKEN - Ambil dari hidden input dulu, lalu cookie/meta
         const token = document.getElementById('currentUserToken')?.value || getTokenFromCookie() || getTokenFromMeta();
         console.log('🔑 Token:', token ? 'ADA' : 'TIDAK ADA');
         
@@ -16,10 +19,8 @@
             return;
         }
         
-        // Simpan token ke variable global untuk digunakan di fungsi lain
         window.userToken = token;
         
-        // Ambil ID dari URL atau dari hidden input
         const submissionId = document.getElementById('currentSubmissionId')?.value || 
                             window.location.pathname.split('/').pop();
         
@@ -30,11 +31,9 @@
             return;
         }
         
-        // Load data
         loadSubmissionDetail(submissionId, token);
     });
 
-    // Fungsi untuk mendapatkan token dari cookie
     function getTokenFromCookie() {
         const cookies = document.cookie.split(';');
         for (let cookie of cookies) {
@@ -46,33 +45,37 @@
         return null;
     }
 
-    // Fungsi untuk mendapatkan token dari meta tag (jika ada)
     function getTokenFromMeta() {
         const metaToken = document.querySelector('meta[name="csrf-token"]');
         return metaToken ? metaToken.getAttribute('content') : null;
     }
 
+    // Fungsi untuk membersihkan nama file dari path database
     function normalizeFilename(filename) {
-        if (!filename || typeof filename !== 'string') return '';
+        if (!filename) return '';
+        // Ambil hanya nama filenya saja (misal: "laporan/abc.pdf" jadi "abc.pdf")
         return filename.split('/').pop().split('\\').pop().trim();
     }
 
+    // Fungsi membuat URL yang akan di-fetch
     function buildProtectedFileUrl(fileType, filename, token) {
-        const safeFilename = normalizeFilename(filename);
-        if (!safeFilename || !token) return '#';
-        return `http://localhost:5000/api/file/${fileType}/${encodeURIComponent(safeFilename)}?token=${encodeURIComponent(token)}`;
+        const safeName = normalizeFilename(filename);
+        if (!safeName) return '#';
+        
+        // Format: /api/file/tipe/nama_file
+        // Contoh: /api/file/surat/surat-permohonan-123.pdf
+        const baseUrl = 'http://localhost:5000/api/file';
+        return `${baseUrl}/${fileType}/${encodeURIComponent(safeName)}`;
     }
 
     async function loadSubmissionDetail(id, token) {
         console.log('🔄 Loading detail for ID:', id);
         
-        // Tampilkan loading
         document.getElementById('loadingState').style.display = 'block';
         document.getElementById('contentState').style.display = 'none';
         document.getElementById('errorState').style.display = 'none';
         
         try {
-            // Panggil API
             const API_URL = 'http://localhost:5000/api';
             const endpoint = `${API_URL}/user/history/${id}`;
             
@@ -103,14 +106,21 @@
             console.log('📦 Data dari API:', result);
 
             if (result.success) {
-                // Sembunyikan loading, tampilkan content
+                currentSubmissionData = result.data;
+                
+                // 🔥 CEK APAKAH KUIISIONER SUDAH ADA
+                if (result.data.kuisioner) {
+                    hasKuisioner = true;
+                } else {
+                    hasKuisioner = false;
+                }
+                
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('contentState').style.display = 'block';
                 
-                // Isi data ke HTML
                 fillData(result.data, token);
             } else {
-                throw new Error(result.message || 'Gagal memuat data');
+                throw new Error(result.message || 'Gagal memuat数据');
             }
 
         } catch (error) {
@@ -122,7 +132,6 @@
     function fillData(data, token) {
         console.log('📝 Mengisi data:', data);
         
-        // Header - Format ID dengan 6 digit
         const formattedId = String(data.id).padStart(6, '0');
         setText('det-id', data.no_permohonan ? `#${data.no_permohonan}` : `#${formattedId}`);
         setText('det-status', data.status || '-');
@@ -131,10 +140,8 @@
         // Perusahaan
         setText('det-company', data.nama_instansi || '-');
         setText('det-pic', data.nama_pemohon || '-');
-        setText('det-position', data.jabatan || '-');
         setText('det-address', data.alamat_pemohon || '-');
         
-        // Contact
         const contact = [];
         if (data.email_pemohon) contact.push(data.email_pemohon);
         if (data.nomor_telepon) contact.push(data.nomor_telepon);
@@ -148,38 +155,21 @@
         // Material & Layanan
         if (data.samples && data.samples.length > 0) {
             const sample = data.samples[0];
-            
-            // Jenis sample
             setText('det-sample-type', sample.jenis_sample || '-');
-            
-            // Metode Pengujian
             setText('det-method', sample.method_at_time || sample.method || '-');
-            
-            // Nama layanan
             setText('det-service-name', sample.nama_identitas_sample || '-');
             
-            // Jumlah sample
             const qty = sample.jumlah_sample_angka || 1;
             setText('det-qty', qty);
             
-            // Harga per sample
             const unitPrice = parseFloat(sample.price_at_time) || 0;
             setText('det-unit-price', formatRupiah(unitPrice));
             
-            // Subtotal
             const subtotal = qty * unitPrice;
             setText('det-subtotal', formatRupiah(subtotal));
             
-            // Total tagihan
             const totalTagihan = data.payment?.total_tagihan || subtotal;
             setText('det-total', formatRupiah(totalTagihan));
-            
-            console.log('💰 Perhitungan:', {
-                qty: qty,
-                unitPrice: unitPrice,
-                subtotal: subtotal,
-                totalTagihan: totalTagihan
-            });
         } else {
             setText('det-sample-type', '-');
             setText('det-method', '-');
@@ -201,18 +191,13 @@
             
             let paymentStatus = data.payment.status_pembayaran || '-';
             let statusClass = '';
-            
             if (paymentStatus === 'Lunas') statusClass = 'badge-soft-success';
             else if (paymentStatus === 'Belum Lunas' || paymentStatus === 'Belum Bayar') statusClass = 'badge-soft-danger';
             else if (paymentStatus === 'Menunggu SKRD Upload') statusClass = 'badge-soft-warning';
             
-            document.getElementById('det-payment-status').innerHTML = 
-                `<span class="badge ${statusClass}">${paymentStatus}</span>`;
+            document.getElementById('det-payment-status').innerHTML = `<span class="badge ${statusClass}">${paymentStatus}</span>`;
+            setText('det-payment-date', data.payment.bukti_pembayaran_1_uploaded_at ? formatDate(data.payment.bukti_pembayaran_1_uploaded_at) : '-');
             
-            setText('det-payment-date', data.payment.bukti_pembayaran_1_uploaded_at ? 
-                formatDate(data.payment.bukti_pembayaran_1_uploaded_at) : '-');
-            
-            // Tampilkan bukti pembayaran jika ada
             renderPaymentProofs(data.payment, token);
         } else {
             setText('det-invoice', '-');
@@ -226,8 +211,8 @@
         // Dokumen
         renderDocuments(data, token);
         
-        // Laporan
-        renderLaporan(data, token);
+        // 🔥 LAPORAN & KUIISIONER (Syarat: Laporan sudah diupload + Kuisioner belum diisi)
+        renderLaporanWithKuisioner(data, token);
         
         // Catatan Admin
         if (data.catatan_admin) {
@@ -260,18 +245,11 @@
                     </div>
                     <div class="doc-info flex-grow-1">
                         <small>Bukti Pembayaran 1</small>
-                        ${payment.bukti_pembayaran_notes ? 
-                            `<small class="text-muted d-block">Catatan: ${payment.bukti_pembayaran_notes}</small>` : ''}
+                        ${payment.bukti_pembayaran_notes ? `<small class="text-muted d-block">Catatan: ${payment.bukti_pembayaran_notes}</small>` : ''}
                     </div>
                     <div class="doc-action">
-                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
-                           class="btn btn-sm btn-outline-primary me-1">
-                            <i class="fas fa-eye"></i> Buka
-                        </a>
-                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
-                           class="btn btn-sm btn-primary">
-                            <i class="fas fa-download"></i> Download
-                        </a>
+                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
+                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
                     </div>
                 </div>
             `;
@@ -289,14 +267,8 @@
                         <small>Bukti Pembayaran 2</small>
                     </div>
                     <div class="doc-action">
-                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
-                           class="btn btn-sm btn-outline-primary me-1">
-                            <i class="fas fa-eye"></i> Buka
-                        </a>
-                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
-                           class="btn btn-sm btn-primary">
-                            <i class="fas fa-download"></i> Download
-                        </a>
+                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
+                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
                     </div>
                 </div>
             `;
@@ -309,78 +281,116 @@
     }
 
     function renderDocuments(data, token) {
-        // Surat Permohonan - 1 TOMBOL DOWNLOAD SAJA
+        // Surat Permohonan
         if (data.file_surat_permohonan) {
             setText('status-doc-permohonan', '✅ Terupload');
             const fileUrl = buildProtectedFileUrl('surat', data.file_surat_permohonan, token);
-            document.getElementById('action-doc-permohonan').innerHTML = 
-                `<a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
-                    class="btn btn-sm btn-outline-primary me-1">
-                    <i class="fas fa-eye"></i> Buka
-                </a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
-                    class="btn btn-sm btn-primary">
-                    <i class="fas fa-download"></i> Download
-                </a>`;
+            document.getElementById('action-doc-permohonan').innerHTML = `
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+            `;
         } else {
             setText('status-doc-permohonan', '❌ Belum diupload');
             document.getElementById('action-doc-permohonan').innerHTML = '';
         }
         
-        // Scan KTP - 1 TOMBOL DOWNLOAD SAJA
+        // Scan KTP
         if (data.file_ktp) {
             setText('status-doc-ktp', '✅ Terupload');
             const fileUrl = buildProtectedFileUrl('ktp', data.file_ktp, token);
-            document.getElementById('action-doc-ktp').innerHTML = 
-                `<a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
-                    class="btn btn-sm btn-outline-primary me-1">
-                    <i class="fas fa-eye"></i> Buka
-                </a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
-                    class="btn btn-sm btn-primary">
-                    <i class="fas fa-download"></i> Download
-                </a>`;
+            document.getElementById('action-doc-ktp').innerHTML = `
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+            `;
         } else {
             setText('status-doc-ktp', '❌ Belum diupload');
             document.getElementById('action-doc-ktp').innerHTML = '';
         }
     }
 
-    function renderLaporan(data, token) {
+    // 🔥 FUNGSI UTAMA UNTUK LAPORAN + KUIISIONER
+    function renderLaporanWithKuisioner(data, token) {
         const statusLaporan = document.getElementById('status-laporan');
         const actionLaporan = document.getElementById('action-laporan');
         const laporanDate = document.getElementById('laporan-date');
+        const kuisionerSection = document.getElementById('kuisioner-section');
         
         if (!statusLaporan || !actionLaporan) return;
         
-        if (data.status === 'Selesai' && data.report && data.report.file_laporan) {
+        // 🔥 CEK APAKAH LAPORAN SUDAH ADA
+        const hasReport = data.report && data.report.file_laporan;
+        
+        if (hasReport) {
+            // Laporan sudah diupload oleh admin
+            const fileUrl = buildProtectedFileUrl('laporan', data.report.file_laporan, token);
+            
             statusLaporan.innerHTML = '<i class="fas fa-check-circle text-success"></i> Laporan siap diunduh';
             if (laporanDate) {
                 laporanDate.innerHTML = `Diterbitkan: ${formatDate(data.report.tanggal_selesai || data.report.created_at)}`;
             }
             
-            const fileUrl = buildProtectedFileUrl('laporan', data.report.file_laporan, token);
-            
+            // 🔥 TAMPILKAN 2 TOMBOL: Preview dan Download
             actionLaporan.innerHTML = `
-                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" 
-                   class="btn btn-sm btn-outline-success me-1">
-                    <i class="fas fa-eye"></i> Buka
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">
+                    <i class="fas fa-eye"></i> Preview
                 </a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" 
-                   class="btn btn-sm btn-success">
-                    <i class="fas fa-download"></i> Download Laporan
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">
+                    <i class="fas fa-download"></i> Download
                 </a>
             `;
-        } else if (data.status === 'Selesai' && !data.report) {
-            statusLaporan.innerHTML = '<i class="fas fa-exclamation-circle text-warning"></i> Laporan sedang diproses';
-            actionLaporan.innerHTML = '';
-            if (laporanDate) laporanDate.innerHTML = '';
+            
+            // 🔥 CEK APAKAH KUIISIONER SUDAH DIISI
+            if (!hasKuisioner) {
+                // Belum isi kuisioner - tampilkan tombol isi kuisioner
+                kuisionerSection.style.display = 'block';
+                
+                // Tambahkan info bahwa laporan bisa didownload setelah isi kuisioner
+                const existingInfo = document.querySelector('#kuisioner-section .alert-info');
+                if (!existingInfo) {
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'alert alert-info mt-3 mb-0';
+                    infoDiv.innerHTML = '<i class="fas fa-info-circle me-2"></i> Laporan siap diunduh. Silakan isi kuisioner terlebih dahulu.';
+                    document.querySelector('#kuisioner-section .card-body-custom').appendChild(infoDiv);
+                }
+                
+                // Sembunyikan sementara tombol download (tapi tetap tampil preview?)
+                // Atau biarkan preview tetap bisa dilihat, tapi download baru bisa setelah isi kuisioner
+                // Sesuai permintaan: tombol download dan preview baru muncul setelah isi kuisioner
+                // Jadi kita sembunyikan dulu
+                actionLaporan.innerHTML = `
+                    <span class="text-muted small">Laporan tersedia setelah mengisi kuisioner</span>
+                `;
+            } else {
+                // Sudah isi kuisioner - tampilkan tombol download dan preview
+                kuisionerSection.style.display = 'none';
+                actionLaporan.innerHTML = `
+                    <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">
+                        <i class="fas fa-eye"></i> Preview
+                    </a>
+                    <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                `;
+            }
+            
         } else {
+            // Belum ada laporan
             statusLaporan.innerHTML = '<i class="fas fa-hourglass-half text-secondary"></i> Laporan akan tersedia setelah pengujian selesai';
             actionLaporan.innerHTML = '';
             if (laporanDate) laporanDate.innerHTML = '';
+            kuisionerSection.style.display = 'none';
         }
     }
+
+    // 🔥 FUNGSI BUKA KUIISIONER
+    window.openKuisioner = function() {
+        const submissionId = document.getElementById('currentSubmissionId')?.value;
+        if (submissionId) {
+            window.location.href = `/kuisioner/${submissionId}`;
+        } else {
+            alert('ID pengajuan tidak ditemukan');
+        }
+    };
 
     function renderTimeline(data) {
         const timelineEl = document.getElementById('timeline');
@@ -419,96 +429,106 @@
     }
 
     async function fetchProtectedFileBlob(url, token) {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            console.log('📡 Fetch File Status:', response.status);
+
+            // 1. Cek jika Unauthorized
+            if (response.status === 401) {
+                alert('Sesi habis. Silakan login ulang.');
+                window.location.href = '/login';
+                return null;
             }
-        });
 
-        console.log('📡 Response status:', response.status);
+            // 2. Cek jika file tidak ada (Ini biasanya penyebab 9 bytes)
+            if (!response.ok) {
+                // Coba baca pesan errornya
+                const errorData = await response.text();
+                console.error('❌ Server Error Response:', errorData);
+                
+                if (response.status === 404) {
+                    alert('File tidak ditemukan di server. Pastikan folder uploads sudah benar.');
+                } else {
+                    alert('Gagal mengambil file dari server (Error ' + response.status + ')');
+                }
+                return null;
+            }
 
-        if (response.status === 401) {
-            alert('Sesi habis. Silakan login ulang.');
-            window.location.href = '/login';
+            // 3. Ambil Blob
+            const blob = await response.blob();
+            console.log('📦 Received Blob size:', blob.size, 'bytes');
+
+            // 🔥 Validasi "9 Bytes" atau file rusak
+            // Jika size sangat kecil, kemungkinan besar isinya teks error, bukan PDF/Gambar
+            if (blob.size < 50) { 
+                console.warn('⚠️ Ukuran file sangat kecil, kemungkinan corrupt.');
+                // Opsional: Baca isi blob untuk debug
+                const text = await blob.text();
+                console.log('📄 Isi blob kecil tersebut:', text);
+                
+                if (text.includes('not found') || text.includes('error')) {
+                    alert('File di server rusak atau tidak terbaca.');
+                    return null;
+                }
+            }
+
+            return blob;
+        } catch (error) {
+            console.error('❌ Network Error saat fetch file:', error);
+            alert('Terjadi kesalahan jaringan saat mengambil file.');
             return null;
         }
-
-        if (response.status === 404) {
-            alert('File tidak ditemukan di server');
-            return null;
-        }
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        console.log('📦 Blob size:', blob.size, 'bytes');
-
-        if (blob.size === 0) {
-            alert('File kosong');
-            return null;
-        }
-
-        return blob;
     }
 
+    // Fungsi Preview (Buka Tab Baru Tanpa Diblokir Browser)
     window.openFileWithToken = async function(url, token) {
+        const newTab = window.open('', '_blank');
+        if (!newTab) return alert('Izinkan popup browser!');
+        
+        newTab.document.write('<html><body style="background:#333;color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;">Memproses dokumen...</body></html>');
+
         try {
-            console.log('👁️ Opening file:', url);
-
+            // fetchProtectedFileBlob adalah fungsi yang Jey buat untuk fetch dengan Header Auth
             const blob = await fetchProtectedFileBlob(url, token);
-            if (!blob) return;
-
-            const blobUrl = window.URL.createObjectURL(blob);
-            const opened = window.open(blobUrl, '_blank', 'noopener,noreferrer');
-
-            if (!opened) {
-                alert('Popup diblokir browser. Izinkan popup untuk membuka dokumen.');
+            if (!blob) {
+                newTab.close();
+                return;
             }
-
-            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60 * 1000);
-        } catch (error) {
-            console.error('❌ Error membuka file:', error);
-            alert('Gagal membuka file: ' + error.message);
+            const blobUrl = window.URL.createObjectURL(blob);
+            newTab.location.href = blobUrl;
+            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
+        } catch (e) {
+            newTab.close();
+            alert('Gagal memuat file.');
         }
     };
 
-    // 🔥 FUNGSI DOWNLOAD FILE DENGAN TOKEN
     window.downloadFileWithToken = async function(url, token) {
         try {
             console.log('📥 Downloading file:', url);
-
             const blob = await fetchProtectedFileBlob(url, token);
             if (!blob) return;
-
-            // 🔥 SEMUA FILE DI-DOWNLOAD, TIDAK ADA YANG DITAMPILKAN
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            
-            // Ambil nama file dari URL
             const urlParts = url.split('/');
             const filename = decodeURIComponent(urlParts[urlParts.length - 1].split('?')[0]);
             link.download = filename;
-            
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            // Bersihkan blob URL
             setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-            
             console.log('✅ Download selesai:', filename);
-            
         } catch (error) {
             console.error('❌ Error download:', error);
             alert('Gagal download file: ' + error.message);
         }
     };
 
-    // Helper function
     function setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
@@ -518,22 +538,14 @@
         if (!dateString) return '-';
         try {
             const date = new Date(dateString);
-            return date.toLocaleDateString('id-ID', {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric'
-            });
+            return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
         } catch {
             return '-';
         }
     }
 
     function formatRupiah(amount) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0
-        }).format(amount);
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
     }
 
     function showError(message) {

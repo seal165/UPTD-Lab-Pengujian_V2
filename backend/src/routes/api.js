@@ -201,38 +201,8 @@ router.post('/user/transactions/:id/upload',
 );
 
 // ==================== FILE ACCESS ROUTES ====================
-router.get('/file/:folder/:filename', authMiddleware, (req, res) => {
-    try {
-        const { folder, filename } = req.params;
-        const userId = req.user?.id;
-        
-        console.log('📁 File request:', { folder, filename, userId });
-        
-        if (!userId) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' });
-        }
-        
-        // Tambahkan folder 'skrd' ke allowedFolders
-        const allowedFolders = ['surat', 'ktp', 'laporan', 'payment', 'skrd'];
-        if (!allowedFolders.includes(folder)) {
-            return res.status(403).json({ success: false, message: 'Forbidden' });
-        }
-        
-        const filePath = path.join(__dirname, '../../uploads', folder, filename);
-        console.log('📁 File path:', filePath);
-        
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ success: false, message: 'File not found' });
-        }
-        
-        // Kirim file langsung
-        res.sendFile(filePath);
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+// Pastikan parameter pertama adalah :fileType agar nyambung dengan Controller
+router.get('/file/:fileType/:filename', authMiddleware, apiController.getFile);
 
 // ==================== USER PROFILE API ====================
 // Get user profile

@@ -6,12 +6,10 @@ const fs = require('fs');
 
 const apiController = {
     // ==================== SERVICES METHODS ====================
-    // GET SERVICES LIST from database
     getServices: async (req, res) => {
         try {
             console.log('========== GET SERVICES ==========');
             
-            // Ambil semua layanan dari database dengan JOIN
             const [services] = await db.query(`
                 SELECT 
                     s.id,
@@ -20,83 +18,44 @@ const apiController = {
                     s.duration_days as duration,
                     s.price,
                     s.method,
-                    tc.id as category_id,
-                    tc.category_name,
-                    tt.id as type_id,
+                    s.kan,
+                    s.test_type_id,
                     tt.type_name
                 FROM services s
-                JOIN test_categories tc ON s.category_id = tc.id
-                JOIN test_types tt ON tc.test_type_id = tt.id
-                ORDER BY tt.type_name, tc.category_name, s.service_name
+                JOIN test_types tt ON s.test_type_id = tt.id
+                ORDER BY s.test_type_id, s.service_name
             `);
 
             console.log(`✅ Found ${services.length} services`);
 
-            // Kelompokkan berdasarkan tipe dan kategori
+            // Kelompokkan berdasarkan test_type_id
             const servicesByType = {};
             
             services.forEach(service => {
-                if (!servicesByType[service.type_name]) {
-                    servicesByType[service.type_name] = {
+                if (!servicesByType[service.test_type_id]) {
+                    servicesByType[service.test_type_id] = {
+                        typeId: service.test_type_id,
                         typeName: service.type_name,
-                        categories: {}
-                    };
-                }
-                
-                if (!servicesByType[service.type_name].categories[service.category_name]) {
-                    servicesByType[service.type_name].categories[service.category_name] = {
-                        categoryName: service.category_name,
                         items: []
                     };
                 }
                 
-                // Tentukan tipe lab/field berdasarkan metode atau nama layanan
-                let itemType = 'lab';
-                const fieldKeywords = ['lapangan', 'core drill', 'sondir', 'hammer', 'field', 'cbr lapangan'];
-                const serviceNameLower = service.service_name.toLowerCase();
-                const methodLower = (service.method || '').toLowerCase();
-                
-                if (fieldKeywords.some(keyword => 
-                    serviceNameLower.includes(keyword) || methodLower.includes(keyword)
-                )) {
-                    itemType = 'field';
-                }
-                
-                // Tentukan akreditasi (berdasarkan method yang mengandung SNI)
-                const accredited = service.method && service.method.includes('SNI');
-                
-                // Parse min_sample untuk mendapatkan satuan
-                let unit = 'Sampel';
-                if (service.min_sample) {
-                    if (service.min_sample.toLowerCase().includes('kilogram') || service.min_sample.includes('Kg')) unit = 'Kg';
-                    else if (service.min_sample.toLowerCase().includes('buah')) unit = 'Buah';
-                    else if (service.min_sample.toLowerCase().includes('titik')) unit = 'Titik';
-                    else if (service.min_sample.toLowerCase().includes('liter')) unit = 'Liter';
-                    else if (service.min_sample.toLowerCase().includes('meter')) unit = 'M';
-                }
-                
-                servicesByType[service.type_name].categories[service.category_name].items.push({
+                servicesByType[service.test_type_id].items.push({
                     id: service.id,
                     service_name: service.service_name,
                     name: service.service_name,
-                    min_sample: service.min_sample,
                     sample: service.min_sample || '1 Sampel',
                     duration: service.duration || '7',
                     price: parseFloat(service.price) || 0,
                     method: service.method || '-',
-                    unit: unit,
-                    type: itemType,
-                    accredited: accredited
+                    kan: service.kan,
+                    test_type_id: service.test_type_id
                 });
             });
 
-            const formattedData = Object.values(servicesByType).map(type => ({
-                typeName: type.typeName,
-                categories: Object.values(type.categories)
-            }));
-
+            const formattedData = Object.values(servicesByType);
             console.log(`✅ Formatted ${formattedData.length} service types`);
-            
+
             res.json({
                 success: true,
                 data: formattedData
@@ -125,13 +84,14 @@ const apiController = {
                     s.duration_days as duration,
                     s.price,
                     s.method,
+                    s.kan,
+                    s.test_type_id,
                     tc.id as category_id,
                     tc.category_name,
-                    tt.id as type_id,
                     tt.type_name
                 FROM services s
                 JOIN test_categories tc ON s.category_id = tc.id
-                JOIN test_types tt ON tc.test_type_id = tt.id
+                JOIN test_types tt ON s.test_type_id = tt.id
                 WHERE s.id = ?
             `, [id]);
 
@@ -154,10 +114,12 @@ const apiController = {
                     duration: service.duration || '7',
                     price: parseFloat(service.price),
                     method: service.method || '-',
+                    kan: service.kan,
+                    test_type_id: service.test_type_id,
+                    test_type_name: service.type_name,
+                    accredited: service.kan === 'Ya',
                     category_id: service.category_id,
-                    category_name: service.category_name,
-                    type_id: service.type_id,
-                    type_name: service.type_name
+                    category_name: service.category_name
                 }
             });
 
@@ -229,9 +191,11 @@ const apiController = {
         }
     },
 
-    // Alias untuk backward compatibility
+    // 🔥 ALIAS - TANPA MENGGUNAKAN `this`
     getPublicBusySchedule: async (req, res) => {
-        return exports.getJadwalSibuk(req, res);
+        // Import atau ambil referensi ke method
+        const { getJadwalSibuk } = require('../controllers/apiController');
+        return getJadwalSibuk(req, res);
     },
     
     // ==================== REGISTER ====================
@@ -2602,7 +2566,7 @@ const apiController = {
     createKuisioner: async (req, res) => {
         try {
             const {
-                submission_id, nama_pemohon, instansi, telepon, jabatan,
+                submission_id, nama_pemohon, instansi, telepon,
                 skor_1, skor_2, skor_3, skor_4, skor_5,
                 skor_6, skor_7, skor_8, skor_9, skor_10,
                 saran
@@ -2643,13 +2607,13 @@ const apiController = {
             
             const [result] = await db.query(
                 `INSERT INTO kuisioner (
-                    submission_id, nama_pemohon, instansi, telepon, jabatan,
+                    submission_id, nama_pemohon, instansi, telepon,
                     skor_1, skor_2, skor_3, skor_4, skor_5,
                     skor_6, skor_7, skor_8, skor_9, skor_10,
                     saran
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                    submission_id, nama_pemohon, instansi, telepon, jabatan,
+                    submission_id, nama_pemohon, instansi, telepon,
                     skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
                     skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
                     saran
@@ -2676,7 +2640,7 @@ const apiController = {
         try {
             const { id } = req.params;
             const {
-                nama_pemohon, instansi, telepon, jabatan,
+                nama_pemohon, instansi, telepon,
                 skor_1, skor_2, skor_3, skor_4, skor_5,
                 skor_6, skor_7, skor_8, skor_9, skor_10,
                 saran
@@ -2684,13 +2648,13 @@ const apiController = {
             
             const [result] = await db.query(
                 `UPDATE kuisioner SET
-                    nama_pemohon = ?, instansi = ?, telepon = ?, jabatan = ?,
+                    nama_pemohon = ?, instansi = ?, telepon = ?,
                     skor_1 = ?, skor_2 = ?, skor_3 = ?, skor_4 = ?, skor_5 = ?,
                     skor_6 = ?, skor_7 = ?, skor_8 = ?, skor_9 = ?, skor_10 = ?,
                     saran = ?, updated_at = NOW()
                 WHERE id = ?`,
                 [
-                    nama_pemohon, instansi, telepon, jabatan,
+                    nama_pemohon, instansi, telepon,
                     skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
                     skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
                     saran, id
@@ -3033,7 +2997,7 @@ const apiController = {
             }
 
             const {
-                nama_pemohon, instansi, telepon, jabatan,
+                nama_pemohon, instansi, telepon,
                 skor_1, skor_2, skor_3, skor_4, skor_5,
                 skor_6, skor_7, skor_8, skor_9, skor_10,
                 saran
@@ -3041,13 +3005,13 @@ const apiController = {
             
             const [result] = await db.query(
                 `UPDATE kuisioner SET
-                    nama_pemohon = ?, instansi = ?, telepon = ?, jabatan = ?,
+                    nama_pemohon = ?, instansi = ?, telepon = ?,
                     skor_1 = ?, skor_2 = ?, skor_3 = ?, skor_4 = ?, skor_5 = ?,
                     skor_6 = ?, skor_7 = ?, skor_8 = ?, skor_9 = ?, skor_10 = ?,
                     saran = ?, updated_at = NOW()
                 WHERE id = ?`,
                 [
-                    nama_pemohon, instansi, telepon, jabatan,
+                    nama_pemohon, instansi, telepon,
                     skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
                     skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
                     saran, id
@@ -3953,8 +3917,6 @@ const apiController = {
             });
         }
     },
-
-
 
     // ==================== REPORTS METHODS ====================
     getReports: async (req, res) => {
@@ -5449,136 +5411,90 @@ const apiController = {
     createSubmission: async (req, res) => {
         try {
             console.log('========== CREATE SUBMISSION ==========');
-            console.log('📦 req.body:', req.body);
-            console.log('📦 req.files:', req.files);
-            console.log('👤 req.user:', req.user);
             
             const userId = req.user?.id;
-            
             if (!userId) {
                 return res.status(401).json({
                     success: false,
                     message: 'Unauthorized - User tidak ditemukan'
                 });
             }
-            
-            // CEK DUPLIKASI REQUEST (5 DETIK TERAKHIR)
+
+            // 1. CEK DUPLIKASI REQUEST (5 DETIK TERAKHIR)
             const [recentSubmission] = await db.query(`
-                SELECT id, created_at 
-                FROM submissions 
+                SELECT id FROM submissions 
                 WHERE user_id = ? 
                 AND created_at > DATE_SUB(NOW(), INTERVAL 5 SECOND)
-                ORDER BY created_at DESC 
-                LIMIT 1
+                ORDER BY created_at DESC LIMIT 1
             `, [userId]);
             
             if (recentSubmission.length > 0) {
-                console.log('⚠️ Duplicate submission detected:', recentSubmission[0].id);
                 return res.json({
                     success: true,
                     message: 'Pengajuan sudah diproses',
-                    data: {
-                        id: recentSubmission[0].id,
-                        no_permohonan: 'Sudah ada'
-                    }
+                    data: { id: recentSubmission[0].id, no_permohonan: 'Sudah ada' }
                 });
             }
-            
-            // Ambil semua data dari body
+
+            // 2. AMBIL DATA DARI BODY & HANDLE JUMLAH SAMPLE
             const {
-                nomor_permohonan,
-                nama_pemohon,
-                nama_instansi,
-                alamat_pemohon,
-                nomor_telepon,
-                email,
-                nama_proyek,
-                lokasi_proyek,
-                catatan_pemohon,
-                uji_bahan,
-                uji_konstruksi,
-                qty_estimasi,
-                tanggal_sampel,
-                jenis_sampel,
-                jenis_sampel_lainnya,
-                nama_sampel,
-                jumlah_sample_angka,
-                jumlah_sample_satuan,
-                kemasan_sampel,
-                asal_sampel,
-                diambil_oleh,
-                test_type_id,
-                test_category_id,
-                service_id,
-                price_at_time,
-                method_at_time
+                nomor_permohonan, nama_pemohon, nama_instansi, alamat_pemohon,
+                nomor_telepon, email, nama_proyek, lokasi_proyek, catatan_pemohon,
+                uji_bahan, uji_konstruksi, tanggal_sampel, jenis_sampel,
+                jenis_sampel_lainnya, nama_sampel, jumlah_sample_angka,
+                jumlah_sample_satuan, kemasan_sampel, asal_sampel, diambil_oleh,
+                test_type_id, test_category_id, service_id, price_at_time, method_at_time
             } = req.body;
-            
-            // Validasi data wajib
+
+            // Pastikan jumlah_sample_angka adalah integer murni
+            const finalQty = parseInt(jumlah_sample_angka) || 1;
+
+            // 3. VALIDASI & SERVICE SELECTION
             if (!nama_pemohon || !nama_proyek) {
                 return res.status(400).json({
                     success: false,
                     message: 'Nama pemohon dan nama proyek wajib diisi'
                 });
             }
-            
-            // Tentukan service_id yang dipilih
+
             const selectedServiceId = service_id || uji_bahan || uji_konstruksi;
-            
             if (!selectedServiceId) {
                 return res.status(400).json({
                     success: false,
                     message: 'Pilih jenis pengujian terlebih dahulu'
                 });
             }
-            
-            // Ambil data service untuk mendapatkan test_type_id dan test_category_id
+
+            // 4. AMBIL DATA SERVICE (UNTUK BACKUP INFO HARGA/METODE)
             const [serviceData] = await db.query(`
-                SELECT 
-                    s.*,
-                    tc.id as category_id,
-                    tc.test_type_id as type_id
+                SELECT s.*, tc.id as category_id, tc.test_type_id as type_id
                 FROM services s
                 JOIN test_categories tc ON s.category_id = tc.id
                 WHERE s.id = ?
             `, [selectedServiceId]);
-            
-            console.log('📋 Service data:', serviceData[0]);
-            
-            // Gunakan data dari service jika tidak dikirim dari form
-            const finalTestTypeId = test_type_id || serviceData[0]?.type_id;
-            const finalTestCategoryId = test_category_id || serviceData[0]?.category_id;
+
+            const finalTestTypeId = test_type_id || serviceData[0]?.type_id || 0;
+            const finalTestCategoryId = test_category_id || serviceData[0]?.category_id || 0;
             const finalPrice = price_at_time || serviceData[0]?.price || 0;
             const finalMethod = method_at_time || serviceData[0]?.method || '-';
-            
-            // Generate nomor permohonan jika tidak ada
+
+            // 5. GENERATE NOMOR PERMOHONAN
             let no_permohonan_final = nomor_permohonan;
             if (!no_permohonan_final) {
                 const date = new Date();
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
-                const [countResult] = await db.query(
-                    "SELECT COUNT(*) as total FROM submissions WHERE DATE(created_at) = CURDATE()"
-                );
+                const [countResult] = await db.query("SELECT COUNT(*) as total FROM submissions WHERE DATE(created_at) = CURDATE()");
                 const sequence = String(countResult[0].total + 1).padStart(4, '0');
                 no_permohonan_final = `SUB/${year}/${month}/${sequence}`;
             }
-            
-            // Proses jenis sampel (dari checkbox)
-            let jenisSampleArray = [];
-            if (jenis_sampel) {
-                if (Array.isArray(jenis_sampel)) {
-                    jenisSampleArray = jenis_sampel;
-                } else {
-                    jenisSampleArray = [jenis_sampel];
-                }
-            }
-            if (jenis_sampel_lainnya && jenis_sampel_lainnya.trim() !== '') {
-                jenisSampleArray.push(jenis_sampel_lainnya);
-            }
+
+            // 6. PROSES JENIS SAMPEL
+            let jenisSampleArray = Array.isArray(jenis_sampel) ? jenis_sampel : (jenis_sampel ? [jenis_sampel] : []);
+            if (jenis_sampel_lainnya?.trim()) jenisSampleArray.push(jenis_sampel_lainnya);
             const jenisSampleStr = jenisSampleArray.join(', ');
-            
-            // INSERT KE TABEL SUBMISSIONS
+
+            // 7. INSERT SUBMISSIONS (Gunakan email_pemohon sesuai tabel Jey)
             const [submissionResult] = await db.query(
                 `INSERT INTO submissions (
                     user_id, no_permohonan, nama_pemohon, nama_instansi, 
@@ -5586,136 +5502,66 @@ const apiController = {
                     lokasi_proyek, catatan_tambahan, status, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Menunggu Verifikasi', NOW(), NOW())`,
                 [
-                    userId, 
-                    no_permohonan_final, 
-                    nama_pemohon || '', 
-                    nama_instansi || '',
-                    alamat_pemohon || '', 
-                    nomor_telepon || '', 
-                    email || '', 
-                    nama_proyek || '',
-                    lokasi_proyek || '', 
-                    catatan_pemohon || ''
+                    userId, no_permohonan_final, nama_pemohon, nama_instansi, 
+                    alamat_pemohon, nomor_telepon, email, nama_proyek, 
+                    lokasi_proyek, catatan_pemohon
                 ]
             );
-            
+
             const submissionId = submissionResult.insertId;
-            console.log('✅ Submission created with ID:', submissionId);
-            
-            // INSERT KE TABEL SUBMISSION_SAMPLES
+
+            // 8. INSERT SUBMISSION_SAMPLES
             await db.query(
                 `INSERT INTO submission_samples (
-                    submission_id, 
-                    jenis_sample, 
-                    nama_identitas_sample, 
-                    jumlah_sample_angka, 
-                    jumlah_sample_satuan, 
-                    tanggal_pengambilan, 
-                    kemasan_sample, 
-                    asal_sample, 
-                    sample_diambil_oleh,
-                    test_type_id, 
-                    test_category_id, 
-                    service_id,
-                    price_at_time, 
-                    method_at_time, 
-                    created_at
+                    submission_id, jenis_sample, nama_identitas_sample, 
+                    jumlah_sample_angka, jumlah_sample_satuan, tanggal_pengambilan, 
+                    kemasan_sample, asal_sample, sample_diambil_oleh,
+                    test_type_id, test_category_id, service_id,
+                    price_at_time, method_at_time, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
                 [
-                    submissionId,
-                    jenisSampleStr || '-',
-                    nama_sampel || '-',
-                    jumlah_sample_angka || 1,
-                    jumlah_sample_satuan || 'sample',
-                    tanggal_sampel || null,
-                    kemasan_sampel || '-',
-                    asal_sampel || '-',
-                    diambil_oleh || 'Pelanggan',
-                    finalTestTypeId || 0,
-                    finalTestCategoryId || 0,
-                    selectedServiceId,
-                    finalPrice,
-                    finalMethod
+                    submissionId, jenisSampleStr || '-', nama_sampel || '-',
+                    finalQty, jumlah_sample_satuan || 'sample', tanggal_sampel || null,
+                    kemasan_sampel || '-', asal_sampel || '-', diambil_oleh || 'Pelanggan',
+                    finalTestTypeId, finalTestCategoryId, selectedServiceId,
+                    finalPrice, finalMethod
                 ]
             );
-            console.log('✅ Submission sample inserted');
-            
-            // HANDLE FILE UPLOAD
-            let suratFile = null;
-            let ktpFile = null;
-            
+
+            // 9. HANDLE FILE UPLOAD
             if (req.files) {
-                if (req.files['surat_permohonan']) {
-                    const file = req.files['surat_permohonan'][0];
-                    suratFile = file.filename; // Simpan hanya nama file
-                    console.log('📁 Surat file saved:', suratFile);
-                    console.log('📁 Full path:', file.path);
-                }
-                if (req.files['scan_ktp']) {
-                    const file = req.files['scan_ktp'][0];
-                    ktpFile = file.filename; // Simpan hanya nama file
-                    console.log('📁 KTP file saved:', ktpFile);
-                    console.log('📁 Full path:', file.path);
-                }
-            }
-            
-            // UPDATE SUBMISSION DENGAN FILE JIKA ADA
-            if (suratFile || ktpFile) {
                 let updateFields = [];
-                const updateValues = [];
-                
-                if (suratFile) {
+                let updateValues = [];
+
+                if (req.files['surat_permohonan']?.[0]?.size > 0) {
                     updateFields.push('file_surat_permohonan = ?');
-                    updateValues.push(suratFile);
+                    updateValues.push(req.files['surat_permohonan'][0].filename);
                 }
-                if (ktpFile) {
+                if (req.files['scan_ktp']?.[0]?.size > 0) {
                     updateFields.push('file_ktp = ?');
-                    updateValues.push(ktpFile);
+                    updateValues.push(req.files['scan_ktp'][0].filename);
                 }
-                
-                updateValues.push(submissionId);
-                
-                await db.query(
-                    `UPDATE submissions SET ${updateFields.join(', ')} WHERE id = ?`,
-                    updateValues
-                );
-                console.log('✅ Files updated in submission');
+
+                if (updateFields.length > 0) {
+                    updateValues.push(submissionId);
+                    await db.query(`UPDATE submissions SET ${updateFields.join(', ')} WHERE id = ?`, updateValues);
+                }
             }
+
+            // 10. LOG ACTIVITY & RESPONSE
+            await db.query("INSERT INTO activities (user_id, activity_name, created_at) VALUES (?, 'create_submission', NOW())", [userId]);
             
-            // CATAT AKTIVITAS
-            await db.query(
-                `INSERT INTO activities (user_id, activity_name, created_at) 
-                VALUES (?, 'create_submission', NOW())`,
-                [userId]
-            );
+            console.log('✅ SUBMISSION SUCCESS:', submissionId, 'Qty:', finalQty);
             
-            console.log('✅ SUBMISSION COMPLETED:', submissionId);
-            
-            // KIRIM RESPONSE SUKSES
             res.json({
                 success: true,
                 message: 'Pengajuan berhasil dibuat',
-                data: {
-                    id: submissionId,
-                    no_permohonan: no_permohonan_final
-                }
+                data: { id: submissionId, no_permohonan: no_permohonan_final }
             });
-            
+
         } catch (error) {
-            console.error('❌ ERROR in createSubmission:');
-            console.error('❌ Error name:', error.name);
-            console.error('❌ Error message:', error.message);
-            console.error('❌ Error stack:', error.stack);
-            
-            if (error.code) {
-                console.error('❌ SQL Error code:', error.code);
-                console.error('❌ SQL Error sqlMessage:', error.sqlMessage);
-            }
-            
-            res.status(500).json({
-                success: false,
-                message: 'Gagal membuat pengajuan: ' + error.message
-            });
+            console.error('❌ ERROR createSubmission:', error.message);
+            res.status(500).json({ success: false, message: 'Gagal membuat pengajuan: ' + error.message });
         }
     },
 
@@ -5849,7 +5695,14 @@ const apiController = {
             
             submission.report = reports.length > 0 ? reports[0] : null;
             
-            console.log('✅ Data ditemukan, mengirim response');
+            // 🔥 AMBIL DATA KUIISIONER JIKA ADA
+            const [kuisioners] = await db.query(`
+                SELECT id, created_at FROM kuisioner WHERE submission_id = ?
+            `, [submissionId]);
+            
+            submission.kuisioner = kuisioners.length > 0 ? kuisioners[0] : null;
+            
+            console.log('✅ Data ditemukan, kuisioner:', submission.kuisioner ? 'ADA' : 'TIDAK ADA');
             
             res.json({
                 success: true,
@@ -5868,105 +5721,55 @@ const apiController = {
     // ==================== GET FILE DENGAN TOKEN ====================
     getFile: async (req, res) => {
         try {
-            const { filename } = req.params;
+            // Ambil params 'fileType' (dari route :fileType) dan 'filename'
+            const { fileType, filename } = req.params; 
             const userId = req.user?.id;
             
-            console.log('========== GET FILE ==========');
-            console.log('📂 Filename:', filename);
-            console.log('🔑 User ID:', userId);
+            console.log('========== GET FILE REQUEST ==========');
+            console.log('📂 Tipe Folder:', fileType);
+            console.log('📄 Nama File:', filename);
             
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
 
-            // Tentukan folder berdasarkan URL path
-            const pathParts = req.path.split('/');
-            const fileType = pathParts[2]; // 'surat', 'ktp', 'payment', 'laporan', 'skrd'
-            
-            console.log('📁 File type (dari URL):', fileType);
-            
-            // 🔥 PERBAIKI MAPPING FOLDER - Sesuaikan dengan nama folder asli
             const folderMap = {
                 'surat': 'surat',
                 'ktp': 'ktp',
                 'payment': 'payment',
-                'laporan': 'laporan',     // 🔥 Ganti dari 'reports' menjadi 'laporan'
+                'laporan': 'laporan',
                 'skrd': 'skrd'
             };
             
-            // Coba cari di folder yang ditentukan URL
             const targetFolder = folderMap[fileType] || 'others';
+            
+            // Sesuaikan path ke folder uploads (mundur 2x dari controllers/api ke root)
+            const path = require('path');
+            const fs = require('fs');
             let filepath = path.join(__dirname, '../../uploads', targetFolder, filename);
             
-            console.log('📄 Mencoba di:', filepath);
-            
-            // Cek apakah file ada di folder yang ditentukan
+            // 1. Cek di folder tujuan utama
             if (fs.existsSync(filepath)) {
-                console.log('✅ File ditemukan di folder:', targetFolder);
-                return sendFile(res, filepath, filename);
+                console.log('✅ File ketemu di folder:', targetFolder);
+                return sendFileWithHeaders(res, filepath, filename);
             }
             
-            // Jika tidak ditemukan, coba cari di semua folder
-            console.log('❌ File tidak ditemukan di folder target, mencari di semua folder...');
-            
-            // 🔥 DAFTAR FOLDER YANG BENAR
-            const allFolders = ['surat', 'ktp', 'payment', 'laporan', 'skrd', 'uploads', 'others'];
-            let found = false;
-            
-            for (const folder of allFolders) {
-                const testPath = path.join(__dirname, '../../uploads', folder, filename);
-                console.log('🔍 Mencoba:', testPath);
-                
+            // 2. Fallback: Cari di semua sub-folder kalau tidak ketemu (Jaga-jaga salah folder)
+            console.log('⚠️ Mencari di seluruh sub-folder uploads...');
+            const allSubFolders = ['surat', 'ktp', 'payment', 'laporan', 'skrd', 'others'];
+            for (const sub of allSubFolders) {
+                const testPath = path.join(__dirname, '../../uploads', sub, filename);
                 if (fs.existsSync(testPath)) {
-                    console.log('✅ File DITEMUKAN di folder:', folder);
-                    return sendFile(res, testPath, filename);
+                    console.log('✅ File akhirnya ketemu di:', sub);
+                    return sendFileWithHeaders(res, testPath, filename);
                 }
             }
             
-            // Coba langsung di folder uploads tanpa subfolder
-            const directPath = path.join(__dirname, '../../uploads', filename);
-            console.log('🔍 Mencoba di root uploads:', directPath);
-            
-            if (fs.existsSync(directPath)) {
-                console.log('✅ File DITEMUKAN di root uploads');
-                return sendFile(res, directPath, filename);
-            }
-            
-            // File benar-benar tidak ditemukan
-            console.error('❌ File TIDAK DITEMUKAN di mana pun');
-            
-            // List isi folder untuk debugging
-            try {
-                const uploadsDir = path.join(__dirname, '../../uploads');
-                console.log('📋 Isi folder uploads:');
-                const files = fs.readdirSync(uploadsDir);
-                files.forEach(f => console.log('   -', f));
-                
-                // Cek isi folder laporan
-                const laporanDir = path.join(__dirname, '../../uploads/laporan');
-                if (fs.existsSync(laporanDir)) {
-                    console.log('📋 Isi folder laporan:');
-                    const laporanFiles = fs.readdirSync(laporanDir);
-                    laporanFiles.forEach(f => console.log('   -', f));
-                }
-            } catch (e) {
-                console.log('Gagal membaca direktori:', e.message);
-            }
-            
-            return res.status(404).json({
-                success: false,
-                message: 'File tidak ditemukan di server'
-            });
+            return res.status(404).json({ success: false, message: 'File fisik tidak ada di server' });
 
         } catch (error) {
-            console.error('❌ Error getting file:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengakses file: ' + error.message
-            });
+            console.error('❌ Error getFile:', error);
+            res.status(500).json({ success: false, message: error.message });
         }
     },
 
@@ -6715,6 +6518,21 @@ function sendFile(res, filepath, filename) {
             message: 'Gagal mengirim file: ' + error.message
         });
     }
+}
+
+// HELPER FUNCTION (Letakkan di bawah atau di luar object apiController)
+function sendFileWithHeaders(res, filepath, filename) {
+    const path = require('path');
+    const ext = path.extname(filename).toLowerCase();
+    let contentType = 'application/octet-stream';
+    
+    if (ext === '.pdf') contentType = 'application/pdf';
+    else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+    else if (ext === '.png') contentType = 'image/png';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    return res.sendFile(filepath);
 }
 
 // Generate VA Number Bank Banten

@@ -47,7 +47,7 @@
             <div class="step-icon-box"><i class="fas fa-flask"></i></div>
             <div>
                 <h5>5. Pengujian</h5>
-                <p>Analisa Lab/Lapangan</p>
+                <p>Analisa Bahan/Kontruksi</p>
             </div>
         </div>
         <div class="step-card">
@@ -66,8 +66,8 @@
         </div>
         <select id="typeFilter" class="modern-select">
             <option value="all">Semua Kategori</option>
-            <option value="lab">Laboratorium</option>
-            <option value="field">Lapangan</option>
+            <option value="bahan">Pengujian Bahan</option>
+            <option value="konstruksi">Pengujian Konstruksi</option>
         </select>
     </div>
 
@@ -75,34 +75,31 @@
         <% if (services && services.length > 0) { %>
             <% 
             let globalNo = 1;
-            services.forEach((type, typeIndex) => { 
+            services.forEach((type) => { 
             %>
                 <div class="type-section">
                     <h2 class="type-title"><%= type.typeName %></h2>
                     
-                    <% 
-                    type.categories.forEach((category, catIndex) => { 
-                        if (category.items && category.items.length > 0) {
-                    %>
-                        <div class="category-wrapper" id="cat-<%= typeIndex %>-<%= catIndex %>">
-                            <div class="category-title"><%= category.categoryName %></div>
-
-                            <% category.items.forEach(item => { %>
-                            <div class="service-card-row item-row" data-type="<%= item.type %>" data-category="cat-<%= typeIndex %>-<%= catIndex %>">
+                    <div class="category-wrapper" id="cat-<%= type.typeId %>">
+                        <% if (type.items && type.items.length > 0) { %>
+                            <% type.items.forEach(item => { %>
+                            <div class="service-card-row item-row" data-type="<%= item.test_type_id === 1 ? 'bahan' : 'konstruksi' %>">
                                 
                                 <div class="svc-info">
                                     <div class="svc-number"><%= globalNo++ %></div>
                                     <div class="svc-name">
                                         <h4><%= item.service_name %></h4>
                                         <div class="svc-meta">
-                                            <% if(item.accredited) { %>
-                                                <span class="badge-pill badge-kan"><i class="fas fa-check-circle"></i> KAN</span>
+                                            <!-- Badge KAN -->
+                                            <% if(item.kan === 'Ya') { %>
+                                                <span class="badge-pill badge-kan"><i class="fas fa-check-circle"></i> Terakreditasi KAN</span>
                                             <% } else { %>
-                                                <span class="badge-pill badge-non">Non-Akred</span>
+                                                <span class="badge-pill badge-non"><i class="fas fa-clock"></i> Belum Terakreditasi</span>
                                             <% } %>
                                             
-                                            <span class="badge-pill <%= item.type === 'lab' ? 'badge-lab' : 'badge-field' %>">
-                                                <%= item.type === 'lab' ? 'Lab' : 'Lapangan' %>
+                                            <!-- Badge Jenis Pengujian -->
+                                            <span class="badge-pill <%= item.test_type_id === 1 ? 'badge-lab' : 'badge-field' %>">
+                                                <%= item.test_type_id === 1 ? 'Pengujian Bahan' : 'Pengujian Konstruksi' %>
                                             </span>
                                             
                                             <% if(item.method) { %>
@@ -116,7 +113,7 @@
 
                                 <div class="svc-details">
                                     <div class="detail-item">
-                                        <div class="detail-label">Sampel</div>
+                                        <div class="detail-label">Min. Sampel</div>
                                         <div class="detail-value"><%= item.sample || '-' %></div>
                                     </div>
                                     <div class="detail-item">
@@ -127,17 +124,14 @@
 
                                 <div class="svc-price">
                                     <div class="price-tag">Rp <%= (item.price || 0).toLocaleString('id-ID') %></div>
-                                    <% if (item.unit) { %>
-                                        <div class="unit-tag"><%= item.unit %></div>
-                                    <% } %>
+                                    <div class="unit-tag">/sample</div>
                                 </div>
                             </div>
                             <% }) %>
-                        </div>
-                    <% 
-                        } 
-                    }); 
-                    %>
+                        <% } else { %>
+                            <div class="text-center py-3 text-muted">Tidak ada layanan</div>
+                        <% } %>
+                    </div>
                 </div>
             <% 
             }); 
@@ -161,11 +155,55 @@
 
 </div>
 
+<style>
+    .badge-kan {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: white;
+    }
+    .badge-non {
+        background: #e2e8f0;
+        color: #475569;
+    }
+    .badge-pill {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .badge-lab {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .badge-field {
+        background: #fef3c7;
+        color: #b45309;
+    }
+    .svc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 6px;
+    }
+    .type-section {
+        margin-bottom: 40px;
+    }
+    .type-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary);
+        border-left: 4px solid var(--primary);
+        padding-left: 15px;
+        margin-bottom: 20px;
+    }
+</style>
+
 <script>
-    // Script filter tetap sama
     const searchInput = document.getElementById('searchInput');
     const typeFilter = document.getElementById('typeFilter');
-    const itemRows = document.querySelectorAll('.item-row');
     const categoryWrappers = document.querySelectorAll('.category-wrapper');
     const noData = document.getElementById('noData');
 
@@ -194,11 +232,10 @@
                 }
             });
 
-            const title = wrapper.querySelector('.category-title');
             if (visibleInCat > 0) {
-                title.style.display = 'block';
+                wrapper.style.display = 'block';
             } else {
-                title.style.display = 'none';
+                wrapper.style.display = 'none';
             }
         });
 
@@ -209,8 +246,8 @@
         }
     }
 
-    searchInput.addEventListener('input', filterData);
-    typeFilter.addEventListener('change', filterData);
+    if (searchInput) searchInput.addEventListener('input', filterData);
+    if (typeFilter) typeFilter.addEventListener('change', filterData);
 </script>
 
 <%- include('layout/footer') %>

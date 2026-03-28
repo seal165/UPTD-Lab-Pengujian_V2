@@ -1,4 +1,48 @@
 const db = require('../config/database');
+const axios = require('axios');
+const FormData = require('form-data'); // Jey harus install: npm install form-data
+const fs = require('fs');
+
+exports.postSubmission = async (req, res) => {
+    try {
+        const API_URL = process.env.API_URL || 'http://localhost:5000/api';
+        const formToAPI = new FormData();
+
+        // 1. Masukkan semua data teks dari form (nama, instansi, dll)
+        Object.keys(req.body).forEach(key => {
+            formToAPI.append(key, req.body[key]);
+        });
+
+        // 2. Oper filenya! Ambil dari folder temporary frontend, kirim ke API
+        if (req.files) {
+            if (req.files['surat_permohonan']) {
+                const file = req.files['surat_permohonan'][0];
+                formToAPI.append('surat_permohonan', fs.createReadStream(file.path));
+            }
+            if (req.files['scan_ktp']) {
+                const file = req.files['scan_ktp'][0];
+                formToAPI.append('scan_ktp', fs.createReadStream(file.path));
+            }
+        }
+
+        // 3. Tembak ke API Backend (Port 5000)
+        const response = await axios.post(`${API_URL}/user/submission`, formToAPI, {
+            headers: {
+                ...formToAPI.getHeaders(),
+                'Authorization': `Bearer ${req.session.token}`
+            }
+        });
+
+        // 4. Kalau berhasil, hapus file temporary di frontend (opsional tapi bagus)
+        // fs.unlinkSync(req.files['surat_permohonan'][0].path); 
+
+        return res.json(response.data);
+
+    } catch (error) {
+        console.error('❌ Error oper ke API:', error.message);
+        res.status(500).json({ success: false, message: 'Gagal mengirim file ke server backend' });
+    }
+};
 
 const pageController = {
     // ==================== HALAMAN PUBLIK ====================
@@ -91,11 +135,22 @@ const pageController = {
             const axios = require('axios');
             const API_URL = process.env.API_URL || 'http://localhost:5000/api';
             
+            console.log('📡 Fetching services from:', `${API_URL}/services`);
+            
             const response = await axios.get(`${API_URL}/services`, { timeout: 10000 });
+            
+            console.log('📦 Response status:', response.status);
+            console.log('📦 Response data success:', response.data?.success);
             
             let services = [];
             if (response.data && response.data.success) {
                 services = response.data.data || [];
+                console.log('✅ Services loaded:', services.length, 'types');
+                
+                // Log struktur data pertama untuk debugging
+                if (services.length > 0) {
+                    console.log('📋 Sample service structure:', JSON.stringify(services[0], null, 2));
+                }
             }
             
             res.render('services', { 
@@ -107,27 +162,31 @@ const pageController = {
             });
             
         } catch (error) {
-            console.error('❌ Error loading services page:', error.message);
+            console.error('❌ Error loading services page:');
+            console.error('❌ Error name:', error.name);
+            console.error('❌ Error message:', error.message);
+            console.error('❌ Error stack:', error.stack);
+            
+            if (error.response) {
+                console.error('❌ Response status:', error.response.status);
+                console.error('❌ Response data:', error.response.data);
+            }
             
             // Data dummy untuk fallback
             const dummyServices = [
                 {
+                    typeId: 1,
                     typeName: "PENGUJIAN BAHAN",
-                    categories: [
+                    items: [
                         {
-                            categoryName: "Agregat",
-                            items: [
-                                {
-                                    service_name: "Pengujian Keausan Agregat",
-                                    sample: "20 Kilogram",
-                                    duration: "14",
-                                    price: 90000,
-                                    method: "SNI 2417:2008",
-                                    unit: "Kg",
-                                    type: "lab",
-                                    accredited: true
-                                }
-                            ]
+                            id: 1,
+                            service_name: "Pengujian Keausan Agregat",
+                            sample: "20 Kilogram",
+                            duration: "14",
+                            price: 90000,
+                            method: "SNI 2417:2008",
+                            kan: "Ya",
+                            test_type_id: 1
                         }
                     ]
                 }
@@ -150,21 +209,25 @@ const pageController = {
         try {
             const db = require('../config/database');
             
+            // 🔥 AMBIL DATA SERVICES DENGAN SATUAN YANG DIPISAH
             const [services] = await db.query(`
                 SELECT 
                     s.id,
                     s.service_name,
                     s.min_sample,
+                    s.satuan,
+                    CONCAT(s.min_sample, ' ', s.satuan) as sample_text,
                     s.duration_days as duration,
                     s.price,
                     s.method,
+                    s.kan,
+                    s.test_type_id,
                     tc.id as category_id,
                     tc.category_name,
-                    tt.id as type_id,
                     tt.type_name
                 FROM services s
                 JOIN test_categories tc ON s.category_id = tc.id
-                JOIN test_types tt ON tc.test_type_id = tt.id
+                JOIN test_types tt ON s.test_type_id = tt.id
                 ORDER BY tt.type_name, tc.category_name, s.service_name
             `);
 
@@ -186,32 +249,19 @@ const pageController = {
                     };
                 }
                 
-                let itemType = 'lab';
-                const fieldKeywords = ['lapangan', 'core drill', 'sondir', 'hammer'];
-                const serviceNameLower = service.service_name.toLowerCase();
-                
-                if (fieldKeywords.some(keyword => serviceNameLower.includes(keyword))) {
-                    itemType = 'field';
-                }
-                
-                let unit = 'Sampel';
-                if (service.min_sample) {
-                    if (service.min_sample.toLowerCase().includes('kilogram')) unit = 'Kg';
-                    else if (service.min_sample.toLowerCase().includes('buah')) unit = 'Buah';
-                    else if (service.min_sample.toLowerCase().includes('titik')) unit = 'Titik';
-                }
-                
                 servicesByType[service.type_name].categories[service.category_name].items.push({
                     id: service.id,
                     service_name: service.service_name,
                     name: service.service_name,
-                    sample: service.min_sample || '1 sampel',
+                    sample_value: service.min_sample || 1,
+                    sample_unit: service.satuan || 'sample',
+                    sample_text: service.sample_text || `${service.min_sample || 1} ${service.satuan || 'sample'}`,
                     duration: service.duration || '7',
                     price: parseFloat(service.price) || 0,
                     method: service.method || '-',
-                    unit: unit,
-                    type: itemType,
-                    accredited: service.method && service.method.includes('SNI')
+                    kan: service.kan,
+                    test_type_id: service.test_type_id,
+                    unit: service.satuan || 'sample'
                 });
             });
 
@@ -222,9 +272,6 @@ const pageController = {
 
             res.render('estimasi', {
                 services: formattedServices,
-                modeSibukActive: false,
-                jadwalSibuk: [],
-                holidays: [],
                 title: 'Estimasi Biaya Pengujian - UPTD Lab',
                 active: 'estimasi',
                 user: req.session.user || null,
@@ -236,9 +283,6 @@ const pageController = {
             
             res.render('estimasi', {
                 services: [],
-                modeSibukActive: false,
-                jadwalSibuk: [],
-                holidays: [],
                 title: 'Estimasi Biaya Pengujian - UPTD Lab',
                 active: 'estimasi',
                 user: req.session.user || null,
@@ -700,13 +744,20 @@ const pageController = {
                 return res.redirect('/login');
             }
             
-            // 🔥 AMBIL DATA USER DARI DATABASE
+            // 🔥 AMBIL DATA USER LENGKAP DARI DATABASE
             const [users] = await db.query(
-                'SELECT full_name as name, nama_instansi as company, email FROM users WHERE id = ?',
+                `SELECT 
+                    full_name as name, 
+                    nama_instansi as company, 
+                    email,
+                    nomor_telepon as phone,
+                    alamat as address
+                FROM users 
+                WHERE id = ?`,
                 [userId]
             );
             
-            // 🔥 AMBIL DATA SERVICES
+            // 🔥 AMBIL DATA SERVICES - PAKAI KOLOM MIN_SAMPLE DAN SATUAN YANG SUDAH DIPISAH
             const [services] = await db.query(`
                 SELECT 
                     tt.id as type_id,
@@ -715,10 +766,13 @@ const pageController = {
                     tc.category_name as categoryName,
                     s.id as service_id,
                     s.service_name as name,
-                    s.min_sample as sample,
+                    s.min_sample as sample_value,
+                    s.satuan as sample_unit,
+                    CONCAT(s.min_sample, ' ', s.satuan) as sample,
                     s.duration_days as duration,
                     s.price,
-                    s.method
+                    s.method,
+                    s.satuan as unit
                 FROM test_types tt
                 JOIN test_categories tc ON tt.id = tc.test_type_id
                 JOIN services s ON tc.id = s.category_id
@@ -729,14 +783,12 @@ const pageController = {
             let busyMode = { active: false, activePeriods: [] };
             
             try {
-                // Cek status mode sibuk
                 const [settings] = await db.query(
                     'SELECT setting_value FROM settings WHERE setting_key = "busy_mode_active"'
                 );
                 const active = settings.length > 0 ? settings[0].setting_value === '1' : false;
                 
                 if (active) {
-                    // Ambil periode aktif
                     const [periods] = await db.query(
                         `SELECT 
                             id, 
@@ -757,13 +809,24 @@ const pageController = {
                 console.log('Error loading busy mode:', error.message);
             }
             
-            // ✅ PANGGIL FUNGSI groupServices YANG SUDAH DITAMBAHKAN
+            // ✅ PANGGIL FUNGSI groupServices
             const groupedServices = groupServices(services);
+            
+            // 🔥 DATA USER YANG DIKIRIM KE VIEW
+            const userData = users[0] || { 
+                name: '', 
+                company: '', 
+                email: '', 
+                phone: '', 
+                address: '' 
+            };
+            
+            console.log('📋 User data for submission:', userData);
             
             res.render('user/submission', {
                 title: 'Form Pengajuan Pengujian',
                 currentPage: 'submission',
-                user: users[0] || { name: '', company: '', email: '' },
+                user: userData,
                 services: groupedServices,
                 busyMode: busyMode,
                 formData: {},
@@ -818,19 +881,14 @@ const pageController = {
             if (req.files) {
                 if (req.files['surat_permohonan']) {
                     const file = req.files['surat_permohonan'][0];
-                    formData.append('surat_permohonan', file.buffer, {
-                        filename: file.originalname,
-                        contentType: file.mimetype
-                    });
-                    console.log('📁 Surat file appended:', file.originalname);
+                    // GUNAKAN fs.createReadStream karena kita pakai diskStorage
+                    formData.append('surat_permohonan', fs.createReadStream(file.path));
+                    console.log('📁 Surat file appended from path:', file.path);
                 }
                 if (req.files['scan_ktp']) {
                     const file = req.files['scan_ktp'][0];
-                    formData.append('scan_ktp', file.buffer, {
-                        filename: file.originalname,
-                        contentType: file.mimetype
-                    });
-                    console.log('📁 KTP file appended:', file.originalname);
+                    formData.append('scan_ktp', fs.createReadStream(file.path));
+                    console.log('📁 KTP file appended from path:', file.path);
                 }
             }
             
@@ -1400,10 +1458,13 @@ function groupServices(services) {
         category.items.push({
             id: item.service_id,
             name: item.name,
-            sample: item.sample,
+            sample: item.sample,                    // CONCAT(min_sample, satuan) - untuk tampilan
+            sample_value: item.sample_value,        // angka minimal sample
+            sample_unit: item.sample_unit,          // satuan (Kilogram, Buah, Titik, dll)
             duration: item.duration,
             price: item.price,
-            method: item.method
+            method: item.method,
+            unit: item.unit || 'sample'              // satuan untuk tampilan quantity
         });
     });
     

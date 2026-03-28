@@ -22,7 +22,7 @@ const formData = locals.formData || {};
                     <p class="subtitle">Dokumen Resmi: UPTD-PBKBIK-F.01-PO.07</p>
                 </section>
 
-                <!-- 🔴 TAMBAHKAN NOTIFIKASI MODE SIBUK JIKA AKTIF -->
+                <!-- 🔴 NOTIFIKASI MODE SIBUK -->
                 <% if (locals.busyMode && locals.busyMode.active) { %>
                     <div class="alert alert-warning" style="background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
                         <i class="fas fa-clock" style="font-size: 1.5rem;"></i>
@@ -43,7 +43,7 @@ const formData = locals.formData || {};
                     </div>
                 <% } %>
 
-                <!-- 🔴 TAMBAHKAN DATA BUSY MODE UNTUK JAVASCRIPT -->
+                <!-- 🔴 DATA BUSY MODE UNTUK JAVASCRIPT -->
                 <div id="busy-mode-data" 
                      data-active="<%= locals.busyMode && locals.busyMode.active ? 'true' : 'false' %>"
                      data-periods='<%- JSON.stringify(locals.busyMode && locals.busyMode.activePeriods ? locals.busyMode.activePeriods : []) %>'
@@ -67,17 +67,18 @@ const formData = locals.formData || {};
                                                     class="test-select" 
                                                     data-type="<%= type.typeName %>"
                                                     onchange="onSelectChange(this)">
-                                                <option value="" data-price="0" data-duration="-">-- Pilih Jenis Uji --</option>
+                                                <option value="" data-price="0" data-duration="-" data-unit="">-- Pilih Jenis Uji --</option>
                                                 <% type.categories.forEach(category => { %>
                                                     <% category.items.forEach(item => { %>
-                                                        <!-- PERBAIKI JADI INI -->
                                                         <option value="<%= item.id %>" 
                                                                 data-price="<%= item.price %>" 
                                                                 data-duration="<%= item.duration %>"
                                                                 data-method="<%= item.method || '-' %>"
-                                                                data-min-sample="<%= item.sample ? parseInt(item.sample) : 1 %>"
+                                                                data-min-sample="<%= item.sample_value %>"
+                                                                data-min-sample-text="<%= item.sample %>"
+                                                                data-unit="<%= item.unit %>"
                                                                 data-name="<%= item.name %>">
-                                                            <%= item.name %> - min. <%= item.sample %> - Rp <%= (item.price || 0).toLocaleString('id-ID') %>/sample
+                                                            <%= item.name %> - min. <%= item.sample %> - Rp <%= (item.price || 0).toLocaleString('id-ID') %>/<%= item.unit %>
                                                         </option>
                                                     <% }); %>
                                                 <% }); %>
@@ -106,6 +107,7 @@ const formData = locals.formData || {};
                                         <input type="number" id="qtyInput" name="qty_estimasi" class="qty-field" value="1" min="1">
                                         <button type="button" id="plusBtn" class="btn-qty" onclick="incrementQty()">+</button>
                                     </div>
+                                    <small id="minSampleInfo" class="text-muted" style="font-size: 0.7rem; display: block; margin-top: 5px;"></small>
                                 </div>
                             </div>
                         </div>
@@ -147,7 +149,7 @@ const formData = locals.formData || {};
 
                             <div class="input-group">
                                 <label>Nama Instansi/Perusahaan</label>
-                                <input type="text" name="nama_instansi" id="namaInstansi" value="<%= user.nama_instansi || '' %>" readonly class="readonly-field company-field">
+                                <input type="text" name="nama_instansi" id="namaInstansi" value="<%= user.company %>" readonly class="readonly-field company-field">
                                 <small class="field-note">Nama perusahaan/instansi (sesuai data registrasi)</small>
                             </div>
 
@@ -203,22 +205,20 @@ const formData = locals.formData || {};
                                 <input type="text" name="nama_sampel" placeholder="Contoh: Silinder Beton K-350" required value="<%= locals.formData ? formData.nama_sampel : '' %>">
                             </div>
 
+                            <!-- 🔥 INPUT JUMLAH SAMPLE UJI - READ ONLY (BUKAN DROPDOWN) -->
                             <div class="input-group">
                                 <label>Jumlah Sample Uji <span class="required">*</span></label>
                                 <div style="display: flex; gap: 10px;">
                                     <input type="number" name="jumlah_sample_angka" id="jumlahSampleAngka" 
-                                        min="1" value="1" required style="width: 100px;" 
-                                        placeholder="Angka">
-                                    <select name="jumlah_sample_satuan" id="jumlahSampleSatuan" required style="width: 120px;">
-                                        <option value="Buah">Buah</option>
-                                        <option value="Kilogram">Kilogram</option>
-                                        <option value="sample">sample</option>
-                                        <option value="Titik">Titik</option>
-                                        <option value="Liter">Liter</option>
-                                        <option value="Meter">Meter</option>
-                                    </select>
+                                           class="readonly-field" 
+                                           readonly 
+                                           style="width: 100px; background-color: #f5f5f5;">
+                                    <input type="text" name="jumlah_sample_satuan" id="jumlahSampleSatuan" 
+                                           class="readonly-field" 
+                                           readonly 
+                                           style="width: 120px; background-color: #f5f5f5;">
                                 </div>
-                                <small class="field-note">Contoh: 3 Buah / 5 Kilogram</small>
+                                <small class="field-note">Jumlah otomatis dari pilihan pengujian di atas</small>
                             </div>
 
                             <!-- Tambahkan hidden inputs untuk data yang diperlukan -->
@@ -291,7 +291,7 @@ const formData = locals.formData || {};
                         </div>
                     </section>
 
-                    <!-- CARD ESTIMASI SELESAI - 🔴 TAMBAHKAN ELEMEN UNTUK INFO BUSY MODE -->
+                    <!-- CARD ESTIMASI SELESAI -->
                     <div class="completion-estimate-card">
                         <div class="completion-label">
                             <i class="fas fa-calendar-check"></i>
@@ -301,7 +301,7 @@ const formData = locals.formData || {};
                             <div class="completion-date" id="completionDate">-</div>
                             <div class="completion-detail">
                                 <span id="totalDays">0</span> hari kerja (termasuk 3 hari perjalanan + 7 hari kaji ulang)
-                                <!-- 🔴 INFO BUSY MODE -->
+                                <!-- INFO BUSY MODE -->
                                 <span id="busyModeInfo" style="display: none; color: #856404; font-weight: 500; margin-left: 5px;">
                                     <i class="fas fa-clock"></i> + tambahan mode sibuk
                                 </span>
