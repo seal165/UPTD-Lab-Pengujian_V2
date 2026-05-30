@@ -221,7 +221,7 @@
         document.getElementById('statsCards').innerHTML = statsHtml;
     }
 
-    /// ==================== UPDATE TABLE DENGAN DATA DARI DATABASE ====================
+    // ==================== UPDATE TABLE DENGAN DATA DARI DATABASE ====================
     function updateInvoicesTable(invoices) {
         const loadingRow = document.getElementById('loadingRow');
         if (loadingRow) {
@@ -244,61 +244,83 @@
 
         let html = '';
         invoices.forEach(inv => {
-            // Ambil data dari database
             const invoiceNumber = inv.invoice_number || inv.no_invoice || '-';
             const skrdNumber = inv.skrd_number || inv.no_invoice || '-';
-            
-            // PERBAIKI: Ambil dari berbagai kemungkinan field
-            const companyName = inv.company_name || inv.nama_instansi || '-';
-            const serviceDesc = inv.service_description || inv.nama_proyek || 'Pengujian';
-            
+            const companyName = inv.nama_instansi || '-';
+            const serviceDesc = inv.nama_proyek || 'Pengujian';
             const issueDate = inv.issue_date || inv.created_at;
             const dueDate = inv.due_date || inv.created_at;
-            const totalAmount = parseFloat(inv.total_amount || inv.total_tagihan || 0);
-            const paidAmount = parseFloat(inv.paid_amount || inv.jumlah_dibayar || 0);
-            const remainingAmount = parseFloat(inv.remaining_amount || inv.sisa_tagihan || (totalAmount - paidAmount));
-            
-            // Status dari database - KONSISTEN
-            const statusPembayaran = inv.status_pembayaran || inv.status || '-';
+            const totalAmount = parseFloat(inv.total_amount || 0);
+            const remainingAmount = parseFloat(inv.remaining_amount || totalAmount);
+            const status = inv.status_pembayaran || 'Belum Bayar';
             
             let statusClass = 'badge-soft-secondary';
-            let statusText = statusPembayaran;
+            let statusIcon = 'fa-circle';
+            let statusText = status;
             
-            // Mapping class berdasarkan status - konsisten dengan filter
-            if (statusPembayaran === 'Lunas') {
-                statusClass = 'badge-soft-success';
-                statusText = 'Lunas';
-            } else if (statusPembayaran === 'Belum Bayar') {
-                statusClass = 'badge-soft-danger';
-                statusText = 'Belum Bayar';
-            } else if (statusPembayaran === 'Belum Lunas') {
-                statusClass = 'badge-soft-warning';
-                statusText = 'Belum Lunas';
-            } else if (statusPembayaran === 'Menunggu SKRD Upload') {
-                statusClass = 'badge-soft-primary';
-                statusText = 'Menunggu Verifikasi';
-            } else if (statusPembayaran === 'Dibatalkan') {
-                statusClass = 'badge-soft-secondary';
-                statusText = 'Dibatalkan';
+            switch(status) {
+                case 'Menunggu Verifikasi':
+                    statusClass = 'badge-soft-warning';
+                    statusIcon = 'fa-clock';
+                    break;
+                case 'Pengecekan Sampel':
+                    statusClass = 'badge-soft-info';
+                    statusIcon = 'fa-search';
+                    break;
+                case 'Belum Bayar':
+                    statusClass = 'badge-soft-danger';
+                    statusIcon = 'fa-credit-card';
+                    break;
+                case 'Menunggu SKRD Upload':
+                    statusClass = 'badge-soft-primary';
+                    statusIcon = 'fa-file-invoice';
+                    break;
+                case 'Belum Lunas':
+                    statusClass = 'badge-soft-warning';
+                    statusIcon = 'fa-hourglass-half';
+                    break;
+                case 'Lunas':
+                    statusClass = 'badge-soft-success';
+                    statusIcon = 'fa-check-circle';
+                    break;
+                case 'Sedang Diuji':
+                    statusClass = 'badge-soft-primary';
+                    statusIcon = 'fa-flask';
+                    break;
+                case 'Selesai':
+                    statusClass = 'badge-soft-success';
+                    statusIcon = 'fa-check-double';
+                    break;
+                case 'Dibatalkan':
+                    statusClass = 'badge-soft-secondary';
+                    statusIcon = 'fa-ban';
+                    break;
+                default:
+                    statusClass = 'badge-soft-secondary';
+                    statusIcon = 'fa-circle';
             }
             
             html += `
                 <tr>
                     <td class="ps-4">
                         <span class="fw-bold text-primary">#${invoiceNumber}</span>
-                        <div class="small text-muted">SKRD: ${skrdNumber}</div>
-                    </td>
-                    <td>
+                        <div class="small text-muted">${skrdNumber}</div>
+                    </table>
+                    <td style="min-width: 180px;">
                         <div class="fw-bold text-dark">${companyName}</div>
                         <small class="text-muted">${serviceDesc}</small>
                     </td>
                     <td class="text-muted small">${formatDate(issueDate)}</td>
                     <td class="text-muted small">${formatDate(dueDate)}</td>
-                    <td class="fw-bold text-dark">${formatRupiah(totalAmount)}</td>
-                    <td>
-                        <span class="badge ${statusClass} px-3 py-2">${statusText}</span>
+                    <td class="fw-bold text-dark text-end">${formatRupiah(totalAmount)}</td>
+                    <td class="text-right">
+                        <span class="badge ${statusClass} px-3 py-2 rounded-pill">
+                            <i class="fas ${statusIcon} me-1"></i> ${statusText}
+                        </span>
                     </td>
-                    <td class="fw-bold ${remainingAmount > 0 ? 'text-danger' : 'text-success'}">${formatRupiah(remainingAmount)}</td>
+                    <td class="fw-bold text-end ${remainingAmount > 0 ? 'text-danger' : 'text-success'}">
+                        ${formatRupiah(remainingAmount)}
+                    </td>
                     <td class="text-end pe-4">
                         <a href="/admin/skrd/${inv.id}" class="btn btn-sm btn-light">Detail</a>
                     </td>
@@ -367,13 +389,14 @@
             });
         }
 
-        // STATUS FILTER
+        // STATUS FILTER - langsung pakai status dari database
         document.querySelectorAll('#statusFilter .dropdown-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const status = e.target.dataset.status;
                 currentStatus = status;
-                document.getElementById('selectedFilter').textContent = e.target.textContent;
+                const selectedText = e.target.textContent;
+                document.getElementById('selectedFilter').innerHTML = selectedText;
                 currentPage = 1;
                 loadInvoices(true);
                 console.log('📊 Filter status:', status);
@@ -500,11 +523,10 @@
                 const paidAmount = parseFloat(inv.paid_amount || inv.jumlah_dibayar || 0);
                 const remainingAmount = parseFloat(inv.remaining_amount || inv.sisa_tagihan || (totalAmount - paidAmount));
                 const status = inv.status_pembayaran || inv.status || '-';
-                
-                // Konsisten dengan tampilan
+
                 let displayStatus = status;
-                if (status === 'Menunggu SKRD Upload') displayStatus = 'Menunggu Verifikasi';
                 
+                // Konsisten dengan tampilan                
                 return [
                     inv.invoice_number || inv.no_invoice || '-',
                     inv.skrd_number || inv.no_invoice || '-',

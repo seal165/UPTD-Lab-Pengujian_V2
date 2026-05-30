@@ -14,12 +14,14 @@
     let startDate = '';
     let endDate = '';
     let sortOrder = 'desc';
+    let currentTestType = '';
+    let currentTestCategory = '';
     let totalData = 0;
     let searchTimeout;
 
     // ==================== CEK TOKEN ====================
     function getToken() {
-        return localStorage.getItem('token'); // GANTI: dari admin_token jadi token
+        return localStorage.getItem('token');
     }
 
     if (!getToken()) {
@@ -39,7 +41,6 @@
         const initialPagination = JSON.parse(pageData.dataset.pagination || '{}');
         const initialFilters = JSON.parse(pageData.dataset.filters || '{}');
 
-        // Set initial state dari data yang dikirim server
         if (initialPagination.page) currentPage = initialPagination.page;
         if (initialFilters.status) currentStatus = initialFilters.status;
         if (initialFilters.search) searchTerm = initialFilters.search;
@@ -47,12 +48,10 @@
         if (initialFilters.endDate) endDate = initialFilters.endDate;
         if (initialPagination.total) totalData = initialPagination.total;
 
-        // Render tabel dari data awal
         if (initialSubmissions.length > 0) {
             renderTable(initialSubmissions);
             updatePaginationInfo(initialPagination);
         } else {
-            // Load data jika tidak ada data awal
             loadSubmissions();
         }
     } catch (error) {
@@ -96,33 +95,6 @@
 
         let html = '';
         submissions.forEach(sub => {
-            // Tentukan class status
-            let statusClass = 'badge-soft-secondary';
-            switch(sub.status) {
-                case 'Menunggu Verifikasi':
-                    statusClass = 'badge-soft-warning';
-                    break;
-                case 'Pengecekan Sampel':
-                    statusClass = 'badge-soft-info';
-                    break;
-                case 'Belum Bayar':
-                case 'Belum Lunas':
-                    statusClass = 'badge-soft-danger';
-                    break;
-                case 'Menunggu SKRD Upload':
-                    statusClass = 'badge-soft-warning';
-                    break;
-                case 'Lunas':
-                    statusClass = 'badge-soft-success';
-                    break;
-                case 'Sedang Diuji':
-                    statusClass = 'badge-soft-primary';
-                    break;
-                case 'Selesai':
-                    statusClass = 'badge-soft-success';
-                    break;
-            }
-            
             // Format tanggal
             const dateStr = sub.tgl_permohonan || sub.created_at;
             const formattedDate = dateStr ? new Date(dateStr).toLocaleDateString('id-ID', {
@@ -134,7 +106,54 @@
             const namaPemohon = sub.nama_pemohon || '-';
             
             // Jenis pengujian
-            const jenisPengujian = sub.jenis_pengujian || '-';
+            const jenisUji = sub.jenis_uji || '-';
+            const kategoriUji = sub.kategori_uji || '';
+            
+            // 🔥 MAPPING STATUS LANGSUNG (tanpa external file)
+            let statusClass = 'badge-soft-secondary';
+            let statusIcon = 'fa-circle';
+            
+            switch(sub.status) {
+                case 'Menunggu Verifikasi':
+                    statusClass = 'badge-soft-warning';
+                    statusIcon = 'fa-clock';
+                    break;
+                case 'Pengecekan Sampel':
+                    statusClass = 'badge-soft-info';
+                    statusIcon = 'fa-search';
+                    break;
+                case 'Belum Bayar':
+                    statusClass = 'badge-soft-danger';
+                    statusIcon = 'fa-credit-card';
+                    break;
+                case 'Menunggu SKRD Upload':
+                    statusClass = 'badge-soft-primary';
+                    statusIcon = 'fa-file-invoice';
+                    break;
+                case 'Belum Lunas':
+                    statusClass = 'badge-soft-warning';
+                    statusIcon = 'fa-hourglass-half';
+                    break;
+                case 'Lunas':
+                    statusClass = 'badge-soft-success';
+                    statusIcon = 'fa-check-circle';
+                    break;
+                case 'Sedang Diuji':
+                    statusClass = 'badge-soft-primary';
+                    statusIcon = 'fa-flask';
+                    break;
+                case 'Selesai':
+                    statusClass = 'badge-soft-success';
+                    statusIcon = 'fa-check-double';
+                    break;
+                case 'Dibatalkan':
+                    statusClass = 'badge-soft-secondary';
+                    statusIcon = 'fa-ban';
+                    break;
+                default:
+                    statusClass = 'badge-soft-secondary';
+                    statusIcon = 'fa-circle';
+            }
             
             html += `
                 <tr style="cursor: pointer;" onclick="viewDetail(${sub.id})">
@@ -147,11 +166,17 @@
                         <small class="text-muted">${namaPemohon}</small>
                     </td>
                     <td>
-                        <div>${jenisPengujian}</div>
-                        <small class="text-muted">${sub.total_samples || 0} sampel</small>
+                        <div class="jenis-pengujian-cell">
+                            <span class="jenis-pengujian-tipe">${jenisUji}</span>
+                            ${kategoriUji ? `<span class="jenis-pengujian-kategori">${kategoriUji}</span>` : ''}
+                        </div>
                     </td>
                     <td>${formattedDate}</td>
-                    <td><span class="badge ${statusClass} px-3 py-2 rounded-pill">${sub.status || '-'}</span></td>
+                    <td>
+                        <span class="badge ${statusClass} px-3 py-2 rounded-pill">
+                            <i class="fas ${statusIcon} me-1"></i>${sub.status}
+                        </span>
+                    </td>
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-primary" onclick="viewDetail(${sub.id}); event.stopPropagation();">
                             <i class="fas fa-eye"></i>
@@ -180,7 +205,6 @@
         console.log('========== LOAD SUBMISSIONS ==========');
         
         try {
-            // Tampilkan loading di tabel
             const tbody = document.getElementById('submissionsTableBody');
             if (tbody) {
                 tbody.innerHTML = `
@@ -195,7 +219,6 @@
                 `;
             }
             
-            // Build URL
             let url = `${API_BASE_URL}/submissions?page=${currentPage}&limit=${ITEMS_PER_PAGE}`;
             url += `&sort=${sortOrder}`;
             
@@ -203,6 +226,8 @@
             if (startDate) url += `&start_date=${startDate}`;
             if (endDate) url += `&end_date=${endDate}`;
             if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+            if (currentTestType) url += `&test_type=${encodeURIComponent(currentTestType)}`;
+            if (currentTestCategory) url += `&test_category=${encodeURIComponent(currentTestCategory)}`;
             
             console.log('📡 Fetching:', url);
 
@@ -252,12 +277,10 @@
 
         let html = '';
         
-        // Previous button
         if (currentPage > 1) {
             html += `<li class="page-item"><a class="page-link" href="#" onclick="window.changePage(${currentPage - 1})"><i class="fas fa-chevron-left"></i></a></li>`;
         }
         
-        // Page numbers
         for (let i = 1; i <= totalPages; i++) {
             if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
                 html += `<li class="page-item ${currentPage === i ? 'active' : ''}">
@@ -268,14 +291,12 @@
             }
         }
         
-        // Next button
         if (currentPage < totalPages) {
             html += `<li class="page-item"><a class="page-link" href="#" onclick="window.changePage(${currentPage + 1})"><i class="fas fa-chevron-right"></i></a></li>`;
         }
         
         pagination.innerHTML = html;
         
-        // Update pagination info
         const paginationInfo = document.getElementById('paginationInfo');
         if (paginationInfo) {
             const start = ((currentPage - 1) * ITEMS_PER_PAGE) + 1;
@@ -320,7 +341,24 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Halaman submissions siap');
         
-        // Setup event listeners
+        const testTypeFilter = document.getElementById('testTypeFilter');
+        if (testTypeFilter) {
+            testTypeFilter.addEventListener('change', function() {
+                currentTestType = this.value;
+                currentPage = 1;
+                loadSubmissions();
+            });
+        }
+        
+        const testCategoryFilter = document.getElementById('testCategoryFilter');
+        if (testCategoryFilter) {
+            testCategoryFilter.addEventListener('change', function() {
+                currentTestCategory = this.value;
+                currentPage = 1;
+                loadSubmissions();
+            });
+        }
+        
         const statusSelect = document.getElementById('statusSelect');
         if (statusSelect) {
             statusSelect.addEventListener('change', function() {

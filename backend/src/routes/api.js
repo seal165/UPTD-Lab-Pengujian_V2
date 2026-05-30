@@ -54,24 +54,13 @@ router.get('/skrd/:id', authMiddleware, apiController.getSKRDDetail);
 router.post('/skrd', authMiddleware, apiController.createSKRD);
 router.put('/skrd/:id/status', authMiddleware, apiController.updateSKRDStatus);
 router.post('/skrd/:id/verify-payment', authMiddleware, apiController.verifyPayment);
-router.post('/skrd/:id/upload-skrd', authMiddleware, upload.single('skrd_file'), apiController.uploadSkrd);
+router.post('/skrd/:id/upload-skrd', authMiddleware, upload.single('skrd'), apiController.uploadSkrd);  // ⚠️ PERHATIKAN: 'skrd' sebagai field name
 router.post('/skrd/:id/reject-proof', authMiddleware, apiController.rejectProof);
 router.post('/skrd/:id/remind', authMiddleware, apiController.sendPaymentReminder);
 router.post('/skrd/:id/cancel', authMiddleware, apiController.cancelInvoice);
 
-// ==================== SKRD API ====================
-// Upload SKRD file
-router.post('/skrd/:id/upload-skrd', 
-    authMiddleware, 
-    upload.single('skrd'), 
-    apiController.uploadSkrd
-);
-
 // Download SKRD file
-router.get('/skrd/:id/download-skrd', 
-    authMiddleware, 
-    apiController.downloadSkrd
-);
+router.get('/skrd/:id/download-skrd', authMiddleware, apiController.downloadSkrd);
 
 // ==================== KUISIONER API ====================
 // PENTING: URUTKAN DARI YANG PALING SPESIFIK
@@ -137,6 +126,22 @@ router.put('/settings/system', authMiddleware, apiController.updateSystemConfig)
 
 // Backup & Restore
 router.get('/settings/backups', authMiddleware, apiController.getBackupHistory);
+// ==================== DOWNLOAD BACKUP FILE ====================
+router.get('/backups/:filename', authMiddleware, async (req, res) => {
+    try {
+        const { filename } = req.params;
+        if (!filename.endsWith('.sql')) {
+            return res.status(403).json({ success: false, message: 'Akses ditolak' });
+        }
+        const filepath = path.join(__dirname, '../backups', filename);
+        if (!fs.existsSync(filepath)) {
+            return res.status(404).json({ success: false, message: 'File tidak ditemukan' });
+        }
+        res.download(filepath, filename);
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 router.post('/settings/backup', authMiddleware, apiController.createBackup);
 router.post('/settings/restore', authMiddleware, upload.single('backup_file'), apiController.restoreBackup);
 

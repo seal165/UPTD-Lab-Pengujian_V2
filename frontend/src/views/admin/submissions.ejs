@@ -83,6 +83,21 @@
             border: 1px solid #dcfce7;
             color: #166534;
         }
+        
+        /* Jenis Pengujian cell styling */
+        .jenis-pengujian-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .jenis-pengujian-tipe {
+            font-weight: 600;
+            color: #2d3748;
+        }
+        .jenis-pengujian-kategori {
+            font-size: 0.75rem;
+            color: #718096;
+        }
     </style>
 </head>
 <body>
@@ -111,17 +126,17 @@
         <div class="card-custom mb-4">
             <div class="row g-3 align-items-center">
                 <!-- Search -->
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="input-group">
                         <span class="input-group-text bg-light border-0 text-muted ps-3">
                             <i class="fas fa-search"></i>
                         </span>
-                        <input type="text" class="form-control bg-light border-0 shadow-none" id="searchInput" placeholder="Cari ID Pengajuan, Perusahaan, atau PIC...">
+                        <input type="text" class="form-control bg-light border-0 shadow-none" id="searchInput" placeholder="Cari ID, Perusahaan, atau PIC...">
                     </div>
                 </div>
                 
-                <!-- Filter Tanggal (di tengah) -->
-                <div class="col-md-4">
+                <!-- Filter Tanggal -->
+                <div class="col-md-3">
                     <div class="d-flex gap-2 align-items-center">
                         <div class="flex-fill">
                             <input type="date" class="form-control bg-light border-0 shadow-none" 
@@ -138,18 +153,42 @@
                     </div>
                 </div>
                 
-                <!-- Filter Status, Kategori, dan Sort -->
-                <div class="col-md-4">
-                    <div class="d-flex justify-content-md-end gap-2 flex-wrap">
-                        <select class="form-select form-select-sm w-auto" id="statusSelect" style="min-width: 150px;">
+                <!-- Filter Jenis Pengujian (Tipe) -->
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm bg-light border-0" id="testTypeFilter" style="min-width: 100px;">
+                        <option value="">Semua Tipe</option>
+                        <option value="PENGUJIAN BAHAN">PENGUJIAN BAHAN</option>
+                        <option value="PENGUJIAN KONSTRUKSI">PENGUJIAN KONSTRUKSI</option>
+                    </select>
+                </div>
+
+                <!-- Filter Kategori -->
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm bg-light border-0" id="testCategoryFilter" style="min-width: 100px;">
+                        <option value="">Semua Kategori</option>
+                        <option value="Agregat">Agregat</option>
+                        <option value="Tanah">Tanah</option>
+                        <option value="Besi / Baja">Besi / Baja</option>
+                        <option value="Mortar / Lainnya">Mortar / Lainnya</option>
+                        <option value="Beton">Beton</option>
+                        <option value="Aspal">Aspal</option>
+                    </select>
+                </div>
+
+                <!-- Filter Status dan Sort -->
+                <div class="col-md-2">
+                    <div class="d-flex justify-content-end gap-2 flex-wrap">
+                        <select class="form-select form-select-sm w-auto" id="statusSelect" style="min-width: 140px;">
                             <option value="">Semua Status</option>
                             <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
                             <option value="Pengecekan Sampel">Pengecekan Sampel</option>
                             <option value="Belum Bayar">Belum Bayar</option>
+                            <option value="Menunggu SKRD Upload">Menunggu SKRD Upload</option>
                             <option value="Belum Lunas">Belum Lunas</option>
                             <option value="Lunas">Lunas</option>
                             <option value="Sedang Diuji">Sedang Diuji</option>
                             <option value="Selesai">Selesai</option>
+                            <option value="Dibatalkan">Dibatalkan</option>
                         </select>
                         
                         <select class="form-select form-select-sm w-auto" id="sortSelect" style="min-width: 100px;">

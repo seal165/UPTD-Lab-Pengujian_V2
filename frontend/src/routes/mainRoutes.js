@@ -87,33 +87,18 @@ router.get('/admin/login', (req, res) => {
     });
 });
 
-// PASTIKAN INI ADA
 router.get('/admin/dashboard', authMiddleware.verifyPageAccess, pageController.adminDashboard);
-
-// ==================== HALAMAN ADMIN ====================
 router.get('/admin/submissions', authMiddleware.verifyPageAccess, pageController.adminSubmissions);
 router.get('/admin/submissions/:id', authMiddleware.verifyPageAccess, pageController.adminDetailSubmission);
-
-// TAMBAHKAN INI - ROUTE SKRD
 router.get('/admin/skrd', authMiddleware.verifyPageAccess, pageController.adminSKRD);
 router.get('/admin/skrd/:id', authMiddleware.verifyPageAccess, pageController.adminDetailSKRD);
-
-// ==================== HALAMAN ADMIN ====================
 router.get('/admin/kuisioner', authMiddleware.verifyPageAccess, pageController.adminKuisioner);
-
-// ==================== HALAMAN ADMIN USERS ====================
-// TAMBAHKAN INI - ROUTE USERS
 router.get('/admin/users', authMiddleware.verifyPageAccess, pageController.adminUsers);
 router.get('/admin/users/:id', authMiddleware.verifyPageAccess, pageController.adminUserDetail);
-
-// ==================== HALAMAN SETTINGS ====================
 router.get('/admin/settings', authMiddleware.verifyPageAccess, pageController.adminSettings);
 
 // ==================== HALAMAN USER (PEMOHON) ====================
-// Dashboard
 router.get('/user/dashboard', authMiddleware.verifyUserAccess, pageController.userDashboard);
-
-// Form pengajuan baru
 router.get('/user/submission', authMiddleware.verifyUserAccess, pageController.userSubmission);
 router.post('/user/submission', 
     authMiddleware.verifyUserAccess,
@@ -123,27 +108,15 @@ router.post('/user/submission',
     ]), 
     pageController.postSubmission
 );
-
-// History (daftar pengajuan)
 router.get('/user/history', authMiddleware.verifyUserAccess, pageController.userHistory);
-
-// History Detail (detail satu pengajuan)
 router.get('/user/history/:id', authMiddleware.verifyUserAccess, pageController.userHistoryDetail);
-
-// Transaction (daftar transaksi)
 router.get('/user/transaction', authMiddleware.verifyUserAccess, pageController.userTransaction);
-
-// Transaction Detail
 router.get('/user/transaction/:id', authMiddleware.verifyUserAccess, pageController.userTransactionDetail);
-
-// Upload payment proof
 router.post('/user/transaction/:id/upload', 
     authMiddleware.verifyUserAccess,
     upload.single('payment_proof'),
     pageController.uploadPaymentProof
 );
-
-// Profile
 router.get('/user/profile', authMiddleware.verifyUserAccess, pageController.userProfile);
 router.post('/user/profile', authMiddleware.verifyUserAccess, pageController.updateProfile);
 

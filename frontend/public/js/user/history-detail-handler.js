@@ -392,40 +392,14 @@
         }
     };
 
+    // 🔥 UPDATE FUNGSI renderTimeline DENGAN 9 STATUS
     function renderTimeline(data) {
         const timelineEl = document.getElementById('timeline');
         if (!timelineEl) return;
         
-        const statuses = [
-            { status: 'Menunggu Verifikasi', date: data.created_at, icon: 'fa-clock' },
-            { status: 'Pengecekan Sampel', date: data.tgl_pengecekan, icon: 'fa-search' },
-            { status: 'Menunggu Pembayaran', date: data.tgl_tagihan, icon: 'fa-credit-card' },
-            { status: 'Lunas', date: data.payment?.updated_at, icon: 'fa-check-circle' },
-            { status: 'Sedang Diuji', date: data.tgl_pengujian, icon: 'fa-flask' },
-            { status: 'Selesai', date: data.report?.created_at, icon: 'fa-check-double' }
-        ];
-        
-        let html = '<div class="timeline-vertical">';
-        
-        statuses.forEach((item, index) => {
-            const isActive = item.date && new Date(item.date) <= new Date();
-            const isCurrent = item.status === data.status;
-            
-            html += `
-                <div class="timeline-item ${isCurrent ? 'current' : ''} ${isActive ? 'active' : ''}">
-                    <div class="timeline-icon ${isActive ? 'bg-primary' : 'bg-secondary'}">
-                        <i class="fas ${item.icon}"></i>
-                    </div>
-                    <div class="timeline-content">
-                        <h6>${item.status}</h6>
-                        <p class="text-muted small">${item.date ? formatDate(item.date) : '-'}</p>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        timelineEl.innerHTML = html;
+        // 🔥 PAKAI STATUS_CONFIG
+        const timelineHtml = window.STATUS_CONFIG.getTimelineHtml(data.status);
+        timelineEl.innerHTML = timelineHtml;
     }
 
     async function fetchProtectedFileBlob(url, token) {

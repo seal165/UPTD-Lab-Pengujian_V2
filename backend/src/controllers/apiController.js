@@ -3,6 +3,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
+const mysqldump = require('mysqldump');
+const fse = require('fs-extra');
 
 const apiController = {
     // ==================== SERVICES METHODS ====================
@@ -923,24 +925,47 @@ const apiController = {
             const limit = parseInt(req.query.limit) || 10;
             const offset = (page - 1) * limit;
             
-            // 🔴 FILTER USER_ID (untuk detail user)
             const filterUserId = req.query.user_id || ''; 
             const status = req.query.status || '';
             const search = req.query.search || '';
             const startDate = req.query.start_date || '';
             const endDate = req.query.end_date || '';
             const sort = req.query.sort === 'asc' ? 'ASC' : 'DESC';
+            
+            // 🔥 TAMBAHKAN FILTER TEST TYPE DAN TEST CATEGORY
+            const testType = req.query.test_type || '';
+            const testCategory = req.query.test_category || '';
 
-            console.log('📋 Getting submissions - Page:', page, 'User ID filter:', filterUserId);
+            console.log('📋 Getting submissions - Page:', page);
+            console.log('📋 Filter - Test Type:', testType, 'Test Category:', testCategory);
 
             // Build query conditions
             let whereConditions = [];
             let queryParams = [];
 
-            // 🔴 TAMBAHKAN FILTER USER ID
             if (filterUserId) {
                 whereConditions.push('s.user_id = ?');
                 queryParams.push(filterUserId);
+            }
+
+            // 🔥 FILTER TEST TYPE
+            if (testType) {
+                whereConditions.push(`EXISTS (
+                    SELECT 1 FROM submission_samples ss 
+                    JOIN test_types tt ON ss.test_type_id = tt.id 
+                    WHERE ss.submission_id = s.id AND tt.type_name = ?
+                )`);
+                queryParams.push(testType);
+            }
+
+            // 🔥 FILTER TEST CATEGORY
+            if (testCategory) {
+                whereConditions.push(`EXISTS (
+                    SELECT 1 FROM submission_samples ss 
+                    JOIN test_categories tc ON ss.test_category_id = tc.id 
+                    WHERE ss.submission_id = s.id AND tc.category_name = ?
+                )`);
+                queryParams.push(testCategory);
             }
 
             if (status) {
@@ -979,11 +1004,11 @@ const apiController = {
             const total = countResult[0].total;
             const totalPages = Math.ceil(total / limit);
 
-            // 🔴 PISAHKAN QUERY - Jenis Uji (dari test_types) dan Jenis Sample (dari submission_samples.jenis_sample)
             const submissionsQuery = `
                 SELECT 
                     s.id,
                     s.no_permohonan,
+                    CONCAT('SUB-', LPAD(s.id, 5, '0')) as no_urut,
                     s.nama_pemohon,
                     s.nama_instansi,
                     s.nama_proyek,
@@ -1000,18 +1025,15 @@ const apiController = {
                         FROM submission_samples ss 
                         JOIN test_types tt ON ss.test_type_id = tt.id 
                         WHERE ss.submission_id = s.id
+                        LIMIT 1
                     ) as jenis_uji,
                     (
                         SELECT GROUP_CONCAT(DISTINCT tc.category_name SEPARATOR ', ') 
                         FROM submission_samples ss 
                         JOIN test_categories tc ON ss.test_category_id = tc.id 
                         WHERE ss.submission_id = s.id
-                    ) as kategori_uji,
-                    (
-                        SELECT GROUP_CONCAT(ss.jenis_sample SEPARATOR ', ') 
-                        FROM submission_samples ss 
-                        WHERE ss.submission_id = s.id
-                    ) as jenis_sample
+                        LIMIT 1
+                    ) as kategori_uji
                 FROM submissions s
                 LEFT JOIN users u ON s.user_id = u.id
                 ${whereClause}
@@ -1086,7 +1108,7 @@ const apiController = {
                 });
             }
             
-            // Ambil data dari tabel submissions - TAMBAHKAN catatan_admin (TANPA KOMENTAR)
+            // Ambil data dari tabel submissions
             const [submissions] = await db.query(`
                 SELECT 
                     s.id,
@@ -1103,6 +1125,7 @@ const apiController = {
                     s.updated_at,
                     s.catatan_tambahan,
                     s.catatan_admin,
+                    s.jadwal_sampling,
                     s.file_surat_permohonan,
                     s.file_ktp,
                     u.full_name as pic_name,
@@ -1153,10 +1176,15 @@ const apiController = {
             const formattedSamples = samples.map(sample => ({
                 id: sample.id,
                 name: sample.nama_identitas_sample || sample.service_name,
-                jenis: sample.jenis_sample,
+                jenis_sample: sample.jenis_sample,
+                nama_identitas_sample: sample.nama_identitas_sample,
+                service_name: sample.service_name,
+                jumlah_sample_angka: sample.jumlah_sample_angka,
+                jumlah_sample_satuan: sample.jumlah_sample_satuan,
                 quantity: sample.jumlah_sample_angka,
                 unit: sample.jumlah_sample_satuan,
-                price: sample.price_at_time,
+                price_at_time: sample.price_at_time,
+                unit_price: sample.price_at_time,
                 subtotal: sample.price_at_time * sample.jumlah_sample_angka,
                 method: sample.method_at_time || sample.method,
                 category: sample.category_name,
@@ -1174,12 +1202,33 @@ const apiController = {
                     p.status_pembayaran,
                     p.bukti_pembayaran_1,
                     p.bukti_pembayaran_2,
-                    p.created_at as payment_date
+                    p.bukti_pembayaran_1_uploaded_at,
+                    p.bukti_pembayaran_2_uploaded_at,
+                    p.bukti_pembayaran_notes,
+                    p.skrd_file,
+                    p.skrd_filename,
+                    p.skrd_uploaded_at,
+                    p.created_at as payment_created_at,
+                    p.updated_at as payment_updated_at
                 FROM payments p 
                 WHERE p.submission_id = ?
             `, [id]);
             
+            // Ambil data test report jika ada
+            const [reports] = await db.query(`
+                SELECT 
+                    id,
+                    file_laporan,
+                    no_laporan,
+                    tanggal_selesai,
+                    catatan_laporan,
+                    created_at as report_created_at
+                FROM test_reports 
+                WHERE submission_id = ?
+            `, [id]);
+            
             const payment = payments.length > 0 ? payments[0] : null;
+            const report = reports.length > 0 ? reports[0] : null;
             
             // Hitung total tagihan dari samples
             const totalAmount = samples.reduce((sum, item) => {
@@ -1190,8 +1239,9 @@ const apiController = {
             const categories = [...new Set(samples.map(s => s.category_name))];
             const testTypes = [...new Set(samples.map(s => s.type_name))];
             
-            // Format response sesuai dengan yang diharapkan frontend
+            // Format response LENGKAP
             const response = {
+                // Basic Info
                 id: submission.id,
                 no_urut: submission.no_permohonan || `SUB-${String(submission.id).padStart(5, '0')}`,
                 no_permohonan: submission.no_permohonan,
@@ -1200,52 +1250,90 @@ const apiController = {
                 lokasi_proyek: submission.lokasi_proyek,
                 description: submission.catatan_tambahan,
                 
-                // Data perusahaan
+                // Data perusahaan (LENGKAP)
+                nama_instansi: submission.nama_instansi || submission.company_name || '-',
+                nama_pemohon: submission.nama_pemohon || submission.pic_name || '-',
                 company_name: submission.nama_instansi || submission.company_name || '-',
                 pic_name: submission.nama_pemohon || submission.pic_name || '-',
+                alamat_pemohon: submission.alamat_pemohon || submission.address || '-',
                 address: submission.alamat_pemohon || submission.address || '-',
+                email_pemohon: submission.email_pemohon || submission.pic_email || '-',
                 pic_email: submission.email_pemohon || submission.pic_email || '-',
+                nomor_telepon: submission.nomor_telepon || submission.pic_phone || '-',
                 pic_phone: submission.nomor_telepon || submission.pic_phone || '-',
                 
-                // Status
+                // File Dokumen
+                file_surat_permohonan: submission.file_surat_permohonan,
+                file_ktp: submission.file_ktp,
+                
+                // Status & Dates
                 status: submission.status,
                 created_at: submission.created_at,
                 updated_at: submission.updated_at,
                 
-                // TAMBAHKAN CATATAN DI RESPONSE
+                // Catatan
                 catatan_tambahan: submission.catatan_tambahan,
                 catatan_admin: submission.catatan_admin,
+                notes: submission.catatan_tambahan,
+                
+                // Jadwal Sampling
+                jadwal_sampling: submission.jadwal_sampling,
                 
                 // Kategori
                 category: categories.join(', ') || 'Pengujian',
                 test_type: testTypes.join(', ') || 'Material',
                 
-                // Items (samples)
+                // Items (samples) - LENGKAP
+                samples: formattedSamples,
                 items: formattedSamples.map(s => ({
                     service_name: s.name,
                     name: s.name,
                     quantity: s.quantity,
                     unit: s.unit,
-                    unit_price: s.price,
-                    subtotal: s.subtotal
+                    unit_price: s.price_at_time,
+                    subtotal: s.subtotal,
+                    jumlah_sample_angka: s.jumlah_sample_angka,
+                    jumlah_sample_satuan: s.jumlah_sample_satuan,
+                    price_at_time: s.price_at_time
                 })),
                 
-                // Payment
+                // Payment - LENGKAP
                 payment: payment ? {
                     id: payment.id,
                     no_invoice: payment.no_invoice,
-                    total_tagihan: payment.total_tagihan || totalAmount,
-                    jumlah_dibayar: payment.jumlah_dibayar || 0,
-                    sisa_tagihan: payment.sisa_tagihan || totalAmount,
+                    total_tagihan: parseFloat(payment.total_tagihan) || totalAmount,
+                    jumlah_dibayar: parseFloat(payment.jumlah_dibayar) || 0,
+                    sisa_tagihan: parseFloat(payment.sisa_tagihan) || totalAmount,
                     status_pembayaran: payment.status_pembayaran,
                     bukti_pembayaran_1: payment.bukti_pembayaran_1,
                     bukti_pembayaran_2: payment.bukti_pembayaran_2,
-                    payment_date: payment.payment_date
+                    bukti_pembayaran_1_uploaded_at: payment.bukti_pembayaran_1_uploaded_at,
+                    bukti_pembayaran_2_uploaded_at: payment.bukti_pembayaran_2_uploaded_at,
+                    bukti_pembayaran_notes: payment.bukti_pembayaran_notes,
+                    skrd_file: payment.skrd_file,
+                    skrd_filename: payment.skrd_filename,
+                    skrd_uploaded_at: payment.skrd_uploaded_at,
+                    payment_date: payment.payment_created_at,
+                    created_at: payment.payment_created_at,
+                    updated_at: payment.payment_updated_at
+                } : null,
+                
+                // Report
+                report: report ? {
+                    id: report.id,
+                    file_laporan: report.file_laporan,
+                    no_laporan: report.no_laporan,
+                    tanggal_selesai: report.tanggal_selesai,
+                    catatan_laporan: report.catatan_laporan,
+                    created_at: report.report_created_at
                 } : null,
                 
                 // Total
                 total_tagihan: totalAmount
             };
+
+            console.log('📦 Response payment.id:', response.payment?.id);
+            console.log('📦 Total samples:', response.samples?.length);
 
             res.json({
                 success: true,
@@ -1265,124 +1353,87 @@ const apiController = {
     updateSubmission: async (req, res) => {
         try {
             const id = req.params.id;
-            const { status, catatan, catatan_admin } = req.body; // Terima kedua kemungkinan
+            const { status, catatan, catatan_admin, jadwal_sampling } = req.body;
             const userId = req.user?.id;
 
             console.log('========== UPDATE SUBMISSION ==========');
             console.log('📥 ID:', id);
             console.log('📥 Status dari frontend:', status);
-            console.log('📥 Catatan dari frontend:', catatan); // Ini yang dikirim frontend
+            console.log('📥 Jadwal Sampling:', jadwal_sampling);
             console.log('📥 Catatan Admin:', catatan_admin);
-            console.log('👤 User ID:', userId);
-            console.log('👤 User Role:', req.user?.role);
 
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
 
             if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Forbidden - Admin only'
-                });
+                return res.status(403).json({ success: false, message: 'Forbidden - Admin only' });
             }
 
-            // Validasi status
+            if (!status) {
+                return res.status(400).json({ success: false, message: 'Status tidak boleh kosong' });
+            }
+
             const validStatuses = [
-                'Menunggu Verifikasi',
-                'Pengecekan Sampel',
-                'Belum Bayar',
-                'Belum Lunas',
-                'Menunggu SKRD Upload',
-                'Lunas',
-                'Sedang Diuji',
-                'Selesai',
-                'Dibatalkan'
+                'Menunggu Verifikasi', 'Pengecekan Sampel', 'Belum Bayar',
+                'Menunggu SKRD Upload', 'Belum Lunas', 'Lunas',
+                'Sedang Diuji', 'Selesai', 'Dibatalkan'
             ];
 
-            if (status && !validStatuses.includes(status)) {
-                console.log('❌ Status tidak valid:', status);
-                return res.status(400).json({
-                    success: false,
-                    message: 'Status tidak valid'
-                });
+            if (!validStatuses.includes(status)) {
+                return res.status(400).json({ success: false, message: 'Status tidak valid' });
             }
 
-            // Cek apakah submission ada
-            const [check] = await db.query(
-                'SELECT id, status FROM submissions WHERE id = ?',
-                [id]
-            );
+            // 🔥 UPDATE SUBMISSIONS SAJA (tanpa menyentuh payments)
+            const updateFields = [];
+            const updateValues = [];
 
-            if (check.length === 0) {
-                console.log('❌ Submission tidak ditemukan');
-                return res.status(404).json({
-                    success: false,
-                    message: 'Submission tidak ditemukan'
-                });
-            }
-
-            console.log('📋 Status saat ini di database:', check[0].status);
-
-            // Buat query dinamis - Gunakan catatan_admin sebagai field database
-            let updateFields = [];
-            let queryParams = [];
-
-            if (status) {
-                updateFields.push('status = ?');
-                queryParams.push(status);
-                console.log('📝 Akan update status ke:', status);
-            }
-            
-            // Prioritaskan catatan_admin, jika tidak ada gunakan catatan
-            const catatanToSave = catatan_admin || catatan;
-            if (catatanToSave !== undefined) {
-                updateFields.push('catatan_admin = ?'); // Simpan ke kolom catatan_admin
-                queryParams.push(catatanToSave);
-                console.log('📝 Akan update catatan admin ke:', catatanToSave);
-            }
-            
+            updateFields.push('status = ?');
+            updateValues.push(status);
             updateFields.push('updated_at = NOW()');
-            
-            if (updateFields.length === 1) {
-                console.log('ℹ️ Tidak ada perubahan');
-                return res.json({
-                    success: true,
-                    message: 'Tidak ada perubahan'
-                });
+
+            if (jadwal_sampling) {
+                updateFields.push('jadwal_sampling = ?');
+                updateValues.push(jadwal_sampling);
             }
 
-            queryParams.push(id);
+            const catatanToSave = catatan_admin || catatan;
+            if (catatanToSave !== undefined && catatanToSave !== null && catatanToSave !== '') {
+                updateFields.push('catatan_admin = ?');
+                updateValues.push(catatanToSave);
+            }
+
+            updateValues.push(id);
 
             const query = `UPDATE submissions SET ${updateFields.join(', ')} WHERE id = ?`;
             console.log('📋 Query:', query);
-            console.log('📦 Params:', queryParams);
+            const [result] = await db.query(query, updateValues);
 
-            const [result] = await db.query(query, queryParams);
-
-            console.log('✅ Update result:', result);
-
-            // Catat aktivitas jika status berubah
-            if (status) {
-                try {
+            // 🔥 HANYA JIKA STATUS DIBATALKAN, BARU PAYMENTS IKUT DIBATALKAN
+            if (status === 'Dibatalkan') {
+                const [existingPayment] = await db.query(
+                    'SELECT id FROM payments WHERE submission_id = ?',
+                    [id]
+                );
+                if (existingPayment.length > 0) {
                     await db.query(
-                        `INSERT INTO activities (user_id, activity_name, created_at) 
-                        VALUES (?, ?, NOW())`,
-                        [userId, `Update status ke ${status}`]
+                        `UPDATE payments 
+                        SET status_pembayaran = 'Dibatalkan', updated_at = NOW() 
+                        WHERE submission_id = ?`,
+                        [id]
                     );
-                    console.log('✅ Activity logged');
-                } catch (activityError) {
-                    console.log('Activity log error:', activityError.message);
+                    console.log('✅ Payment status also set to Dibatalkan');
                 }
             }
 
-            res.json({
-                success: true,
-                message: 'Submission berhasil diupdate'
-            });
+            // Catat aktivitas
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, created_at) 
+                VALUES (?, ?, NOW())`,
+                [userId, `Update status ke ${status}`]
+            );
+
+            res.json({ success: true, message: 'Submission berhasil diupdate' });
 
         } catch (error) {
             console.error('❌ Error updating submission:', error);
@@ -1670,18 +1721,13 @@ const apiController = {
 
     // ==================== SKRD ====================
 
-    // GET SKRD LIST - VERSI OPTIMASI (DENGAN FILTER TANGGAL DAN SUBMISSION ID)
     getSKRD: async (req, res) => {
         try {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 10;
             const status = req.query.status || '';
             const search = req.query.search || '';
-            
-            // 🔥 TAMBAHKAN FILTER SUBMISSION ID
             const submissionId = req.query.submission_id || '';
-            
-            // FILTER TANGGAL
             const startDate = req.query.start_date || '';
             const endDate = req.query.end_date || '';
             
@@ -1700,7 +1746,6 @@ const apiController = {
             `;
             let countParams = [];
             
-            // FILTER SUBMISSION ID
             if (submissionId) {
                 countQuery += ` AND p.submission_id = ?`;
                 countParams.push(submissionId);
@@ -1721,9 +1766,9 @@ const apiController = {
             }
             
             if (search) {
-                countQuery += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ?)`;
+                countQuery += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ? OR s.no_permohonan LIKE ?)`;
                 const searchPattern = `%${search}%`;
-                countParams.push(searchPattern, searchPattern, searchPattern);
+                countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
             }
             
             const [countResult] = await db.query(countQuery, countParams);
@@ -1761,9 +1806,10 @@ const apiController = {
                     p.sisa_tagihan as remaining_amount,
                     p.status_pembayaran,
                     p.created_at,
-                    u.nama_instansi,
-                    s.nama_proyek,
-                    s.id as submission_id
+                    COALESCE(u.nama_instansi, s.nama_instansi, '-') as nama_instansi,
+                    COALESCE(s.nama_proyek, '-') as nama_proyek,
+                    s.id as submission_id,
+                    s.no_permohonan
                 FROM payments p
                 LEFT JOIN submissions s ON p.submission_id = s.id
                 LEFT JOIN users u ON s.user_id = u.id
@@ -1772,7 +1818,6 @@ const apiController = {
             
             let params = [];
             
-            // FILTER SUBMISSION ID
             if (submissionId) {
                 query += ` AND p.submission_id = ?`;
                 params.push(submissionId);
@@ -1793,9 +1838,9 @@ const apiController = {
             }
             
             if (search) {
-                query += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ?)`;
+                query += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ? OR s.no_permohonan LIKE ?)`;
                 const searchPattern = `%${search}%`;
-                params.push(searchPattern, searchPattern, searchPattern);
+                params.push(searchPattern, searchPattern, searchPattern, searchPattern);
             }
             
             query += ` ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
@@ -1806,21 +1851,53 @@ const apiController = {
             
             const [invoices] = await db.query(query, params);
             
+            // Format invoices untuk frontend
+            const formattedInvoices = invoices.map(inv => ({
+                id: inv.id,
+                invoice_number: inv.invoice_number,
+                skrd_number: inv.skrd_number,
+                total_amount: parseFloat(inv.total_amount) || 0,
+                paid_amount: parseFloat(inv.paid_amount) || 0,
+                remaining_amount: parseFloat(inv.remaining_amount) || 0,
+                status_pembayaran: inv.status_pembayaran || 'Belum Bayar',
+                created_at: inv.created_at,
+                issue_date: inv.created_at,
+                due_date: inv.created_at,
+                nama_instansi: inv.nama_instansi,
+                nama_proyek: inv.nama_proyek,
+                submission_id: inv.submission_id,
+                no_permohonan: inv.no_permohonan
+            }));
+            
             // ========== HITUNG STATS ==========
+            // Query untuk menghitung semua statistik
             let statsQuery = `
                 SELECT 
-                    COALESCE(SUM(CASE WHEN status_pembayaran IN ('Belum Bayar', 'Menunggu SKRD Upload') THEN total_tagihan ELSE 0 END), 0) as total_receivable,
+                    SUM(CASE 
+                        WHEN status_pembayaran IN ('Belum Bayar', 'Menunggu SKRD Upload', 'Menunggu Verifikasi', 'Belum Lunas') 
+                        THEN total_tagihan 
+                        ELSE 0 
+                    END) as total_receivable,
                     COUNT(CASE WHEN status_pembayaran = 'Belum Bayar' THEN 1 END) as pending_count,
                     COUNT(CASE WHEN status_pembayaran = 'Belum Lunas' THEN 1 END) as partial_count,
-                    COUNT(CASE WHEN status_pembayaran = 'Menunggu SKRD Upload' THEN 1 END) as waiting_verification,
-                    COUNT(CASE WHEN status_pembayaran = 'Lunas' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) THEN 1 END) as paid_count,
-                    COALESCE(SUM(CASE WHEN status_pembayaran = 'Lunas' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) THEN total_tagihan ELSE 0 END), 0) as monthly_income
+                    COUNT(CASE WHEN status_pembayaran IN ('Menunggu SKRD Upload', 'Menunggu Verifikasi') THEN 1 END) as waiting_verification,
+                    COUNT(CASE WHEN status_pembayaran = 'Lunas' 
+                        AND MONTH(created_at) = MONTH(CURRENT_DATE()) 
+                        AND YEAR(created_at) = YEAR(CURRENT_DATE()) 
+                        THEN 1 END) as paid_count,
+                    SUM(CASE WHEN status_pembayaran = 'Lunas' 
+                        AND MONTH(created_at) = MONTH(CURRENT_DATE()) 
+                        AND YEAR(created_at) = YEAR(CURRENT_DATE()) 
+                        THEN total_tagihan 
+                        ELSE 0 
+                    END) as monthly_income
                 FROM payments
                 WHERE 1=1
             `;
             
             let statsParams = [];
             
+            // Terapkan filter tanggal ke stats juga
             if (startDate) {
                 statsQuery += ` AND DATE(created_at) >= ?`;
                 statsParams.push(startDate);
@@ -1832,19 +1909,41 @@ const apiController = {
             
             const [statsResult] = await db.query(statsQuery, statsParams);
             
-            const stats = {
-                totalReceivable: 'Rp ' + new Intl.NumberFormat('id-ID').format(statsResult[0].total_receivable || 0),
-                pendingCount: statsResult[0].pending_count || 0,
-                partialCount: statsResult[0].partial_count || 0,
-                waitingVerification: statsResult[0].waiting_verification || 0,
-                paidCount: statsResult[0].paid_count || 0,
-                monthlyIncome: 'Rp ' + new Intl.NumberFormat('id-ID').format(statsResult[0].monthly_income || 0)
+            // Ambil nilai dengan aman
+            const totalReceivableValue = parseFloat(statsResult[0].total_receivable) || 0;
+            const monthlyIncomeValue = parseFloat(statsResult[0].monthly_income) || 0;
+            
+            // Format Rupiah untuk stats
+            const formatRupiahStats = (value) => {
+                return 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
             };
+            
+            const stats = {
+                totalReceivable: formatRupiahStats(totalReceivableValue),
+                pendingCount: parseInt(statsResult[0].pending_count) || 0,
+                partialCount: parseInt(statsResult[0].partial_count) || 0,
+                waitingVerification: parseInt(statsResult[0].waiting_verification) || 0,
+                paidCount: parseInt(statsResult[0].paid_count) || 0,
+                monthlyIncome: formatRupiahStats(monthlyIncomeValue)
+            };
+            
+            console.log('📊 Stats calculated:', {
+                totalReceivableRaw: totalReceivableValue,
+                totalReceivable: stats.totalReceivable,
+                pendingCount: stats.pendingCount,
+                waitingVerification: stats.waitingVerification,
+                partialCount: stats.partialCount,
+                monthlyIncomeRaw: monthlyIncomeValue,
+                monthlyIncome: stats.monthlyIncome,
+                paidCount: stats.paidCount
+            });
+            
+            console.log(`✅ Found ${formattedInvoices.length} invoices, total: ${total}`);
             
             res.json({
                 success: true,
                 data: {
-                    invoices: invoices,
+                    invoices: formattedInvoices,
                     stats: stats,
                     total: total,
                     page: page,
@@ -1852,8 +1951,9 @@ const apiController = {
                     totalPages: Math.ceil(total / limit)
                 }
             });
+            
         } catch (error) {
-            console.error('❌ Error:', error);
+            console.error('❌ Error in getSKRD:', error);
             res.status(500).json({ 
                 success: false, 
                 message: 'Gagal mengambil data SKRD: ' + error.message 
@@ -1911,7 +2011,9 @@ const apiController = {
                 SELECT 
                     ss.*,
                     sv.service_name,
-                    sv.method
+                    sv.method,
+                    sv.satuan,
+                    sv.price as current_price
                 FROM submission_samples ss
                 JOIN services sv ON ss.service_id = sv.id
                 WHERE ss.submission_id = ?
@@ -1935,14 +2037,19 @@ const apiController = {
                 jumlah_dibayar: paidAmount,
                 sisa_tagihan: remainingAmount,
                 status_pembayaran: payment.status_pembayaran,
+                
+                // Bukti pembayaran
                 bukti_pembayaran_1: payment.bukti_pembayaran_1,
                 bukti_pembayaran_2: payment.bukti_pembayaran_2,
+                bukti_pembayaran_1_uploaded_at: payment.bukti_pembayaran_1_uploaded_at,
+                bukti_pembayaran_2_uploaded_at: payment.bukti_pembayaran_2_uploaded_at,
+                bukti_pembayaran_1_filename: payment.bukti_pembayaran_1, // nama file
                 bukti_pembayaran_notes: payment.bukti_pembayaran_notes,
                 payment_history: paymentHistory,
                 created_at: payment.created_at,
                 updated_at: payment.updated_at,
                 
-                // 🔥 TAMBAHKAN FIELD UNTUK FILE SKRD
+                // File SKRD
                 skrd_file: payment.skrd_file,
                 skrd_filename: payment.skrd_filename,
                 skrd_uploaded_at: payment.skrd_uploaded_at,
@@ -2241,48 +2348,86 @@ const apiController = {
     sendPaymentReminder: async (req, res) => {
         try {
             const id = req.params.id;
+            const userId = req.user?.id || 1;
             
+            console.log('📧 Sending payment reminder for SKRD ID:', id);
+            
+            // Ambil data payment, submission, dan user
             const [invoices] = await db.query(`
-                SELECT p.*, u.email, u.name, u.company, u.phone
+                SELECT 
+                    p.*,
+                    s.nama_pemohon,
+                    s.nama_instansi,
+                    s.email_pemohon,
+                    s.nomor_telepon,
+                    u.email as user_email,
+                    u.full_name as user_name
                 FROM payments p
-                JOIN users u ON p.user_id = u.id
+                LEFT JOIN submissions s ON p.submission_id = s.id
+                LEFT JOIN users u ON s.user_id = u.id
                 WHERE p.id = ?
             `, [id]);
 
             if (invoices.length === 0) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Invoice tidak ditemukan'
+                    message: 'SKRD tidak ditemukan'
                 });
             }
 
             const invoice = invoices[0];
             
+            // Ambil email dari berbagai sumber
+            const emailTo = invoice.email_pemohon || invoice.user_email;
+            const companyName = invoice.nama_instansi || invoice.nama_pemohon || '-';
+            const totalAmount = parseFloat(invoice.total_tagihan) || 0;
+            const paidAmount = parseFloat(invoice.jumlah_dibayar) || 0;
+            const remainingAmount = parseFloat(invoice.sisa_tagihan) || (totalAmount - paidAmount);
+            
+            // Format tanggal
+            const dueDate = invoice.created_at ? new Date(invoice.created_at) : new Date();
+            const formattedDate = dueDate.toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+            
             console.log('=================================');
             console.log('📧 SIMULASI KIRIM REMINDER');
-            console.log('To:', invoice.email);
-            console.log('Phone:', invoice.phone);
-            console.log('Company:', invoice.company || invoice.name);
-            console.log('Invoice:', invoice.invoice_number);
-            console.log('Amount:', formatRupiah(invoice.total_tagihan));
-            console.log('Due Date:', invoice.due_date);
+            console.log('To:', emailTo || 'Email tidak tersedia');
+            console.log('Company:', companyName);
+            console.log('Invoice:', invoice.no_invoice);
+            console.log('Total Tagihan:', formatRupiah(totalAmount));
+            console.log('Sisa Tagihan:', formatRupiah(remainingAmount));
+            console.log('Tanggal Invoice:', formattedDate);
+            console.log('Status:', invoice.status_pembayaran);
             console.log('=================================');
             
+            // Catat aktivitas ke database (tanpa mengirim email jika email tidak tersedia)
+            const reminderNote = `Pengingat pembayaran dikirim untuk invoice ${invoice.no_invoice} ke ${emailTo || 'email tidak tersedia'}`;
+            
             await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [req.user?.id || 1, 'reminder', `Pengingat pembayaran dikirim untuk invoice ${invoice.invoice_number}`]
+                `INSERT INTO activities (user_id, activity_name, created_at) 
+                VALUES (?, ?, NOW())`,
+                [userId, reminderNote]
             );
-
+            
+            // Jika email tersedia, kita bisa kirim (simulasi sukses)
+            if (emailTo) {
+                // TODO: Implementasi pengiriman email bisa ditambahkan di sini
+                console.log(`📧 Email akan dikirim ke: ${emailTo}`);
+            }
+            
             res.json({
                 success: true,
-                message: 'Pengingat pembayaran berhasil dikirim'
+                message: emailTo ? 'Pengingat pembayaran berhasil dikirim' : 'Pengingat dicatat (email tidak tersedia)'
             });
 
         } catch (error) {
-            console.error('Error sending payment reminder:', error);
+            console.error('❌ Error sending payment reminder:', error);
             res.status(500).json({
                 success: false,
-                message: 'Gagal mengirim pengingat pembayaran'
+                message: 'Gagal mengirim pengingat pembayaran: ' + error.message
             });
         }
     },
@@ -4949,200 +5094,136 @@ const apiController = {
 
     // ==================== BACKUP & RESTORE METHODS ====================
 
-    // Create backup
+    // ==================== CREATE BACKUP (FIX) ====================
     createBackup: async (req, res) => {
         try {
             const userId = req.user?.id;
-            
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
-            
-            const fs = require('fs');
+
+            const fse = require('fs-extra');
             const path = require('path');
-            const { exec } = require('child_process');
-            
-            // Buat direktori backup jika belum ada
+            const mysqldump = require('mysqldump');
+
             const backupDir = path.join(__dirname, '../../backups');
-            if (!fs.existsSync(backupDir)) {
-                fs.mkdirSync(backupDir, { recursive: true });
-            }
-            
-            const dateStr = new Date().toISOString().slice(0,10);
-            const timestamp = new Date().getTime();
-            const filename = `backup_${dateStr}_${timestamp}.sql`;
+            await fse.ensureDir(backupDir);
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `backup_${timestamp}.sql`;
             const filepath = path.join(backupDir, filename);
-            
-            // Ambil konfigurasi database dari environment
+
             const dbConfig = {
                 host: process.env.DB_HOST || 'localhost',
                 user: process.env.DB_USER || 'root',
                 password: process.env.DB_PASSWORD || '',
-                database: process.env.DB_NAME || 'uptd_lab'
+                database: process.env.DB_NAME || 'uptd_lab',
+                port: process.env.DB_PORT || 3306
             };
-            
-            // Jalankan mysqldump
-            const dumpCommand = `mysqldump -h ${dbConfig.host} -u ${dbConfig.user} ${dbConfig.password ? '-p' + dbConfig.password : ''} ${dbConfig.database} > ${filepath}`;
-            
-            exec(dumpCommand, async (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Backup error:', error);
-                    
-                    // Fallback: buat file dummy
-                    const dummyContent = `-- Backup database ${dbConfig.database}\n-- Created at ${new Date().toISOString()}\n\n`;
-                    fs.writeFileSync(filepath, dummyContent);
-                }
-                
-                // Catat aktivitas
-                await db.query(
-                    `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
-                    VALUES (?, ?, ?, ?)`,
-                    [userId, 'Create Backup', req.ip, req.headers['user-agent']]
-                );
-                
-                const baseUrl = `${req.protocol}://${req.get('host')}`;
-                const fileUrl = `${baseUrl}/backups/${filename}`;
-                
-                res.json({
-                    success: true,
-                    message: 'Backup berhasil dibuat',
-                    data: {
-                        url: fileUrl,
-                        filename: filename,
-                        created_at: new Date().toISOString()
-                    }
-                });
-            });
-            
-        } catch (error) {
-            console.error('Error creating backup:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal membuat backup: ' + error.message
-            });
-        }
-    },
 
-    // Get backup history
-    getBackupHistory: async (req, res) => {
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const backupDir = path.join(__dirname, '../../backups');
-            
-            let backups = [];
-            
-            if (fs.existsSync(backupDir)) {
-                const files = fs.readdirSync(backupDir);
-                backups = files
-                    .filter(f => f.endsWith('.sql') || f.endsWith('.gz'))
-                    .map(f => {
-                        const stats = fs.statSync(path.join(backupDir, f));
-                        return {
-                            filename: f,
-                            size: stats.size,
-                            created_at: stats.birthtime,
-                            url: `/backups/${f}`
-                        };
-                    })
-                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                    .slice(0, 10);
-            }
-            
+            await mysqldump({
+                connection: dbConfig,
+                dumpToFile: filepath,
+                compressFile: false
+            });
+
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                    VALUES (?, ?, ?, ?)`,
+                [userId, 'Create Backup', req.ip, req.headers['user-agent']]
+            );
+
+            const fileStat = await fse.stat(filepath);
             res.json({
                 success: true,
-                data: backups
+                message: 'Backup berhasil dibuat',
+                data: {
+                    filename: filename,
+                    size: fileStat.size,
+                    created_at: new Date().toISOString()
+                }
             });
+        } catch (error) {
+            console.error('❌ Backup error:', error);
+            res.status(500).json({ success: false, message: 'Gagal membuat backup: ' + error.message });
+        }
+        },
+
+    // ==================== GET BACKUP HISTORY (FIX) ====================
+    getBackupHistory: async (req, res) => {
+        try {
+            const backupDir = path.join(__dirname, '../../backups');
             
+            if (!fse.existsSync(backupDir)) {
+                return res.json({ success: true, data: [] });
+            }
+
+            const files = await fse.readdir(backupDir);
+            const backups = [];
+            
+            for (const file of files) {
+                if (file.endsWith('.sql')) {
+                    const filepath = path.join(backupDir, file);
+                    const stat = await fse.stat(filepath);
+                    backups.push({
+                        filename: file,
+                        size: stat.size,
+                        created_at: stat.birthtime,
+                        url: `/backups/${file}`
+                    });
+                }
+            }
+            
+            backups.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            res.json({ success: true, data: backups });
         } catch (error) {
             console.error('Error getting backup history:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengambil history backup: ' + error.message
-            });
+            res.status(500).json({ success: false, message: error.message });
         }
     },
 
-    // Restore backup
+    // ==================== RESTORE BACKUP (FIX) ====================
     restoreBackup: async (req, res) => {
         try {
             const userId = req.user?.id;
-            
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
-            
             if (!req.file) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Tidak ada file backup yang diupload'
-                });
+                return res.status(400).json({ success: false, message: 'Tidak ada file backup yang diupload' });
             }
-            
-            const fs = require('fs');
-            const path = require('path');
-            const { exec } = require('child_process');
-            
-            // Simpan file upload
-            const uploadDir = path.join(__dirname, '../../uploads/restore');
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
-            
-            const filename = `restore_${Date.now()}.sql`;
-            const filepath = path.join(uploadDir, filename);
-            fs.writeFileSync(filepath, req.file.buffer);
-            
-            // Ambil konfigurasi database
-            const dbConfig = {
-                host: process.env.DB_HOST || 'localhost',
-                user: process.env.DB_USER || 'root',
-                password: process.env.DB_PASSWORD || '',
-                database: process.env.DB_NAME || 'uptd_lab'
-            };
-            
-            // Jalankan mysql restore
-            const restoreCommand = `mysql -h ${dbConfig.host} -u ${dbConfig.user} ${dbConfig.password ? '-p' + dbConfig.password : ''} ${dbConfig.database} < ${filepath}`;
-            
-            exec(restoreCommand, async (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Restore error:', error);
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Gagal merestore database: ' + error.message
-                    });
+
+            const sqlContent = req.file.buffer.toString('utf8');
+            const statements = sqlContent.split(';').filter(stmt => stmt.trim().length > 0);
+
+            const connection = await db.getConnection();
+            try {
+                await connection.beginTransaction();
+                for (let stmt of statements) {
+                    const upperStmt = stmt.trim().toUpperCase();
+                    if (upperStmt.startsWith('USE') || upperStmt.startsWith('SET') || upperStmt.startsWith('CREATE DATABASE')) {
+                        continue;
+                    }
+                    await connection.query(stmt);
                 }
-                
-                // Catat aktivitas
+                await connection.commit();
+
                 await db.query(
                     `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
                     VALUES (?, ?, ?, ?)`,
                     [userId, 'Restore Backup', req.ip, req.headers['user-agent']]
                 );
-                
-                // Hapus file temporary
-                try {
-                    fs.unlinkSync(filepath);
-                } catch (e) {}
-                
-                res.json({
-                    success: true,
-                    message: 'Restore berhasil'
-                });
-            });
-            
+
+                res.json({ success: true, message: 'Restore database berhasil' });
+            } catch (err) {
+                await connection.rollback();
+                throw err;
+            } finally {
+                connection.release();
+            }
         } catch (error) {
-            console.error('Error restoring backup:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal restore: ' + error.message
-            });
+            console.error('❌ Restore error:', error);
+            res.status(500).json({ success: false, message: 'Gagal restore database: ' + error.message });
         }
     },
 

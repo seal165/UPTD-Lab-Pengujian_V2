@@ -14,6 +14,58 @@
     let invoiceData = null;
     let submissionId = null;
 
+    // ==================== HELPER FUNGSI ====================  
+    function getBadgeHtml(status) {
+        // 🔥 PENTING: Tampilkan status apa adanya, jangan diubah
+        let badgeClass = 'bg-secondary';
+        let icon = 'fa-circle';
+        
+        switch(status) {
+            case 'Menunggu Verifikasi':
+                badgeClass = 'bg-warning text-dark';
+                icon = 'fa-clock';
+                break;
+            case 'Pengecekan Sampel':
+                badgeClass = 'bg-info text-dark';
+                icon = 'fa-microscope';
+                break;
+            case 'Belum Bayar':
+                badgeClass = 'bg-secondary';
+                icon = 'fa-receipt';
+                break;
+            case 'Menunggu SKRD Upload':
+                badgeClass = 'bg-warning text-dark';
+                icon = 'fa-upload';
+                break;
+            case 'Belum Lunas':
+                badgeClass = 'bg-danger';
+                icon = 'fa-exclamation-triangle';
+                break;
+            case 'Lunas':
+                badgeClass = 'bg-success';
+                icon = 'fa-check-circle';
+                break;
+            case 'Sedang Diuji':
+                badgeClass = 'bg-primary';
+                icon = 'fa-flask';
+                break;
+            case 'Selesai':
+                badgeClass = 'bg-dark';
+                icon = 'fa-check-double';
+                break;
+            case 'Dibatalkan':
+                badgeClass = 'bg-secondary';
+                icon = 'fa-ban';
+                break;
+            default:
+                badgeClass = 'bg-secondary';
+                icon = 'fa-circle';
+        }
+        
+        // 🔥 LANGSUNG PAKAI status ASLI, jangan mapping
+        return `<span class="badge ${badgeClass}"><i class="fas ${icon} me-1"></i>${status}</span>`;
+    }
+
     // ==================== CEK TOKEN ====================
     function getToken() {
         return localStorage.getItem('token');
@@ -108,7 +160,7 @@
         
         const itemsRows = generateInvoiceItems(data);
         
-        // Ambil nama pemohon dari database (nama_instansi atau nama_pemohon)
+        // Ambil nama pemohon dari database
         const namaPemohon = data.nama_instansi || data.nama_pemohon || '....................................';
         const alamat = data.alamat || '....................................';
         const telepon = data.nomor_telepon || '....................................';
@@ -176,7 +228,6 @@
                     </tr>
                 </table>
 
-                <!-- NOMOR DIKOSONGKAN UNTUK DIISI TANGAN -->
                 <div class="doc-num-section">
                     Nomor : _______________________________
                 </div>
@@ -224,7 +275,7 @@
 
                 <div class="total-box">
                     <span class="total-label">Total</span>
-                    <span>${formatRupiah(totalAmount).replace('Rp', 'Rp ')}</span>
+                    <span>${formatRupiah(totalAmount)}</span>
                 </div>
 
                 <div class="terbilang-box">
@@ -271,7 +322,7 @@
         const totalAmount = data.total_tagihan || 0;
         
         if (items.length === 0) {
-            const hargaSatuan = Math.round(totalAmount / 1.11);
+            const hargaSatuan = totalAmount;
             const layanan = data.layanan || 'Pengujian';
             return `
                 <tr>
@@ -368,17 +419,16 @@
             // 4. ITEMS TABLE
             updateItemsTable(data);
             
-            // 5. TOTALS
-            const subtotal = totalAmount / 1.11;
-            const ppn = totalAmount - subtotal;
+            // 5. TOTALS - HAPUS PPN, LANGSUNG PAKAI TOTAL TAGIHAN
+            const subtotal = totalAmount;
+            const ppn = 0;
             
-            if (elements.subtotal) elements.subtotal.textContent = formatRupiah(Math.round(subtotal));
-            if (elements.ppn) elements.ppn.textContent = formatRupiah(Math.round(ppn));
+            if (elements.subtotal) elements.subtotal.textContent = formatRupiah(subtotal);
+            if (elements.ppn) elements.ppn.textContent = formatRupiah(ppn);
             if (elements.totalAmount) elements.totalAmount.textContent = formatRupiah(totalAmount);
             
             // 6. NOTES
             if (elements.paymentNotesDisplay) {
-                // Gabungkan catatan dari payment dan notes
                 let notes = '';
                 if (data.bukti_pembayaran_notes) {
                     notes += data.bukti_pembayaran_notes;
@@ -438,28 +488,11 @@
         }
     }
 
+    // ==================== UPDATE STATUS BADGE ====================
     function updateStatusBadge(status) {
-        const badgeDiv = document.getElementById('statusBadge');
-        let badgeHtml = '';
-        
-        switch(status) {
-            case 'Lunas':
-                badgeHtml = '<span class="badge bg-success rounded-pill px-3 py-2">LUNAS</span>';
-                break;
-            case 'Belum Lunas':
-                badgeHtml = '<span class="badge bg-warning rounded-pill px-3 py-2">BELUM LUNAS</span>';
-                break;
-            case 'Belum Bayar':
-                badgeHtml = '<span class="badge bg-danger rounded-pill px-3 py-2">BELUM BAYAR</span>';
-                break;
-            case 'Menunggu SKRD Upload':
-                badgeHtml = '<span class="badge bg-info rounded-pill px-3 py-2">CEK BUKTI</span>';
-                break;
-            default:
-                badgeHtml = `<span class="badge bg-secondary rounded-pill px-3 py-2">${status || '-'}</span>`;
-        }
-        
-        badgeDiv.innerHTML = badgeHtml;
+        const badge = document.getElementById('statusBadge');
+        if (!badge) return;
+        badge.innerHTML = getBadgeHtml(status);
     }
 
     function updateItemsTable(data) {
@@ -468,14 +501,13 @@
         
         if (items.length === 0) {
             const totalAmount = data.total_tagihan || 0;
-            const hargaSatuan = totalAmount / 1.11;
             
             tbody.innerHTML = `
                 <tr>
                     <td>${data.layanan || 'Pengujian'}</td>
                     <td class="text-center">1</td>
-                    <td class="text-end">${formatRupiah(Math.round(hargaSatuan))}</td>
-                    <td class="text-end">${formatRupiah(Math.round(hargaSatuan))}</td>
+                    <td class="text-end">${formatRupiah(totalAmount)}</td>
+                    <td class="text-end">${formatRupiah(totalAmount)}</td>
                 </tr>
             `;
         } else {
@@ -500,7 +532,6 @@
         }
     }
 
-    // 🔥 PERBAIKI FUNGSI updatePaymentProof
     function updatePaymentProof(data) {
         const proofSection = document.getElementById('paymentProofSection');
         const proofStatusBadge = document.getElementById('proofStatusBadge');
@@ -517,7 +548,49 @@
             status_pembayaran: data.status_pembayaran
         });
         
-        // CEK APAKAH ADA BUKTI PEMBAYARAN
+        // 🔥 Status final: Lunas, Selesai, Dibatalkan
+        const finalStatuses = ['Lunas', 'Selesai', 'Dibatalkan'];
+        
+        // CEK JIKA STATUS SUDAH FINAL
+        if (finalStatuses.includes(data.status_pembayaran)) {
+            proofSection.style.display = 'block';
+            
+            // Tampilkan badge sesuai status ASLI
+            if (proofStatusBadge && data.status_pembayaran) {
+                proofStatusBadge.innerHTML = getBadgeHtml(data.status_pembayaran);
+            }
+            
+            // Sembunyikan tombol aksi
+            if (verifyBtn) verifyBtn.style.display = 'none';
+            if (rejectBtn) rejectBtn.style.display = 'none';
+            
+            // Tampilkan info file jika ada
+            if (data.bukti_pembayaran_1) {
+                if (proofFilename) {
+                    const fileName = data.bukti_pembayaran_1_filename || 
+                                    data.bukti_pembayaran_1.split('/').pop() || 
+                                    'Bukti Pembayaran';
+                    proofFilename.textContent = fileName;
+                }
+                
+                if (proofUploadedAt) {
+                    const uploadDate = data.bukti_pembayaran_1_uploaded_at ? 
+                        formatDateTime(data.bukti_pembayaran_1_uploaded_at) : '-';
+                    proofUploadedAt.textContent = `Diunggah: ${uploadDate}`;
+                }
+                
+                // Simpan URL untuk fungsi viewProof
+                const fileUrl = `http://localhost:5000/uploads/payment/${data.bukti_pembayaran_1}`;
+                window.currentProofUrl = fileUrl;
+            } else {
+                if (proofFilename) proofFilename.textContent = 'Tidak ada bukti pembayaran';
+                if (proofUploadedAt) proofUploadedAt.textContent = '';
+            }
+            
+            return;
+        }
+        
+        // CEK APAKAH ADA BUKTI PEMBAYARAN UNTUK STATUS NON-FINAL
         if (data.bukti_pembayaran_1) {
             proofSection.style.display = 'block';
             
@@ -525,7 +598,6 @@
             const fileUrl = `http://localhost:5000/uploads/payment/${data.bukti_pembayaran_1}`;
             
             if (proofFilename) {
-                // Coba ambil nama file dari data atau gunakan default
                 const fileName = data.bukti_pembayaran_1_filename || 
                                 data.bukti_pembayaran_1.split('/').pop() || 
                                 'Bukti Pembayaran';
@@ -538,19 +610,22 @@
                 proofUploadedAt.textContent = `Diunggah: ${uploadDate}`;
             }
             
-            // Update status badge dan tombol
-            if (proofStatusBadge) {
-                if (data.status_pembayaran === 'Menunggu SKRD Upload') {
-                    proofStatusBadge.className = 'badge bg-warning';
-                    proofStatusBadge.textContent = 'Menunggu Verifikasi';
-                    if (verifyBtn) verifyBtn.style.display = 'inline-block';
-                    if (rejectBtn) rejectBtn.style.display = 'inline-block';
-                } else if (data.status_pembayaran === 'Belum Lunas' || data.status_pembayaran === 'Lunas') {
-                    proofStatusBadge.className = 'badge bg-success';
-                    proofStatusBadge.textContent = 'Terverifikasi';
-                    if (verifyBtn) verifyBtn.style.display = 'none';
-                    if (rejectBtn) rejectBtn.style.display = 'none';
-                }
+            // Update status badge sesuai status ASLI
+            if (proofStatusBadge && data.status_pembayaran) {
+                proofStatusBadge.innerHTML = getBadgeHtml(data.status_pembayaran);
+            }
+            
+            // Tampilkan/sembunyikan tombol berdasarkan status
+            if (data.status_pembayaran === 'Menunggu SKRD Upload' || data.status_pembayaran === 'Menunggu Verifikasi') {
+                if (verifyBtn) verifyBtn.style.display = 'inline-block';
+                if (rejectBtn) rejectBtn.style.display = 'inline-block';
+            } else if (data.status_pembayaran === 'Belum Lunas') {
+                // Status Belum Lunas: tetap bisa verifikasi tambahan
+                if (verifyBtn) verifyBtn.style.display = 'inline-block';
+                if (rejectBtn) rejectBtn.style.display = 'none';
+            } else {
+                if (verifyBtn) verifyBtn.style.display = 'none';
+                if (rejectBtn) rejectBtn.style.display = 'none';
             }
             
             // Simpan URL untuk fungsi viewProof
@@ -561,7 +636,6 @@
         }
     }
 
-    // 🔥 PERBAIKI FUNGSI updateSkrdFile
     function updateSkrdFile(data) {
         const skrdFileSection = document.getElementById('skrdFileSection');
         const skrdUploadSection = document.getElementById('skrdUploadSection');
@@ -574,12 +648,33 @@
         console.log('📁 Data SKRD:', {
             skrd_file: data.skrd_file,
             skrd_filename: data.skrd_filename,
-            skrd_uploaded_at: data.skrd_uploaded_at
+            skrd_uploaded_at: data.skrd_uploaded_at,
+            status_pembayaran: data.status_pembayaran
         });
+        
+        // 🔥 TAMBAHKAN: Jika status Dibatalkan, sembunyikan upload section
+        if (data.status_pembayaran === 'Dibatalkan') {
+            skrdFileSection.style.display = 'block';
+            skrdUploadSection.style.display = 'none';
+            
+            if (skrdFilename) {
+                skrdFilename.textContent = 'Pengajuan dibatalkan';
+            }
+            
+            if (skrdUploadedAt) {
+                skrdUploadedAt.textContent = 'Status: Dibatalkan';
+            }
+            
+            if (downloadSkrdBtn) {
+                downloadSkrdBtn.href = '#';
+                downloadSkrdBtn.classList.add('disabled');
+                downloadSkrdBtn.setAttribute('onclick', 'return false;');
+            }
+            return;
+        }
         
         // CEK KOLOM DATABASE YANG TERSEDIA
         if (data.skrd_file) {
-            // Data dari tabel payments
             const fileUrl = `http://localhost:5000/uploads/skrd/${data.skrd_file}`;
             
             skrdFileSection.style.display = 'block';
@@ -593,6 +688,7 @@
             if (downloadSkrdBtn) {
                 downloadSkrdBtn.href = fileUrl;
                 downloadSkrdBtn.setAttribute('download', data.skrd_filename || data.skrd_file);
+                downloadSkrdBtn.classList.remove('disabled');
             }
         } else {
             skrdFileSection.style.display = 'none';
@@ -615,7 +711,6 @@
         if (paymentHistory.length > 0) {
             let historyHtml = '<div class="payment-timeline">';
             
-            // Tampilkan setiap baris riwayat
             paymentHistory.forEach((note, index) => {
                 const isLast = index === paymentHistory.length - 1;
                 
@@ -628,7 +723,7 @@
                                 </span>
                                 ${isLast && remaining === 0 ? '<span class="badge bg-success">LUNAS</span>' : ''}
                             </div>
-                            <p class="mb-0 text-muted small">${note}</p>
+                            <p class="mb-0 text-muted small">${escapeHtml(note)}</p>
                         </div>
                     </div>
                 `;
@@ -636,7 +731,6 @@
             
             historyHtml += '</div>';
             
-            // Tampilkan summary
             historyHtml += `
                 <div class="mt-3 pt-2 border-top bg-light p-3 rounded">
                     <div class="d-flex justify-content-between mb-1">
@@ -684,9 +778,8 @@
         }
         
         const totalAmount = data.total_tagihan || 0;
-        const subtotal = totalAmount / 1.11;
         
-        if (printSubtotal) printSubtotal.textContent = formatRupiah(Math.round(subtotal));
+        if (printSubtotal) printSubtotal.textContent = formatRupiah(totalAmount);
         if (printTotal) printTotal.textContent = formatRupiah(totalAmount);
         
         if (printTerbilang) {
@@ -694,28 +787,59 @@
         }
         
         if (printItemsBody) {
-            const layanan = data.layanan || 'Pengujian';
-            const hargaSatuan = totalAmount / 1.11;
+            const items = data.samples || [];
             
-            printItemsBody.innerHTML = `
-                <tr>
-                    <td class="text-center">1</td>
-                    <td>4120220</td>
-                    <td>Laboratorium>Lab Pengujian Bahan>Penelitian Laboratorium Untuk Pekerjaan Jalan, Jembatan Dan Pengairan>Besi>A, ${layanan}</td>
-                    <td class="text-center">1</td>
-                    <td class="text-center">sample</td>
-                    <td class="text-end">${formatRupiah(Math.round(hargaSatuan)).replace('Rp', '').trim()}</td>
-                    <td class="text-end">${formatRupiah(Math.round(hargaSatuan)).replace('Rp', '').trim()}</td>
-                </tr>
-            `;
+            if (items.length === 0) {
+                const layanan = data.layanan || 'Pengujian';
+                printItemsBody.innerHTML = `
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>4120220</td>
+                        <td>Laboratorium>Lab Pengujian Bahan>Penelitian Laboratorium Untuk Pekerjaan Jalan, Jembatan Dan Pengairan>Besi>A, ${layanan}</td>
+                        <td class="text-center">1</td>
+                        <td class="text-center">sample</td>
+                        <td class="text-end">${formatRupiah(totalAmount).replace('Rp', '').trim()}</td>
+                        <td class="text-end">${formatRupiah(totalAmount).replace('Rp', '').trim()}</td>
+                    </tr>
+                `;
+            } else {
+                let rowsHtml = '';
+                items.forEach((item, index) => {
+                    const description = item.service_name || item.nama_identitas_sample || 'Pengujian';
+                    const quantity = item.jumlah_sample_angka || 1;
+                    const satuan = item.jumlah_sample_satuan || 'sample';
+                    const price = item.price_at_time || 0;
+                    const subtotal = price * quantity;
+                    
+                    rowsHtml += `
+                        <tr>
+                            <td class="text-center">${index + 1}</td>
+                            <td>4120220</td>
+                            <td>Laboratorium>Lab Pengujian Bahan>Penelitian Laboratorium Untuk Pekerjaan Jalan, Jembatan Dan Pengairan>Besi>A, ${description}</td>
+                            <td class="text-center">${quantity}</td>
+                            <td class="text-center">${satuan}</td>
+                            <td class="text-end">${formatRupiah(price).replace('Rp', '').trim()}</td>
+                            <td class="text-end">${formatRupiah(subtotal).replace('Rp', '').trim()}</td>
+                        </tr>
+                    `;
+                });
+                printItemsBody.innerHTML = rowsHtml;
+            }
         }
     }
 
     function updateActionButtons(status) {
         const remindBtn = document.getElementById('remindBtn');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const rejectBtn = document.getElementById('rejectBtn');
         
-        if (status === 'Lunas' || status === 'Dibatalkan') {
+        // 🔥 Sembunyikan tombol aksi jika status sudah final
+        const finalStatuses = ['Lunas', 'Selesai', 'Dibatalkan'];
+        
+        if (finalStatuses.includes(status)) {
             if (remindBtn) remindBtn.style.display = 'none';
+            if (verifyBtn) verifyBtn.style.display = 'none';
+            if (rejectBtn) rejectBtn.style.display = 'none';
         } else {
             if (remindBtn) remindBtn.style.display = 'inline-block';
         }
@@ -764,17 +888,29 @@
             hitungSisa();
         } else {
             input.value = '';
-            document.getElementById('sisaSetelah').value = '';
+            const sisaSetelah = document.getElementById('sisaSetelah');
+            if (sisaSetelah) sisaSetelah.value = '';
         }
     }
 
     function isOverdue(dueDate, status) {
-        if (!dueDate || status === 'Lunas' || status === 'Dibatalkan') return false;
+        // 🔥 Status final tidak perlu dianggap overdue
+        const finalStatuses = ['Lunas', 'Selesai', 'Dibatalkan'];
+        
+        if (!dueDate || finalStatuses.includes(status)) return false;
+        
         try {
             return new Date(dueDate) < new Date();
         } catch {
             return false;
         }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function numberToWords(num) {
@@ -810,45 +946,61 @@
 
     // ==================== PAYMENT FUNCTIONS ====================
     function hitungSisa() {
-        const total = invoiceData?.total_tagihan || 0;
-        const sudahDibayar = invoiceData?.jumlah_dibayar || 0;
+        if (!invoiceData) return;
+        
+        const total = invoiceData.total_tagihan || 0;
+        const sudahDibayar = invoiceData.jumlah_dibayar || 0;
         const sisaSebelum = total - sudahDibayar;
         
-        const nominalInput = document.getElementById('nominalBayar').value;
-        const nominalBayar = parseFloat(nominalInput.replace(/\D/g, '')) || 0;
+        const nominalInput = document.getElementById('nominalBayar');
+        const nominalBayar = nominalInput ? (parseFloat(nominalInput.value.replace(/\D/g, '')) || 0) : 0;
         
-        document.getElementById('totalTagihan').value = total.toLocaleString('id-ID');
-        document.getElementById('sudahDibayar').value = sudahDibayar.toLocaleString('id-ID');
-        document.getElementById('sisaTagihan').value = sisaSebelum.toLocaleString('id-ID');
+        const totalTagihanEl = document.getElementById('totalTagihan');
+        const sudahDibayarEl = document.getElementById('sudahDibayar');
+        const sisaTagihanEl = document.getElementById('sisaTagihan');
+        const sisaSetelahEl = document.getElementById('sisaSetelah');
+        const sisaStatusEl = document.getElementById('sisaStatus');
+        const statusAfterPaymentEl = document.getElementById('statusAfterPayment');
+        
+        if (totalTagihanEl) totalTagihanEl.value = total.toLocaleString('id-ID');
+        if (sudahDibayarEl) sudahDibayarEl.value = sudahDibayar.toLocaleString('id-ID');
+        if (sisaTagihanEl) sisaTagihanEl.value = sisaSebelum.toLocaleString('id-ID');
         
         let sisaSetelah = sisaSebelum;
         if (nominalBayar > 0) {
             if (nominalBayar > sisaSebelum) {
-                document.getElementById('sisaSetelah').value = '0';
-                document.getElementById('sisaStatus').innerHTML = '<span class="text-danger">Melebihi sisa tagihan!</span>';
+                if (sisaSetelahEl) sisaSetelahEl.value = '0';
+                if (sisaStatusEl) sisaStatusEl.innerHTML = '<span class="text-danger">Melebihi sisa tagihan!</span>';
             } else {
                 sisaSetelah = sisaSebelum - nominalBayar;
-                document.getElementById('sisaSetelah').value = sisaSetelah.toLocaleString('id-ID');
+                if (sisaSetelahEl) sisaSetelahEl.value = sisaSetelah.toLocaleString('id-ID');
                 
-                const statusInfo = document.getElementById('statusAfterPayment');
-                if (sisaSetelah === 0) {
-                    statusInfo.innerHTML = '<strong class="text-success">Lunas</strong>';
-                } else {
-                    statusInfo.innerHTML = '<strong class="text-warning">Belum Lunas</strong>';
+                if (statusAfterPaymentEl) {
+                    if (sisaSetelah === 0) {
+                        statusAfterPaymentEl.innerHTML = '<strong class="text-success">Lunas</strong>';
+                    } else {
+                        statusAfterPaymentEl.innerHTML = '<strong class="text-warning">Belum Lunas</strong>';
+                    }
                 }
-                document.getElementById('sisaStatus').innerHTML = '';
+                if (sisaStatusEl) sisaStatusEl.innerHTML = '';
             }
         } else {
-            document.getElementById('sisaSetelah').value = sisaSebelum.toLocaleString('id-ID');
-            document.getElementById('sisaStatus').innerHTML = 'Akan otomatis terisi';
+            if (sisaSetelahEl) sisaSetelahEl.value = sisaSebelum.toLocaleString('id-ID');
+            if (sisaStatusEl) sisaStatusEl.innerHTML = 'Akan otomatis terisi';
         }
     }
 
     function showVerifyModal() {
-        document.getElementById('paymentInputSection').style.display = 'block';
-        document.getElementById('nominalBayar').value = '';
+        const paymentInputSection = document.getElementById('paymentInputSection');
+        if (paymentInputSection) paymentInputSection.style.display = 'block';
+        
+        const nominalBayar = document.getElementById('nominalBayar');
+        if (nominalBayar) nominalBayar.value = '';
+        
         hitungSisa();
-        document.getElementById('paymentInputSection').scrollIntoView({ behavior: 'smooth' });
+        
+        const element = document.getElementById('paymentInputSection');
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
     }
 
     async function submitPayment() {
@@ -940,11 +1092,14 @@
         }
     }
 
-    // Reset form setelah pembayaran
     function resetPaymentForm() {
-        document.getElementById('nominalBayar').value = '';
-        document.getElementById('paymentNotes').value = '';
-        document.getElementById('paymentInputSection').style.display = 'none';
+        const nominalBayar = document.getElementById('nominalBayar');
+        const paymentNotes = document.getElementById('paymentNotes');
+        const paymentInputSection = document.getElementById('paymentInputSection');
+        
+        if (nominalBayar) nominalBayar.value = '';
+        if (paymentNotes) paymentNotes.value = '';
+        if (paymentInputSection) paymentInputSection.style.display = 'none';
         
         // Reset perhitungan sisa
         if (invoiceData) {
@@ -952,19 +1107,22 @@
             const sudahDibayar = invoiceData.jumlah_dibayar || 0;
             const sisa = total - sudahDibayar;
             
-            document.getElementById('totalTagihan').value = total.toLocaleString('id-ID');
-            document.getElementById('sudahDibayar').value = sudahDibayar.toLocaleString('id-ID');
-            document.getElementById('sisaTagihan').value = sisa.toLocaleString('id-ID');
-            document.getElementById('sisaSetelah').value = sisa.toLocaleString('id-ID');
+            const totalTagihanEl = document.getElementById('totalTagihan');
+            const sudahDibayarEl = document.getElementById('sudahDibayar');
+            const sisaTagihanEl = document.getElementById('sisaTagihan');
+            const sisaSetelahEl = document.getElementById('sisaSetelah');
+            
+            if (totalTagihanEl) totalTagihanEl.value = total.toLocaleString('id-ID');
+            if (sudahDibayarEl) sudahDibayarEl.value = sudahDibayar.toLocaleString('id-ID');
+            if (sisaTagihanEl) sisaTagihanEl.value = sisa.toLocaleString('id-ID');
+            if (sisaSetelahEl) sisaSetelahEl.value = sisa.toLocaleString('id-ID');
         }
     }
 
-    // Update fungsi cancelVerify
     function cancelVerify() {
         resetPaymentForm();
     }
 
-    // 🔥 PERBAIKI FUNGSI viewProof
     function viewProof() {
         if (window.currentProofUrl) {
             window.open(window.currentProofUrl, '_blank');
@@ -1031,7 +1189,7 @@
         showLoading(true);
         
         const formData = new FormData();
-        formData.append('skrd', file); // Gunakan nama field 'skrd' sesuai dengan backend
+        formData.append('skrd', file);
         
         try {
             console.log('📡 Uploading SKRD untuk invoice:', invoiceId);
@@ -1040,7 +1198,6 @@
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${getToken()}`
-                    // JANGAN set Content-Type, biar browser yang set dengan boundary
                 },
                 body: formData
             });
@@ -1050,11 +1207,7 @@
             
             if (result.success) {
                 showAlert('SKRD berhasil diupload', 'success');
-                
-                // Refresh data
                 await loadInvoiceDetail();
-                
-                // Reset file input
                 fileInput.value = '';
             } else {
                 showAlert(result.message || 'Gagal upload', 'danger');
@@ -1069,7 +1222,8 @@
     }
 
     function uploadNewSkrd() {
-        document.getElementById('skrdFileInput').click();
+        const fileInput = document.getElementById('skrdFileInput');
+        if (fileInput) fileInput.click();
     }
 
     // ==================== SUBMISSION ====================
@@ -1127,7 +1281,6 @@
     }
 
     // ==================== EXPOSE FUNCTIONS TO WINDOW ====================
-    // INI YANG PALING PENTING!
     window.printInvoice = printInvoice;
     window.sendReminder = sendReminder;
     window.formatRupiahInput = formatRupiahInput;

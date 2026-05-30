@@ -109,6 +109,7 @@
         document.getElementById('lastProfileUpdate').textContent = data.updated_at ? `Terakhir update: ${formatDate(data.updated_at)}` : '';
     }
 
+    // ==================== SYSTEM CONFIG FUNCTIONS ====================
     function updateSystemForm(data) {
         document.getElementById('institutionName').value = data.institution_name || '';
         document.getElementById('officeAddress').value = data.address || '';
@@ -569,16 +570,9 @@
 
     // ==================== SIMPAN MODE SIBUK ====================
     async function simpanModeSibuk(event) {
-        // 🔴 TERIMA EVENT PARAMETER
-        if (!event) event = window.event;
-        
-        const saveBtn = event.target;
-        const originalText = saveBtn.innerHTML;
+        if (event) event.preventDefault();
         
         try {
-            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
-            saveBtn.disabled = true;
-            
             const response = await fetch(`${API_BASE_URL}/settings/busy-mode`, {
                 method: 'PUT',
                 headers: getAuthHeaders(),
@@ -586,62 +580,31 @@
                     active: busyModeActive
                 })
             });
-            
+
             if (response.status === 401) {
                 handleUnauthorized();
                 return;
             }
-            
+
             const result = await response.json();
-            
+
             if (result.success) {
-                showAlert('Mode sibuk berhasil disimpan', 'success');
-                
-                if (busyModeActive) {
-                    showAlert(
-                        `<i class="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Mode Sibuk AKTIF</strong><br>
-                        Estimasi waktu pengerjaan akan bertambah.`,
-                        'warning',
-                        8000
-                    );
-                } else {
-                    showAlert(
-                        `<i class="fas fa-check-circle me-2"></i>
-                        <strong>Mode Sibuk Nonaktif</strong>`,
-                        'info',
-                        5000
-                    );
-                }
-                
-                // Simpan ke localStorage
-                localStorage.setItem('busyMode', JSON.stringify({
-                    active: busyModeActive,
-                    periods: busyPeriods,
-                    lastUpdated: new Date().toISOString()
-                }));
-                
+                showAlert('Mode sibuk berhasil diperbarui', 'success');
+                await loadBusyMode();
             } else {
-                showAlert(result.message || 'Gagal menyimpan mode sibuk', 'danger');
+                showAlert(result.message || 'Gagal memperbarui mode sibuk', 'danger');
             }
-            
         } catch (error) {
-            console.error('Error saving busy mode:', error);
-            showAlert('Gagal menyimpan mode sibuk: ' + error.message, 'danger');
-        } finally {
-            // 🔴 PASTIKAN INI SELALU DIJALANKAN
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
+            console.error('Error saving busy mode status:', error);
+            showAlert('Gagal memperbarui mode sibuk', 'danger');
         }
     }
 
-    // ==================== ACTIVITY LOGS FUNCTIONS ====================
-    async function loadActivityLogs() {
-        const filter = document.getElementById('logFilter').value;
-
+    // ==================== BACKUP & RESTORE ====================
+    async function loadBackupHistory() {
         try {
-            const response = await fetch(`${API_BASE_URL}/settings/logs?type=${filter}&page=${logsPage}`, {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
+            const response = await fetch(`${API_BASE_URL}/settings/backup/history`, {
+                headers: getAuthHeaders()
             });
 
             if (response.status === 401) {
@@ -650,108 +613,50 @@
             }
 
             const result = await response.json();
+            const container = document.getElementById('backupHistory');
 
-            if (result.success) {
-                const logs = result.data;
+            if (result.success && result.data && result.data.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-hover align-middle">';
+                html += '<thead><tr><th>Tanggal</th><th>Nama File</th><th>Ukuran</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
                 
-                if (!logs || logs.length === 0) {
-                    document.getElementById('activityLogs').innerHTML = '<p class="text-muted text-center">Belum ada aktivitas</p>';
-                    return;
-                }
-                
-                // Di function loadActivityLogs, ganti bagian ini:
-
-                const logsHtml = logs.map(log => {
-                    let icon = 'info-circle';
-                    let color = 'primary';
-                    let description = '';
-                    
-                    // Buat deskripsi berdasarkan activity_name
-                    if (log.activity_name) {
-                        if (log.activity_name.toLowerCase().includes('login')) { 
-                            icon = 'sign-in-alt'; 
-                            color = 'success';
-                            description = 'Melakukan login ke sistem';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('register')) { 
-                            icon = 'user-plus'; 
-                            color = 'info';
-                            description = 'Mendaftarkan akun baru';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('update') || log.activity_name.toLowerCase().includes('edit')) { 
-                            icon = 'edit'; 
-                            color = 'warning';
-                            description = 'Memperbarui data';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('create') || log.activity_name.toLowerCase().includes('add')) { 
-                            icon = 'plus-circle'; 
-                            color = 'info';
-                            description = 'Menambahkan data baru';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('delete') || log.activity_name.toLowerCase().includes('hapus')) { 
-                            icon = 'trash'; 
-                            color = 'danger';
-                            description = 'Menghapus data';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('backup')) { 
-                            icon = 'database'; 
-                            color = 'secondary';
-                            description = 'Membuat backup database';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('restore')) { 
-                            icon = 'undo'; 
-                            color = 'secondary';
-                            description = 'Merestore database';
-                        }
-                        else if (log.activity_name.toLowerCase().includes('verify')) { 
-                            icon = 'check-circle'; 
-                            color = 'success';
-                            description = 'Memverifikasi user';
-                        }
-                        else {
-                            description = log.activity_name;
-                        }
-                    }
-                    
-                    return `
-                        <div class="activity-item border-${color} ps-3 mb-3">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <span class="badge bg-${color} bg-opacity-10 text-${color} mb-2">
-                                        <i class="fas fa-${icon} me-1"></i>${log.activity_name || 'Aktivitas'}
-                                    </span>
-                                    <p class="mb-1">${description}</p>  <!-- Deskripsi yang lebih jelas -->
-                                </div>
-                                <small class="text-muted">${formatDateTime(log.created_at)}</small>
-                            </div>
-                            <small class="text-muted">
-                                <i class="fas fa-user me-1"></i>${log.user_name || 'System'}
-                                ${log.ip_address ? ` · <i class="fas fa-network-wired me-1"></i>${log.ip_address}` : ''}
-                                ${log.user_agent ? ` · <i class="fas fa-globe me-1"></i>${log.user_agent.substring(0, 30)}...` : ''}
-                            </small>
-                        </div>
+                result.data.forEach(backup => {
+                    html += `
+                        <tr>
+                            <td>${formatDate(backup.created_at)}</td>
+                            <td><code class="small">${backup.filename}</code></td>
+                            <td>${backup.size || '-'}</td>
+                            <td><span class="badge bg-${backup.status === 'success' ? 'success' : 'danger'}">${backup.status}</span></td>
+                            <td>
+                                <a href="${API_BASE_URL}/settings/backup/download/${backup.id}" class="btn btn-sm btn-outline-primary" title="Download">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </td>
+                        </tr>
                     `;
-                }).join('');
-
-                document.getElementById('activityLogs').innerHTML = logsHtml;
+                });
+                
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-database fa-2x mb-2"></i>
+                        <p>Belum ada history backup database</p>
+                    </div>
+                `;
             }
         } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('activityLogs').innerHTML = '<p class="text-muted text-center">Gagal memuat log</p>';
+            console.error('Error loading backup history:', error);
         }
     }
 
-    function loadMoreLogs() {
-        logsPage++;
-        loadActivityLogs();
-    }
-
-    // ==================== BACKUP FUNCTIONS ====================
     async function createBackup() {
+        showAlert('Membuat backup database...', 'info');
+        
         try {
             const response = await fetch(`${API_BASE_URL}/settings/backup`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${getToken()}` }
+                headers: getAuthHeaders()
             });
 
             if (response.status === 401) {
@@ -763,32 +668,30 @@
 
             if (result.success) {
                 showAlert('Backup berhasil dibuat', 'success');
-                
-                if (result.data && result.data.url) {
-                    const a = document.createElement('a');
-                    a.href = result.data.url;
-                    a.download = result.data.filename;
-                    a.click();
-                }
-                
                 loadBackupHistory();
             } else {
-                showAlert('Gagal membuat backup', 'danger');
+                showAlert(result.message || 'Gagal membuat backup', 'danger');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error creating backup:', error);
             showAlert('Gagal membuat backup', 'danger');
         }
     }
 
     async function restoreBackup() {
-        const file = document.getElementById('restoreFile').files[0];
-        if (!file) return;
+        const fileInput = document.getElementById('restoreFile');
+        if (!fileInput.files || fileInput.files.length === 0) return;
 
-        if (!confirm('Restore akan menimpa semua data. Lanjutkan?')) return;
+        const file = fileInput.files[0];
+        if (!confirm(`Restore database menggunakan file "${file.name}"? Data saat ini mungkin akan tertimpa.`)) {
+            fileInput.value = '';
+            return;
+        }
+
+        showAlert('Mengembalikan database... Mohon tunggu', 'info');
 
         const formData = new FormData();
-        formData.append('backup_file', file);
+        formData.append('backup', file);
 
         try {
             const response = await fetch(`${API_BASE_URL}/settings/restore`, {
@@ -807,20 +710,29 @@
             const result = await response.json();
 
             if (result.success) {
-                showAlert('Restore berhasil', 'success');
+                showAlert('Restore database berhasil. Memuat ulang data...', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                showAlert('Gagal restore', 'danger');
+                showAlert(result.message || 'Gagal restore database', 'danger');
             }
         } catch (error) {
-            console.error('Error:', error);
-            showAlert('Gagal restore', 'danger');
+            console.error('Error restoring backup:', error);
+            showAlert('Gagal restore database', 'danger');
+        } finally {
+            fileInput.value = '';
         }
     }
 
-    async function loadBackupHistory() {
+    // ==================== ACTIVITY LOGS ====================
+    async function loadActivityLogs() {
+        const filter = document.getElementById('logFilter').value;
+        logsPage = 1;
+
         try {
-            const response = await fetch(`${API_BASE_URL}/settings/backups`, {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
+            const response = await fetch(`${API_BASE_URL}/settings/logs?page=${logsPage}&limit=10&filter=${filter}`, {
+                headers: getAuthHeaders()
             });
 
             if (response.status === 401) {
@@ -829,74 +741,29 @@
             }
 
             const result = await response.json();
+            const container = document.getElementById('activityLogs');
 
-            if (result.success) {
-                const backups = result.data;
-                
-                if (!backups || backups.length === 0) {
-                    document.getElementById('backupHistory').innerHTML = '<p class="text-muted text-center">Belum ada backup</p>';
-                    return;
-                }
-                
-                const historyHtml = backups.map(b => `
-                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
-                        <div>
-                            <i class="fas fa-file-archive me-2 text-primary"></i>
-                            <span>${b.filename}</span>
-                            <small class="text-muted ms-2">${formatFileSize(b.size)}</small>
-                        </div>
-                        <div>
-                            <small class="text-muted me-3">${formatDateTime(b.created_at)}</small>
-                            <a href="${b.url}" class="btn btn-sm btn-outline-primary" download>
-                                <i class="fas fa-download"></i>
-                            </a>
-                        </div>
+            if (result.success && result.data && result.data.length > 0) {
+                renderLogs(result.data, false);
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-history fa-2x mb-2"></i>
+                        <p>Tidak ada log aktivitas ditemukan</p>
                     </div>
-                `).join('');
-
-                document.getElementById('backupHistory').innerHTML = historyHtml;
+                `;
             }
         } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('backupHistory').innerHTML = '<p class="text-muted text-center">Gagal memuat backup</p>';
+            console.error('Error loading logs:', error);
         }
     }
 
-    // ==================== SESSION FUNCTIONS ====================
-    async function loadActiveSessions() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/settings/sessions`, {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
-            });
-
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                const sessions = result.data;
-                
-                if (!sessions || sessions.length === 0) {
-                    return;
-                }
-                
-                // TODO: Tampilkan di UI jika ada tempatnya
-                console.log('Active sessions:', sessions);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    }
-
-    async function logoutAllDevices() {
-        if (!confirm('Logout dari semua perangkat lain?')) return;
+    async function loadMoreLogs() {
+        const filter = document.getElementById('logFilter').value;
+        logsPage++;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/settings/sessions/logout-all`, {
-                method: 'POST',
+            const response = await fetch(`${API_BASE_URL}/settings/logs?page=${logsPage}&limit=10&filter=${filter}`, {
                 headers: getAuthHeaders()
             });
 
@@ -907,112 +774,201 @@
 
             const result = await response.json();
 
-            if (result.success) {
-                showAlert('Berhasil logout dari semua perangkat lain', 'success');
+            if (result.success && result.data && result.data.length > 0) {
+                renderLogs(result.data, true);
             } else {
-                showAlert('Gagal logout', 'danger');
+                showAlert('Semua log sudah ditampilkan', 'info');
             }
         } catch (error) {
-            console.error('Error:', error);
-            showAlert('Gagal logout', 'danger');
+            console.error('Error loading more logs:', error);
         }
     }
 
-    // ==================== NAVIGATION ====================
-    function switchSection(section) {
-        currentSection = section;
-        
-        document.querySelectorAll('.list-group-item').forEach(item => {
-            item.classList.remove('active');
+    function renderLogs(logs, append = false) {
+        const container = document.getElementById('activityLogs');
+        let html = '';
+
+        logs.forEach(log => {
+            let iconClass = 'fa-info-circle text-info';
+            let borderStyle = 'border-info';
+
+            if (log.action === 'login') {
+                iconClass = 'fa-sign-in-alt text-primary';
+                borderStyle = 'border-primary';
+            } else if (log.action === 'update') {
+                iconClass = 'fa-edit text-warning';
+                borderStyle = 'border-warning';
+            } else if (log.action === 'create') {
+                iconClass = 'fa-plus-circle text-success';
+                borderStyle = 'border-success';
+            } else if (log.action === 'delete') {
+                iconClass = 'fa-trash text-danger';
+                borderStyle = 'border-danger';
+            } else if (log.action === 'backup') {
+                iconClass = 'fa-database text-secondary';
+                borderStyle = 'border-secondary';
+            }
+
+            html += `
+                <div class="activity-item p-3 mb-2 bg-white rounded shadow-sm border-start border-3 ${borderStyle}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3 fs-5">
+                                <i class="fas ${iconClass}"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold small text-dark">${log.details || ''}</div>
+                                <div class="text-muted small">Oleh: ${log.admin_name || 'System'} • IP: ${log.ip_address || '-'}</div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="small text-muted">${formatDate(log.created_at)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
         });
-        
-        event.target.closest('.list-group-item').classList.add('active');
-        
-        document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
-        document.getElementById(`${section}-section`).style.display = 'block';
-        
-        window.location.hash = section;
+
+        if (append) {
+            container.innerHTML += html;
+        } else {
+            container.innerHTML = html;
+        }
     }
 
-    // ==================== UTILITY FUNCTIONS ====================
-    function togglePassword(inputId) {
+    // ==================== ACTIVE SESSIONS ====================
+    async function loadActiveSessions() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/settings/sessions`, {
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                handleUnauthorized();
+                return;
+            }
+
+            const result = await response.json();
+            console.log('Active Sessions:', result);
+        } catch (error) {
+            console.error('Error loading sessions:', error);
+        }
+    }
+
+    // ==================== NAVIGATION / SWITCH TAB ====================
+    window.switchSection = function(sectionId) {
+        currentSection = sectionId;
+        
+        // Sembunyikan semua section
+        document.querySelectorAll('.settings-section').forEach(section => {
+            section.style.display = 'none';
+        });
+
+        // Tampilkan section yang dipilih
+        const activeSection = document.getElementById(`${sectionId}-section`);
+        if (activeSection) {
+            activeSection.style.display = 'block';
+        }
+
+        // Update active class navigation
+        document.querySelectorAll('#settingsNav a').forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === `#${sectionId}`) {
+                link.classList.add('active');
+            }
+        });
+    };
+
+    // ==================== PASSWORD UI TOGGLE ====================
+    window.togglePassword = function(inputId) {
         const input = document.getElementById(inputId);
-        const type = input.type === 'password' ? 'text' : 'password';
-        input.type = type;
-    }
+        const icon = input.nextElementSibling.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    };
 
+    // ==================== NOTIFICATION SYSTEM ====================
+    window.showAlert = function(message, type = 'info') {
+        const alertBox = document.getElementById('alertMessage');
+        if (!alertBox) return;
+
+        alertBox.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+        alertBox.style.zIndex = '10000';
+        alertBox.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        alertBox.style.display = 'block';
+
+        // Auto close after 4 seconds
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alertBox);
+            bsAlert.close();
+        }, 4000);
+    };
+
+    // ==================== DATE FORMATTERS ====================
     function formatDate(dateString) {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-        return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-    }
+        if (!dateString) return '';
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return dateString;
 
-    function formatDateTime(dateString) {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return formatDate(dateString) + ' ' + 
-               String(date.getHours()).padStart(2, '0') + ':' + 
-               String(date.getMinutes()).padStart(2, '0');
+        const months = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        
+        const day = d.getDate();
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+
+        return `${day} ${month} ${year} ${hours}:${minutes}`;
     }
 
     function formatDateForInput(date) {
-        return date.toISOString().split('T')[0];
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-
-    function showAlert(message, type) {
-        const alertDiv = document.getElementById('alertMessage');
-        alertDiv.style.display = 'block';
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'"></button>
-        `;
+        if (!date) return '';
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return '';
         
-        setTimeout(() => {
-            alertDiv.style.display = 'none';
-        }, 5000);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
     }
 
-    // ==================== EXPOSE FUNCTIONS TO WINDOW ====================
-    window.switchSection = switchSection;
+    // Bind functions to window context for onclick inline triggers in EJS
     window.updateProfile = updateProfile;
     window.previewImage = previewImage;
     window.removeProfileImage = removeProfileImage;
-    window.changePassword = changePassword;
-    window.togglePassword = togglePassword;
     window.checkPasswordStrength = checkPasswordStrength;
     window.checkPasswordMatch = checkPasswordMatch;
+    window.changePassword = changePassword;
     window.updateSystemConfig = updateSystemConfig;
-    window.loadBusyMode = loadBusyMode;
     window.tambahPeriodeSibuk = tambahPeriodeSibuk;
     window.editPeriode = editPeriode;
     window.batalEditPeriode = batalEditPeriode;
     window.simpanPeriode = simpanPeriode;
     window.hapusPeriode = hapusPeriode;
     window.simpanModeSibuk = simpanModeSibuk;
-    window.loadActivityLogs = loadActivityLogs;
-    window.loadMoreLogs = loadMoreLogs;
     window.createBackup = createBackup;
     window.restoreBackup = restoreBackup;
-    window.logoutAllDevices = logoutAllDevices;
+    window.loadActivityLogs = loadActivityLogs;
+    window.loadMoreLogs = loadMoreLogs;
 
-    // ==================== INITIALIZE ====================
+    // ==================== INITIATE LOAD ====================
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('✅ Settings page initialized');
         loadSettings();
-        
-        const hash = window.location.hash.substring(1);
-        if (hash) {
-            const link = document.querySelector(`[href="#${hash}"]`);
-            if (link) link.click();
-        }
     });
 
 })();

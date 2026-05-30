@@ -1250,6 +1250,8 @@ const pageController = {
             const axios = require('axios');
             const API_URL = process.env.API_URL || 'http://localhost:5000/api';
             
+            // 🔥 HAPUS FETCH TEST TYPES - TIDAK PERLU ENDPOINT TERPISAH
+            
             const response = await axios.get(`${API_URL}/submissions`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { page, status, search, limit: 10 }
@@ -1268,6 +1270,7 @@ const pageController = {
                     total: data.total || 0
                 },
                 filters: { status, search }
+                // 🔥 TIDAK PERLU KIRIM testTypes
             });
         } catch (error) {
             console.error('❌ Error loading admin submissions:', error);

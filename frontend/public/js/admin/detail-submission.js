@@ -341,43 +341,81 @@ III. **KAJI ULANG PERMINTAAN**
         // Update Status Timeline
         updateStatusTimeline(data.status);
         
-        // Set form values untuk admin
+        // 🔥 UPDATE STATUS SELECT - LANGSUNG SET VALUE DARI data.status
         const statusSelect = document.getElementById('statusSelect');
-        if (statusSelect) {
-            // Map dari nilai database ke value select
-            const statusMap = {
-                'Menunggu Verifikasi': 'pending_verification',
-                'Pengecekan Sampel': 'sample_checking',
-                'Belum Bayar': 'unpaid',
-                'Belum Lunas': 'partially_paid',
-                'Menunggu SKRD Upload': 'awaiting_skrd',
-                'Lunas': 'paid',
-                'Sedang Diuji': 'testing',
-                'Selesai': 'completed',
-                'Dibatalkan': 'cancelled'
-            };
+        if (statusSelect && data.status) {
+            console.log('📝 Setting status select to:', data.status);
             
-            const selectValue = statusMap[data.status] || 'pending_verification';
-            statusSelect.value = selectValue;
+            // Cari option yang valuenya sesuai dengan status dari database
+            let found = false;
+            for (let i = 0; i < statusSelect.options.length; i++) {
+                if (statusSelect.options[i].value === data.status) {
+                    statusSelect.selectedIndex = i;
+                    found = true;
+                    console.log('✅ Status select set to index:', i, 'value:', statusSelect.options[i].value);
+                    break;
+                }
+            }
+            
+            // Jika tidak ditemukan, set ke default
+            if (!found) {
+                console.log('⚠️ Status not found in select options:', data.status);
+                // Coba cari dengan mapping
+                const statusMapping = {
+                    'Menunggu Verifikasi': 'Menunggu Verifikasi',
+                    'Pengecekan Sampel': 'Pengecekan Sampel',
+                    'Belum Bayar': 'Belum Bayar',
+                    'Menunggu SKRD Upload': 'Menunggu SKRD Upload',
+                    'Belum Lunas': 'Belum Lunas',
+                    'Lunas': 'Lunas',
+                    'Sedang Diuji': 'Sedang Diuji',
+                    'Selesai': 'Selesai',
+                    'Dibatalkan': 'Dibatalkan'
+                };
+                
+                const mappedStatus = statusMapping[data.status] || 'Menunggu Verifikasi';
+                for (let i = 0; i < statusSelect.options.length; i++) {
+                    if (statusSelect.options[i].value === mappedStatus) {
+                        statusSelect.selectedIndex = i;
+                        console.log('✅ Status select set via mapping to:', mappedStatus);
+                        break;
+                    }
+                }
+            }
         }
         
-        // CATATAN DARI USER (dari database catatan_tambahan)
+        // SET JADWAL SAMPLING
+        const testDateInput = document.getElementById('testDate');
+        if (testDateInput && data.jadwal_sampling) {
+            const dateStr = data.jadwal_sampling;
+            if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                testDateInput.value = dateStr;
+            } else {
+                const date = new Date(dateStr);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                testDateInput.value = `${year}-${month}-${day}`;
+            }
+            console.log('📅 Jadwal sampling diisi:', testDateInput.value);
+        } else if (testDateInput) {
+            testDateInput.value = '';
+        }
+        
+        // CATATAN DARI USER
         const userNotes = document.getElementById('userNotes');
         if (userNotes) {
             userNotes.textContent = data.catatan_tambahan || data.notes || '-';
             console.log('📝 Catatan dari user:', data.catatan_tambahan);
         }
         
-        // CATATAN DARI ADMIN (untuk diisi)
+        // CATATAN DARI ADMIN
         const internalNotes = document.getElementById('internalNotes');
         if (internalNotes) {
-            internalNotes.value = data.catatan_admin || ''; // Jika sudah ada kolom catatan_admin
+            internalNotes.value = data.catatan_admin || '';
         }
         
-        // Hitung total items
-        document.getElementById('totalItems').textContent = (data.samples || data.items || []).length + ' item';
-        
-        // 🔥 Tampilkan file laporan jika sudah ada
+        // Tampilkan file laporan jika sudah ada
         if (data.report && data.report.file_laporan) {
             const reportName = normalizeFilename(data.report.file_laporan);
             const reportUrl = buildProtectedFileUrl('laporan', data.report.file_laporan);
@@ -396,28 +434,11 @@ III. **KAJI ULANG PERMINTAAN**
                 </div>
             `;
             
-            // Tampilkan info di bawah upload area
             const uploadArea = document.getElementById('uploadArea');
             const existingInfo = document.querySelector('.alert-success.mt-2');
             if (existingInfo) existingInfo.remove();
             uploadArea.insertAdjacentHTML('afterend', reportInfo);
         }
-    }
-
-    function updateStatusBadge(status) {
-        const badge = document.getElementById('statusBadge');
-        const statusConfig = {
-            'pending_verification': { class: 'badge-soft-warning', text: 'Menunggu Verifikasi' },
-            'payment_pending': { class: 'badge-soft-danger', text: 'Menunggu Pembayaran' },
-            'paid': { class: 'badge-soft-success', text: 'Lunas' },
-            'testing': { class: 'badge-soft-primary', text: 'Sedang Diuji' },
-            'completed': { class: 'badge-soft-info', text: 'Selesai' },
-            'cancelled': { class: 'badge-soft-secondary', text: 'Dibatalkan' }
-        };
-        
-        const config = statusConfig[status] || { class: 'badge-soft-secondary', text: status };
-        badge.className = `badge ${config.class} px-3 py-2 rounded-pill`;
-        badge.textContent = config.text;
     }
 
     function updateItemsTable(items) {
@@ -453,44 +474,79 @@ III. **KAJI ULANG PERMINTAAN**
         tbody.innerHTML = rowsHtml;
     }
 
+    // ==================== UPDATE STATUS BADGE ====================
+    function updateStatusBadge(status) {
+        const badge = document.getElementById('statusBadge');
+        
+        let statusClass = 'badge-soft-secondary';
+        let statusIcon = 'fa-circle';
+        
+        switch(status) {
+            case 'Menunggu Verifikasi':
+                statusClass = 'badge-soft-warning';
+                statusIcon = 'fa-clock';
+                break;
+            case 'Pengecekan Sampel':
+                statusClass = 'badge-soft-info';
+                statusIcon = 'fa-search';
+                break;
+            case 'Belum Bayar':
+                statusClass = 'badge-soft-danger';
+                statusIcon = 'fa-credit-card';
+                break;
+            case 'Menunggu SKRD Upload':
+                statusClass = 'badge-soft-primary';
+                statusIcon = 'fa-file-invoice';
+                break;
+            case 'Belum Lunas':
+                statusClass = 'badge-soft-warning';
+                statusIcon = 'fa-hourglass-half';
+                break;
+            case 'Lunas':
+                statusClass = 'badge-soft-success';
+                statusIcon = 'fa-check-circle';
+                break;
+            case 'Sedang Diuji':
+                statusClass = 'badge-soft-primary';
+                statusIcon = 'fa-flask';
+                break;
+            case 'Selesai':
+                statusClass = 'badge-soft-success';
+                statusIcon = 'fa-check-double';
+                break;
+            case 'Dibatalkan':
+                statusClass = 'badge-soft-secondary';
+                statusIcon = 'fa-ban';
+                break;
+            default:
+                statusClass = 'badge-soft-secondary';
+                statusIcon = 'fa-circle';
+        }
+        
+        badge.className = `badge ${statusClass} px-3 py-2 rounded-pill`;
+        badge.innerHTML = `<i class="fas ${statusIcon} me-1"></i> ${status}`;
+    }
+
+    // ==================== UPDATE STATUS TIMELINE ====================
     function updateStatusTimeline(currentStatus) {
         const timeline = document.getElementById('statusTimeline');
         if (!timeline) return;
         
-        // Urutan status berdasarkan alur yang benar
+        // Urutan 9 status
         const statuses = [
             { key: 'Menunggu Verifikasi', label: 'Pengajuan Diterima', icon: 'fa-file' },
             { key: 'Pengecekan Sampel', label: 'Pengecekan Sampel', icon: 'fa-search' },
             { key: 'Belum Bayar', label: 'Menunggu Pembayaran', icon: 'fa-credit-card' },
-            { key: 'Belum Lunas', label: 'Pembayaran Sebagian', icon: 'fa-hourglass-half' },
             { key: 'Menunggu SKRD Upload', label: 'Menunggu SKRD', icon: 'fa-file-invoice' },
+            { key: 'Belum Lunas', label: 'Pembayaran Sebagian', icon: 'fa-hourglass-half' },
             { key: 'Lunas', label: 'Pembayaran Lunas', icon: 'fa-check-circle' },
             { key: 'Sedang Diuji', label: 'Proses Pengujian', icon: 'fa-flask' },
-            { key: 'Selesai', label: 'Selesai', icon: 'fa-certificate' }
+            { key: 'Selesai', label: 'Pengujian Selesai', icon: 'fa-check-double' },
+            { key: 'Dibatalkan', label: 'Dibatalkan', icon: 'fa-ban' }
         ];
 
-        // Cari index status saat ini
         let currentIndex = statuses.findIndex(s => s.key === currentStatus);
-        
-        // Jika status tidak ditemukan, coba cari berdasarkan kemiripan
-        if (currentIndex === -1) {
-            // Mapping untuk status yang mungkin tidak tepat
-            const statusMap = {
-                'pending_verification': 'Menunggu Verifikasi',
-                'payment_pending': 'Belum Bayar',
-                'paid': 'Lunas',
-                'testing': 'Sedang Diuji',
-                'completed': 'Selesai',
-                'cancelled': 'Dibatalkan',
-                'sample_checking': 'Pengecekan Sampel',
-                'unpaid': 'Belum Bayar',
-                'partially_paid': 'Belum Lunas',
-                'awaiting_skrd': 'Menunggu SKRD Upload'
-            };
-            
-            const mappedStatus = statusMap[currentStatus] || currentStatus;
-            currentIndex = statuses.findIndex(s => s.key === mappedStatus);
-        }
+        if (currentIndex === -1) currentIndex = 0;
 
         const timelineHtml = statuses.map((status, index) => {
             let statusClass = 'pending';
@@ -517,6 +573,24 @@ III. **KAJI ULANG PERMINTAAN**
         }).join('');
 
         timeline.innerHTML = timelineHtml;
+    }
+
+    // ==================== UPDATE STATUS SELECT OPTIONS ====================
+    function updateStatusSelect(currentStatus) {
+        const statusSelect = document.getElementById('statusSelect');
+        if (!statusSelect) return;
+        
+        // Kosongkan dan isi ulang dengan 9 status
+        statusSelect.innerHTML = '';
+        window.STATUS_CONFIG.list.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            if (status === currentStatus) {
+                option.selected = true;
+            }
+            statusSelect.appendChild(option);
+        });
     }
 
     // ==================== HELPER FUNCTIONS ====================
@@ -576,48 +650,93 @@ III. **KAJI ULANG PERMINTAAN**
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
     const filePreview = document.getElementById('filePreview');
+    
+    // 🔥 FLAG UNTUK MENCEGAH DOUBLE SUBMIT
+    let isUploading = false;
 
     if (uploadArea && fileInput) {
-        uploadArea.addEventListener('click', () => fileInput.click());
+        // 🔥 HAPUS EVENT LISTENER LAMA DENGAN CLONE
+        const newUploadArea = uploadArea.cloneNode(true);
+        uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
         
-        uploadArea.addEventListener('dragover', (e) => {
+        const newFileInput = newUploadArea.querySelector('#fileInput');
+        const finalUploadArea = document.getElementById('uploadArea');
+        
+        // 🔥 KLIK AREA UNTUK MEMILIH FILE (HANYA 1 KALI)
+        finalUploadArea.addEventListener('click', (e) => {
+            // Jangan trigger jika klik pada preview atau tombol
+            if (e.target.closest('#filePreview')) return;
+            e.stopPropagation();
+            newFileInput.click();
+        });
+        
+        // Drag & drop
+        finalUploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('dragover');
+            finalUploadArea.style.borderColor = '#4361ee';
+            finalUploadArea.style.backgroundColor = '#f0f7ff';
         });
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+        finalUploadArea.addEventListener('dragleave', () => {
+            finalUploadArea.style.borderColor = '#dee2e6';
+            finalUploadArea.style.backgroundColor = 'transparent';
         });
 
-        uploadArea.addEventListener('drop', (e) => {
+        finalUploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                previewFile(files[0]);
+            finalUploadArea.style.borderColor = '#dee2e6';
+            finalUploadArea.style.backgroundColor = 'transparent';
+            
+            if (e.dataTransfer.files.length && !isUploading) {
+                const file = e.dataTransfer.files[0];
+                newFileInput.files = e.dataTransfer.files;
+                handleFileSelect(file);
             }
         });
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                previewFile(e.target.files[0]);
+        // 🔥 CHANGE EVENT - HANYA SEKALI
+        newFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length && !isUploading) {
+                handleFileSelect(e.target.files[0]);
             }
         });
     }
 
-    // 🔥 FUNGSI PREVIEW FILE DENGAN TOMBOL UPLOAD
-    function previewFile(file) {
-        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+    // Fungsi untuk handle file yang dipilih
+    function handleFileSelect(file) {
+        if (isUploading) {
+            console.log('⏳ Upload sedang berlangsung, tunggu...');
+            return;
+        }
+        
+        console.log('📁 File selected:', file.name, 'size:', file.size, 'type:', file.type);
+        
+        // Validasi ukuran file (maks 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Ukuran file maksimal 5MB', 'danger');
+            return;
+        }
+        
+        // Tampilkan preview
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
         filePreview.style.display = 'block';
+        
+        // Tentukan icon berdasarkan tipe file
+        let fileIcon = 'fa-file-pdf';
+        let iconColor = 'text-danger';
+        if (file.type.includes('image')) {
+            fileIcon = 'fa-file-image';
+            iconColor = 'text-primary';
+        }
+        
         filePreview.innerHTML = `
             <div class="d-flex align-items-center gap-2 p-2 bg-light rounded">
-                <i class="fas fa-file-pdf text-danger"></i>
+                <i class="fas ${fileIcon} ${iconColor} fa-2x"></i>
                 <div class="flex-grow-1">
                     <small class="fw-bold d-block">${file.name}</small>
-                    <small class="text-muted">${fileSize} MB</small>
+                    <small class="text-muted">${fileSizeMB} MB</small>
                 </div>
-                <button type="button" class="btn btn-sm btn-primary me-1" onclick="uploadSelectedFile()">
+                <button type="button" class="btn btn-sm btn-primary me-1" onclick="uploadSelectedFile()" id="confirmUploadBtn">
                     <i class="fas fa-upload"></i> Upload
                 </button>
                 <button type="button" class="btn btn-sm btn-light" onclick="removeFile()">
@@ -625,24 +744,37 @@ III. **KAJI ULANG PERMINTAAN**
                 </button>
             </div>
         `;
+        
+        // Simpan file untuk upload
+        window.selectedFile = file;
     }
 
-    // 🔥 FUNGSI UPLOAD FILE YANG DIPILIH
-    window.uploadSelectedFile = function() {
-        const file = fileInput.files[0];
-        if (file) {
-            uploadReportFile(file);
+    // 🔥 FUNGSI UPLOAD FILE YANG DIPILIH (HANYA SEKALI)
+    window.uploadSelectedFile = async function() {
+        const file = window.selectedFile;
+        if (!file) {
+            showToast('Pilih file terlebih dahulu', 'warning');
+            return;
         }
-    };
-
-    // 🔥 FUNGSI UPLOAD FILE LAPORAN
-    async function uploadReportFile(file) {
-        if (!file) return;
+        
+        if (isUploading) {
+            showToast('Upload sedang berlangsung, tunggu...', 'warning');
+            return;
+        }
+        
+        isUploading = true;
+        
+        // Disable tombol upload
+        const uploadBtn = document.getElementById('confirmUploadBtn');
+        if (uploadBtn) {
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengupload...';
+        }
         
         const formData = new FormData();
         formData.append('laporan', file);
         
-        // Tampilkan loading di tombol
+        // Tampilkan loading di upload area
         const uploadArea = document.getElementById('uploadArea');
         const originalHTML = uploadArea.innerHTML;
         uploadArea.innerHTML = `
@@ -666,19 +798,10 @@ III. **KAJI ULANG PERMINTAAN**
             if (result.success) {
                 showToast('Laporan berhasil diupload!', 'success');
                 
-                // Tampilkan file yang sudah diupload
-                filePreview.innerHTML = `
-                    <div class="d-flex align-items-center gap-2 p-2 bg-success-subtle rounded">
-                        <i class="fas fa-check-circle text-success"></i>
-                        <div class="flex-grow-1">
-                            <small class="fw-bold d-block">${file.name}</small>
-                            <small class="text-success">Terupload</small>
-                        </div>
-                        <a href="${result.data.url}" target="_blank" class="btn btn-sm btn-light">
-                            <i class="fas fa-eye"></i> Lihat
-                        </a>
-                    </div>
-                `;
+                // Reset preview
+                filePreview.style.display = 'none';
+                filePreview.innerHTML = '';
+                window.selectedFile = null;
                 
                 // Kembalikan tampilan upload area
                 uploadArea.innerHTML = originalHTML;
@@ -687,20 +810,34 @@ III. **KAJI ULANG PERMINTAAN**
                 setTimeout(() => loadSubmissionDetail(), 1000);
             } else {
                 showToast(result.message || 'Gagal upload', 'danger');
-                // Kembalikan tampilan awal
                 uploadArea.innerHTML = originalHTML;
+                if (uploadBtn) {
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+                }
             }
         } catch (error) {
             console.error('Error uploading:', error);
             showToast('Gagal upload file: ' + error.message, 'danger');
             uploadArea.innerHTML = originalHTML;
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+            }
+        } finally {
+            isUploading = false;
+            const fileInputElement = document.getElementById('fileInput');
+            if (fileInputElement) fileInputElement.value = '';
         }
-    }
+    };
 
     window.removeFile = function() {
-        fileInput.value = '';
         filePreview.style.display = 'none';
         filePreview.innerHTML = '';
+        window.selectedFile = null;
+        const fileInputElement = document.getElementById('fileInput');
+        if (fileInputElement) fileInputElement.value = '';
+        console.log('🗑️ File removed');
     };
 
     // ==================== FORM HANDLERS ====================
@@ -708,35 +845,21 @@ III. **KAJI ULANG PERMINTAAN**
         event.preventDefault();
         
         const statusSelect = document.getElementById('statusSelect');
-        const adminNotes = document.getElementById('internalNotes').value; // Catatan dari admin
+        const adminNotes = document.getElementById('internalNotes').value;
+        const testDate = document.getElementById('testDate').value;
 
+        // 🔥 AMBIL STATUS LANGSUNG DARI SELECT (VALUE)
         const selectedStatus = statusSelect.value;
         
         console.log('========== HANDLE UPDATE ==========');
-        console.log('📝 Selected status value:', selectedStatus);
+        console.log('📝 Selected status dari select:', selectedStatus);
+        console.log('📝 Jadwal Sampling:', testDate);
         console.log('📝 Admin notes:', adminNotes);
         
-        // Validasi sederhana
         if (!selectedStatus) {
             showAlert('Status harus dipilih', 'warning');
             return;
         }
-
-        // Mapping status dari frontend ke database
-        const statusMap = {
-            'pending_verification': 'Menunggu Verifikasi',
-            'payment_pending': 'Menunggu Pembayaran',
-            'paid': 'Lunas',
-            'testing': 'Sedang Diuji',
-            'completed': 'Selesai',
-            'cancelled': 'Dibatalkan',
-            'sample_checking': 'Pengecekan Sampel',
-            'unpaid': 'Belum Bayar',
-            'partially_paid': 'Belum Lunas',
-            'awaiting_skrd': 'Menunggu SKRD Upload'
-        };
-
-        const dbStatus = statusMap[selectedStatus] || selectedStatus;
 
         // Tampilkan loading
         document.getElementById('updateBtn').disabled = true;
@@ -744,16 +867,25 @@ III. **KAJI ULANG PERMINTAAN**
         document.getElementById('updateBtnSpinner').style.display = 'inline-block';
 
         try {
+            // 🔥 KIRIM STATUS LANGSUNG
+            const requestBody = {
+                status: selectedStatus,
+                catatan: adminNotes || null
+            };
+            
+            if (testDate) {
+                requestBody.jadwal_sampling = testDate;
+            }
+            
+            console.log('📤 Sending to backend:', requestBody);
+            
             const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${getToken()}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    status: dbStatus,
-                    catatan: adminNotes || null // Kirim sebagai catatan
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const result = await response.json();
@@ -859,12 +991,12 @@ III. **KAJI ULANG PERMINTAAN**
             // BORDER LUAR
             doc.rect(12, 12, 192, 305);
 
-            // --- HEADER GRID (3 KOLOM) - REVISI TINGGI 24MM ---
+            // --- HEADER GRID (3 KOLOM) ---
             const headerH = 24;
             const rowH = headerH / 2;
             const metaH = headerH / 4;
 
-            // 1. Kotak Logo (Kiri) - Sekarang 32x24
+            // 1. Kotak Logo (Kiri)
             doc.rect(12, 12, 32, headerH); 
             try {
                 doc.addImage('/img/logo-banten.png', 'PNG', 16, 17.35, 24, 13.3); 
@@ -897,9 +1029,6 @@ III. **KAJI ULANG PERMINTAAN**
 
             doc.rect(metaX, 12 + (metaH * 3), metaW, metaH); 
             doc.text("Halaman : 1 dari 1", metaX + 2, 12 + (metaH * 3) + 4.5);
-
-            // Border Luar
-            doc.rect(12, 12, 192, 305);
 
             y = 43;
             doc.setFontSize(10);
@@ -958,8 +1087,9 @@ III. **KAJI ULANG PERMINTAAN**
                 cbX += 25;
             });
 
+            // 🔥 Nama Sample Uji - KOSONGKAN
             doc.text("Nama Sample Uji :", colMid + 2, y);
-            drawWrappedText(data.test_type, colMid + 32, y, (endX - colMid) - 32);
+            drawWrappedText("________________________", colMid + 32, y, (endX - colMid) - 32);
             y += 22;
 
             // Jumlah Sample
@@ -981,7 +1111,9 @@ III. **KAJI ULANG PERMINTAAN**
             y += 8;
 
             drawRow("Kemasan Sample : ________________", "", "Asal Sample : ________________",);
-            drawRow("Parameter : ", (data.items || []).map(i => i.service_name).join(', '), "Metode : ________________",);
+            
+            // 🔥 Parameter Pengujian - KOSONGKAN
+            drawRow("Parameter : ", "", "Metode : ________________",);
 
             // Sample diambil oleh
             doc.rect(startX, y - 5, colMid - startX, 15);
@@ -1065,8 +1197,35 @@ III. **KAJI ULANG PERMINTAAN**
             return;
         }
         
-        // Redirect ke halaman SKRD/transaksi dengan filter submission ID
-        window.location.href = `/admin/skrd?submission=${submissionId}`;
+        // Cek apakah ada payment ID
+        if (data.payment && data.payment.id) {
+            // Langsung ke halaman detail SKRD berdasarkan payment ID
+            window.location.href = `/admin/skrd/${data.payment.id}`;
+        } else {
+            // Jika tidak ada payment, coba cari berdasarkan submission_id
+            showToast('Mencari data transaksi...', 'info');
+            
+            // Fetch SKRD berdasarkan submission_id
+            fetch(`${API_BASE_URL}/skrd?submission_id=${submissionId}`, {
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success && result.data.invoices && result.data.invoices.length > 0) {
+                    const skrdId = result.data.invoices[0].id;
+                    window.location.href = `/admin/skrd/${skrdId}`;
+                } else {
+                    showToast('Belum ada transaksi untuk pengajuan ini', 'warning');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Gagal mencari data transaksi', 'danger');
+            });
+        }
     };
 
     // ==================== EVENT LISTENERS ====================
