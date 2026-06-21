@@ -1190,12 +1190,12 @@ const apiController = {
     getSubmissionDetail: async (req, res) => {
         try {
             const id = req.params.id;
-            
+
             console.log('========== GET SUBMISSION DETAIL ==========');
             console.log('📥 ID:', id);
-            
+
             const userId = req.user?.id;
-            
+
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -1203,23 +1203,21 @@ const apiController = {
                 });
             }
 
-            // Cek role admin
             if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
                 return res.status(403).json({
                     success: false,
                     message: 'Forbidden - Admin only'
                 });
             }
-            
-            // Validasi ID
+
             if (!id || isNaN(id)) {
                 return res.status(400).json({
                     success: false,
                     message: 'ID tidak valid'
                 });
             }
-            
-            // Ambil data dari tabel submissions
+
+            // 1. Ambil data submissions
             const [submissions] = await db.query(`
                 SELECT 
                     s.id,
@@ -1248,17 +1246,17 @@ const apiController = {
                 LEFT JOIN users u ON s.user_id = u.id
                 WHERE s.id = ?
             `, [id]);
-            
+
             if (submissions.length === 0) {
                 return res.status(404).json({
                     success: false,
                     message: 'Submission tidak ditemukan'
                 });
             }
-            
+
             const submission = submissions[0];
-            
-            // Ambil data samples
+
+            // 2. Ambil samples
             const [samples] = await db.query(`
                 SELECT 
                     ss.id,
@@ -1282,8 +1280,7 @@ const apiController = {
                 JOIN test_types tt ON ss.test_type_id = tt.id
                 WHERE ss.submission_id = ?
             `, [id]);
-            
-            // Format samples untuk frontend
+
             const formattedSamples = samples.map(sample => ({
                 id: sample.id,
                 name: sample.nama_identitas_sample || sample.service_name,
@@ -1301,8 +1298,8 @@ const apiController = {
                 category: sample.category_name,
                 type: sample.type_name
             }));
-            
-            // Ambil data payment
+
+            // 3. Ambil payment
             const [payments] = await db.query(`
                 SELECT 
                     p.id,
@@ -1324,8 +1321,8 @@ const apiController = {
                 FROM payments p 
                 WHERE p.submission_id = ?
             `, [id]);
-            
-            // Ambil data test report jika ada
+
+            // 4. Ambil test report
             const [reports] = await db.query(`
                 SELECT 
                     id,
@@ -1337,35 +1334,31 @@ const apiController = {
                 FROM test_reports 
                 WHERE submission_id = ?
             `, [id]);
-            
-            // Ambil data kuisioner jika ada
+
+            // 5. 🔥 Ambil kuisioner (HANYA JSON, TANPA skor_*)
             const [kuisionerData] = await db.query(`
                 SELECT 
                     id,
-                    skor_1, skor_2, skor_3, skor_4, skor_5,
-                    skor_6, skor_7, skor_8, skor_9, skor_10,
+                    jawaban_json,
+                    pertanyaan_json,
                     saran,
                     created_at as kuisioner_created_at
                 FROM kuisioner 
                 WHERE submission_id = ?
             `, [id]);
-            
+
             const payment = payments.length > 0 ? payments[0] : null;
             const report = reports.length > 0 ? reports[0] : null;
             const kuisioner = kuisionerData.length > 0 ? kuisionerData[0] : null;
-            
-            // Hitung total tagihan dari samples
+
             const totalAmount = samples.reduce((sum, item) => {
                 return sum + (item.price_at_time * item.jumlah_sample_angka);
             }, 0);
-            
-            // Kategori pengujian dari samples
+
             const categories = [...new Set(samples.map(s => s.category_name))];
             const testTypes = [...new Set(samples.map(s => s.type_name))];
-            
-            // Format response LENGKAP
+
             const response = {
-                // Basic Info
                 id: submission.id,
                 no_urut: submission.no_permohonan || `SUB-${String(submission.id).padStart(5, '0')}`,
                 no_permohonan: submission.no_permohonan,
@@ -1373,8 +1366,7 @@ const apiController = {
                 proyek: submission.nama_proyek,
                 lokasi_proyek: submission.lokasi_proyek,
                 description: submission.catatan_tambahan,
-                
-                // Data perusahaan (LENGKAP)
+
                 nama_instansi: submission.nama_instansi || submission.company_name || '-',
                 nama_pemohon: submission.nama_pemohon || submission.pic_name || '-',
                 company_name: submission.nama_instansi || submission.company_name || '-',
@@ -1385,29 +1377,23 @@ const apiController = {
                 pic_email: submission.email_pemohon || submission.pic_email || '-',
                 nomor_telepon: submission.nomor_telepon || submission.pic_phone || '-',
                 pic_phone: submission.nomor_telepon || submission.pic_phone || '-',
-                
-                // File Dokumen
+
                 file_surat_permohonan: submission.file_surat_permohonan,
                 file_ktp: submission.file_ktp,
-                
-                // Status & Dates
+
                 status: submission.status,
                 created_at: submission.created_at,
                 updated_at: submission.updated_at,
-                
-                // Catatan
+
                 catatan_tambahan: submission.catatan_tambahan,
                 catatan_admin: submission.catatan_admin,
                 notes: submission.catatan_tambahan,
-                
-                // Jadwal Sampling
+
                 jadwal_sampling: submission.jadwal_sampling,
-                
-                // Kategori
+
                 category: categories.join(', ') || 'Pengujian',
                 test_type: testTypes.join(', ') || 'Material',
-                
-                // Items (samples) - LENGKAP
+
                 samples: formattedSamples,
                 items: formattedSamples.map(s => ({
                     service_name: s.name,
@@ -1420,8 +1406,7 @@ const apiController = {
                     jumlah_sample_satuan: s.jumlah_sample_satuan,
                     price_at_time: s.price_at_time
                 })),
-                
-                // Payment - LENGKAP
+
                 payment: payment ? {
                     id: payment.id,
                     no_invoice: payment.no_invoice,
@@ -1441,8 +1426,7 @@ const apiController = {
                     created_at: payment.payment_created_at,
                     updated_at: payment.payment_updated_at
                 } : null,
-                
-                // Report
+
                 report: report ? {
                     id: report.id,
                     file_laporan: report.file_laporan,
@@ -1451,23 +1435,14 @@ const apiController = {
                     catatan_laporan: report.catatan_laporan,
                     created_at: report.report_created_at
                 } : null,
-                
-                // Total
+
                 total_tagihan: totalAmount,
-                
-                // Kuisioner user
+
+                // 🔥 Kuisioner dengan jawaban_json dan pertanyaan_json
                 kuisioner: kuisioner ? {
                     id: kuisioner.id,
-                    skor_1: kuisioner.skor_1,
-                    skor_2: kuisioner.skor_2,
-                    skor_3: kuisioner.skor_3,
-                    skor_4: kuisioner.skor_4,
-                    skor_5: kuisioner.skor_5,
-                    skor_6: kuisioner.skor_6,
-                    skor_7: kuisioner.skor_7,
-                    skor_8: kuisioner.skor_8,
-                    skor_9: kuisioner.skor_9,
-                    skor_10: kuisioner.skor_10,
+                    jawaban_json: kuisioner.jawaban_json,
+                    pertanyaan_json: kuisioner.pertanyaan_json,
                     saran: kuisioner.saran,
                     created_at: kuisioner.kuisioner_created_at
                 } : null
@@ -1550,20 +1525,17 @@ const apiController = {
             console.log('📋 Query:', query);
             const [result] = await db.query(query, updateValues);
 
-            // 🔥 HANYA JIKA STATUS DIBATALKAN, BARU PAYMENTS IKUT DIBATALKAN
+            // 🔥 VALIDASI: Jika status = Dibatalkan, cek apakah laporan sudah ada
             if (status === 'Dibatalkan') {
-                const [existingPayment] = await db.query(
-                    'SELECT id FROM payments WHERE submission_id = ?',
+                const [reportCheck] = await db.query(
+                    'SELECT id FROM test_reports WHERE submission_id = ? AND file_laporan IS NOT NULL',
                     [id]
                 );
-                if (existingPayment.length > 0) {
-                    await db.query(
-                        `UPDATE payments 
-                        SET status_pembayaran = 'Dibatalkan', updated_at = NOW() 
-                        WHERE submission_id = ?`,
-                        [id]
-                    );
-                    console.log('✅ Payment status also set to Dibatalkan');
+                if (reportCheck.length > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Tidak dapat membatalkan pengajuan karena laporan hasil pengujian sudah diupload.'
+                    });
                 }
             }
 
@@ -2737,7 +2709,7 @@ const apiController = {
         }
     },
 
-    // GET kuisioner stats (public/user)
+    // GET kuisioner stats (Menggunakan tabel lama Jey - TANPA UBAH DATABASE)
     getKuisionerStats: async (req, res) => {
         try {
             const startDate = req.query.start_date || '';
@@ -2755,48 +2727,78 @@ const apiController = {
                 params.push(endDate);
             }
             
-            const [stats] = await db.query(`
+            // 1. Ambil data rata-rata skor per kolom dan total responden dari tabel lama Jey
+            const [statsRows] = await db.query(`
                 SELECT 
                     COUNT(*) as total_responden,
-                    ROUND(AVG(COALESCE(skor_1,0)), 2) as rata_skor_1,
-                    ROUND(AVG(COALESCE(skor_2,0)), 2) as rata_skor_2,
-                    ROUND(AVG(COALESCE(skor_3,0)), 2) as rata_skor_3,
-                    ROUND(AVG(COALESCE(skor_4,0)), 2) as rata_skor_4,
-                    ROUND(AVG(COALESCE(skor_5,0)), 2) as rata_skor_5,
-                    ROUND(AVG(COALESCE(skor_6,0)), 2) as rata_skor_6,
-                    ROUND(AVG(COALESCE(skor_7,0)), 2) as rata_skor_7,
-                    ROUND(AVG(COALESCE(skor_8,0)), 2) as rata_skor_8,
-                    ROUND(AVG(COALESCE(skor_9,0)), 2) as rata_skor_9,
-                    ROUND(AVG(COALESCE(skor_10,0)), 2) as rata_skor_10,
-                    ROUND(
-                        (AVG(COALESCE(skor_1,0)) + AVG(COALESCE(skor_2,0)) + AVG(COALESCE(skor_3,0)) + 
-                         AVG(COALESCE(skor_4,0)) + AVG(COALESCE(skor_5,0)) + AVG(COALESCE(skor_6,0)) + 
-                         AVG(COALESCE(skor_7,0)) + AVG(COALESCE(skor_8,0)) + AVG(COALESCE(skor_9,0)) + 
-                         AVG(COALESCE(skor_10,0))) / 10, 2
-                    ) as rata_keseluruhan
+                    AVG(COALESCE(skor_1,0)) as avg_1,
+                    AVG(COALESCE(skor_2,0)) as avg_2,
+                    AVG(COALESCE(skor_3,0)) as avg_3,
+                    AVG(COALESCE(skor_4,0)) as avg_4,
+                    AVG(COALESCE(skor_5,0)) as avg_5,
+                    AVG(COALESCE(skor_6,0)) as avg_6,
+                    AVG(COALESCE(skor_7,0)) as avg_7,
+                    AVG(COALESCE(skor_8,0)) as avg_8,
+                    AVG(COALESCE(skor_9,0)) as avg_9,
+                    AVG(COALESCE(skor_10,0)) as avg_10
                 FROM kuisioner
                 ${whereClause}
             `, params);
             
-            const [distribusi] = await db.query(`
+            const stats = statsRows[0] || {};
+            const totalResponden = stats.total_responden || 0;
+            const totalPertanyaan = 10; // Karena kolomnya diset manual skor_1 sampai skor_10
+
+            // 2. Hitung Rata-rata Kepuasan Keseluruhan (Ubah skala 1-5 ke persentase 0-100%)
+            const totalAvg = (
+                (Number(stats.avg_1) || 0) + (Number(stats.avg_2) || 0) + (Number(stats.avg_3) || 0) + 
+                (Number(stats.avg_4) || 0) + (Number(stats.avg_5) || 0) + (Number(stats.avg_6) || 0) + 
+                (Number(stats.avg_7) || 0) + (Number(stats.avg_8) || 0) + (Number(stats.avg_9) || 0) + 
+                (Number(stats.avg_10) || 0)
+            ) / 10;
+            
+            const rataRataKepuasan = totalAvg > 0 ? Math.round(((totalAvg - 1) / 4) * 100) : 0;
+
+            // 3. Mapping Kriteria Stats untuk grafik kriteriaChart (Sesuaikan nama kriteria dengan urutan skor kamu)
+            // Ini contoh mapping jika skor_1 & 2 adalah Tangible, dst. Silakan Jey sesuaikan sendiri kriteria aslinya ya!
+            const kriteriaStats = {
+                "Tangible": Math.round(((( (Number(stats.avg_1)||0) + (Number(stats.avg_2)||0) ) / 2) - 1) / 4 * 100),
+                "Reliability": Math.round(((( (Number(stats.avg_3)||0) + (Number(stats.avg_4)||0) ) / 2) - 1) / 4 * 100),
+                "Responsiveness": Math.round(((( (Number(stats.avg_5)||0) + (Number(stats.avg_6)||0) ) / 2) - 1) / 4 * 100),
+                "Assurance": Math.round(((( (Number(stats.avg_7)||0) + (Number(stats.avg_8)||0) ) / 2) - 1) / 4 * 100),
+                "Empathy": Math.round(((( (Number(stats.avg_9)||0) + (Number(stats.avg_10)||0) ) / 2) - 1) / 4 * 100)
+            };
+
+            // 4. Hitung Distribusi Jawaban untuk distribusiChart (Berapa kali skor 1-5 muncul di semua kolom kuesioner)
+            const [distribusiRows] = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN skor_1 = 1 OR skor_2 = 1 OR skor_3 = 1 OR skor_4 = 1 OR skor_5 = 1 
-                                OR skor_6 = 1 OR skor_7 = 1 OR skor_8 = 1 OR skor_9 = 1 OR skor_10 = 1 THEN 1 END) as skor_1_count,
-                    COUNT(CASE WHEN skor_1 = 2 OR skor_2 = 2 OR skor_3 = 2 OR skor_4 = 2 OR skor_5 = 2 
-                                OR skor_6 = 2 OR skor_7 = 2 OR skor_8 = 2 OR skor_9 = 2 OR skor_10 = 2 THEN 1 END) as skor_2_count,
-                    COUNT(CASE WHEN skor_1 = 3 OR skor_2 = 3 OR skor_3 = 3 OR skor_4 = 3 OR skor_5 = 3 
-                                OR skor_6 = 3 OR skor_7 = 3 OR skor_8 = 3 OR skor_9 = 3 OR skor_10 = 3 THEN 1 END) as skor_3_count,
-                    COUNT(CASE WHEN skor_1 = 4 OR skor_2 = 4 OR skor_3 = 4 OR skor_4 = 4 OR skor_5 = 4 
-                                OR skor_6 = 4 OR skor_7 = 4 OR skor_8 = 4 OR skor_9 = 4 OR skor_10 = 4 THEN 1 END) as skor_4_count
+                    SUM(CASE WHEN skor_1 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_2 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_3 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_4 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_5 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_6 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_7 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_8 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_9 = 1 THEN 1 ELSE 0 END + CASE WHEN skor_10 = 1 THEN 1 ELSE 0 END) as count_1,
+                    SUM(CASE WHEN skor_1 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_2 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_3 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_4 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_5 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_6 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_7 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_8 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_9 = 2 THEN 1 ELSE 0 END + CASE WHEN skor_10 = 2 THEN 1 ELSE 0 END) as count_2,
+                    SUM(CASE WHEN skor_1 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_2 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_3 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_4 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_5 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_6 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_7 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_8 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_9 = 3 THEN 1 ELSE 0 END + CASE WHEN skor_10 = 3 THEN 1 ELSE 0 END) as count_3,
+                    SUM(CASE WHEN skor_1 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_2 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_3 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_4 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_5 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_6 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_7 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_8 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_9 = 4 THEN 1 ELSE 0 END + CASE WHEN skor_10 = 4 THEN 1 ELSE 0 END) as count_4,
+                    SUM(CASE WHEN skor_1 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_2 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_3 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_4 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_5 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_6 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_7 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_8 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_9 = 5 THEN 1 ELSE 0 END + CASE WHEN skor_10 = 5 THEN 1 ELSE 0 END) as count_5
                 FROM kuisioner
                 ${whereClause}
             `, params);
-            
+
+            const dist = distribusiRows[0] || {};
+            const distribusiJawaban = {
+                1: Number(dist.count_1) || 0,
+                2: Number(dist.count_2) || 0,
+                3: Number(dist.count_3) || 0,
+                4: Number(dist.count_4) || 0,
+                5: Number(dist.count_5) || 0
+            };
+
+            // Kirim respons dengan format yang dipahami kuisioner.js frontend kamu
             res.json({
                 success: true,
                 data: {
-                    stats: stats[0] || {},
-                    distribusi: distribusi[0] || {}
+                    totalResponden,
+                    totalPertanyaan,
+                    rataRataKepuasan,
+                    kriteriaStats,
+                    distribusiJawaban
                 }
             });
             
@@ -2847,151 +2849,195 @@ const apiController = {
             });
         }
     },
+    
 
     // ==================== SUBMIT KUISIONER PUBLIC (form user) ====================
     submitKuisionerPublic: async (req, res) => {
         try {
-            const { submission_id, nama_pemohon, instansi, telepon, answers, saran } = req.body;
-            // answers = array of { question_index (1-10), nilai (1-5) }
-            
+            const { submission_id, answers, saran } = req.body;
+
             console.log('========== SUBMIT KUISIONER PUBLIC ==========');
             console.log('📥 Submission ID:', submission_id);
-            console.log('📥 Answers:', answers);
-            
+            console.log('📥 Answers:', JSON.stringify(answers));
+
             if (!submission_id) {
                 return res.status(400).json({ success: false, message: 'Submission ID harus diisi' });
             }
-            
+
             if (!answers || !Array.isArray(answers) || answers.length === 0) {
                 return res.status(400).json({ success: false, message: 'Jawaban tidak boleh kosong' });
             }
-            
-            // Cek submission ada
-            const [submissions] = await db.query('SELECT id FROM submissions WHERE id = ?', [submission_id]);
-            if (submissions.length === 0) {
+
+            // Cek submission
+            const [submission] = await db.query('SELECT id FROM submissions WHERE id = ?', [submission_id]);
+            if (submission.length === 0) {
                 return res.status(404).json({ success: false, message: 'Data pengujian tidak ditemukan' });
             }
-            
-            // Cek apakah sudah ada kuisioner
+
+            // Cek duplikat
             const [existing] = await db.query('SELECT id FROM kuisioner WHERE submission_id = ?', [submission_id]);
             if (existing.length > 0) {
                 return res.status(400).json({ success: false, message: 'Kuisioner sudah pernah diisi' });
             }
-            
-            // Map answers array ke skor_1 - skor_10
-            const skorMap = {};
-            answers.forEach((ans, idx) => {
-                const col = `skor_${idx + 1}`;
-                const nilai = parseInt(ans.nilai);
-                skorMap[col] = (nilai >= 1 && nilai <= 5) ? nilai : null;
-            });
-            
-            // Isi sisanya dengan null jika kurang dari 10 pertanyaan
-            for (let i = 1; i <= 10; i++) {
-                if (!('skor_' + i in skorMap)) skorMap['skor_' + i] = null;
+
+            // 🔥 Ambil daftar pertanyaan aktif
+            const [questions] = await db.query('SELECT id, question_text FROM kuisioner_questions ORDER BY urutan');
+            if (questions.length === 0) {
+                return res.status(400).json({ success: false, message: 'Belum ada pertanyaan kuisioner.' });
             }
-            
-            const [result] = await db.query(
-                `INSERT INTO kuisioner (
-                    submission_id,
-                    skor_1, skor_2, skor_3, skor_4, skor_5,
-                    skor_6, skor_7, skor_8, skor_9, skor_10,
-                    saran, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [
-                    submission_id,
-                    skorMap.skor_1, skorMap.skor_2, skorMap.skor_3,
-                    skorMap.skor_4, skorMap.skor_5, skorMap.skor_6,
-                    skorMap.skor_7, skorMap.skor_8, skorMap.skor_9,
-                    skorMap.skor_10,
-                    saran || null
-                ]
-            );
-            
+
+            // 🔥 Cek format answers: apakah pakai question_id atau question_index?
+            const sample = answers[0];
+            const useQuestionId = sample && sample.question_id !== undefined;
+            const useQuestionIndex = sample && sample.question_index !== undefined;
+
+            const jawabanObj = {};
+            const errors = [];
+
+            questions.forEach((q, idx) => {
+                const key = String(q.id);
+                let nilai = null;
+                let found = false;
+
+                if (useQuestionId) {
+                    // Cari berdasarkan question_id
+                    const answer = answers.find(a => parseInt(a.question_id) === q.id);
+                    if (answer) {
+                        nilai = parseInt(answer.nilai);
+                        found = true;
+                    }
+                } else if (useQuestionIndex) {
+                    // Cari berdasarkan question_index (1-based)
+                    const answer = answers.find(a => parseInt(a.question_index) === (idx + 1));
+                    if (answer) {
+                        nilai = parseInt(answer.nilai);
+                        found = true;
+                    }
+                } else {
+                    // Jika tidak ada keduanya, asumsikan urutan jawaban sesuai urutan pertanyaan
+                    const answer = answers[idx];
+                    if (answer) {
+                        nilai = parseInt(answer.nilai);
+                        found = true;
+                    }
+                }
+
+                // Validasi nilai
+                if (!found || nilai === null || isNaN(nilai) || nilai < 1 || nilai > 5) {
+                    errors.push(`Pertanyaan "${q.question_text}" belum dijawab atau nilai tidak valid (harus 1-5)`);
+                    jawabanObj[key] = null;
+                } else {
+                    jawabanObj[key] = nilai;
+                }
+            });
+
+            if (errors.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ada pertanyaan yang belum dijawab dengan benar:',
+                    errors: errors
+                });
+            }
+
+            // 🔥 Buat pertanyaan_json
+            const pertanyaanJson = questions.map(q => q.question_text);
+
+            // 🔥 Simpan ke database
+            const [result] = await db.query(`
+                INSERT INTO kuisioner 
+                (submission_id, jawaban_json, pertanyaan_json, saran, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            `, [
+                submission_id,
+                JSON.stringify(jawabanObj),
+                JSON.stringify(pertanyaanJson),
+                saran || null
+            ]);
+
             console.log('✅ Kuisioner berhasil disimpan, ID:', result.insertId);
-            
+
             res.json({
                 success: true,
                 message: 'Kuisioner berhasil disimpan. Terima kasih!',
                 data: { id: result.insertId }
             });
-            
+
         } catch (error) {
             console.error('❌ Error submit kuisioner public:', error);
-            res.status(500).json({ success: false, message: 'Gagal menyimpan kuisioner: ' + error.message });
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menyimpan kuisioner: ' + error.message
+            });
         }
     },
-
-    // CREATE kuisioner (public) - VERSION LAMA (pake skor_1 - skor_10)
 
     createKuisioner: async (req, res) => {
         try {
             const {
-                submission_id, nama_pemohon, instansi, telepon,
-                skor_1, skor_2, skor_3, skor_4, skor_5,
-                skor_6, skor_7, skor_8, skor_9, skor_10,
+                submission_id,
+                nama_pemohon,
+                instansi,
+                telepon,
+                jawaban,   // ← ubah: kirim sebagai object { questionId: nilai }
                 saran
             } = req.body;
-            
+
             if (!submission_id) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Submission ID harus diisi'
-                });
+                return res.status(400).json({ success: false, message: 'Submission ID harus diisi' });
             }
-            
-            // Cek apakah submission ada
-            const [submission] = await db.query(
-                'SELECT id FROM submissions WHERE id = ?',
-                [submission_id]
-            );
-            
+
+            // Cek submission
+            const [submission] = await db.query('SELECT id FROM submissions WHERE id = ?', [submission_id]);
             if (submission.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Data pengujian tidak ditemukan'
-                });
+                return res.status(404).json({ success: false, message: 'Data pengujian tidak ditemukan' });
             }
-            
-            // Cek apakah sudah ada kuisioner untuk submission ini
-            const [existing] = await db.query(
-                'SELECT id FROM kuisioner WHERE submission_id = ?',
-                [submission_id]
-            );
-            
+
+            // Cek duplikat
+            const [existing] = await db.query('SELECT id FROM kuisioner WHERE submission_id = ?', [submission_id]);
             if (existing.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Kuisioner untuk submission ini sudah ada'
-                });
+                return res.status(400).json({ success: false, message: 'Kuisioner untuk submission ini sudah ada' });
             }
-            
-            const [result] = await db.query(
-                `INSERT INTO kuisioner (
-                    submission_id, nama_pemohon, instansi, telepon,
-                    skor_1, skor_2, skor_3, skor_4, skor_5,
-                    skor_6, skor_7, skor_8, skor_9, skor_10,
-                    saran
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    submission_id, nama_pemohon, instansi, telepon,
-                    skor_1 || null, skor_2 || null, skor_3 || null, skor_4 || null, skor_5 || null,
-                    skor_6 || null, skor_7 || null, skor_8 || null, skor_9 || null, skor_10 || null,
-                    saran
-                ]
-            );
-            
+
+            // Ambil daftar pertanyaan aktif
+            const [questions] = await db.query('SELECT id, question_text FROM kuisioner_questions ORDER BY urutan');
+            if (questions.length === 0) {
+                return res.status(400).json({ success: false, message: 'Belum ada pertanyaan kuisioner.' });
+            }
+
+            // 🔥 Bangun jawaban_json dari parameter 'jawaban' (object dengan key = id pertanyaan)
+            const jawabanObj = {};
+            questions.forEach(q => {
+                const id = String(q.id);
+                // Jika jawaban dikirim, ambil nilainya; jika tidak, null
+                jawabanObj[id] = (jawaban && jawaban[id] !== undefined) ? parseInt(jawaban[id]) : null;
+            });
+
+            // 🔥 Buat pertanyaan_json (array teks pertanyaan)
+            const pertanyaanJson = questions.map(q => q.question_text);
+
+            // 🔥 Insert tanpa kolom skor_*
+            const [result] = await db.query(`
+                INSERT INTO kuisioner 
+                (submission_id, jawaban_json, pertanyaan_json, saran, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            `, [
+                submission_id,
+                JSON.stringify(jawabanObj),
+                JSON.stringify(pertanyaanJson),
+                saran || null
+            ]);
+
             res.json({
                 success: true,
                 message: 'Kuisioner berhasil disimpan',
                 data: { id: result.insertId }
             });
-            
+
         } catch (error) {
             console.error('❌ Error creating kuisioner:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal menyimpan kuisioner: ' + error.message 
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menyimpan kuisioner: ' + error.message
             });
         }
     },
@@ -3073,23 +3119,13 @@ const apiController = {
 
     // ==================== ADMIN KUISIONER METHODS ====================
 
-    // GET all kuisioner untuk admin (VERSION LAMA - pake skor_1 - skor_10)
+    // ==================== GET ADMIN KUIISIONER (LIST) ====================
     getAdminKuisioner: async (req, res) => {
         try {
             const userId = req.user?.id;
-            
-            if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
-            }
-
+            if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
             if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Forbidden - Admin only'
-                });
+                return res.status(403).json({ success: false, message: 'Forbidden - Admin only' });
             }
 
             const page = parseInt(req.query.page) || 1;
@@ -3097,19 +3133,14 @@ const apiController = {
             const search = req.query.search || '';
             const startDate = req.query.start_date || '';
             const endDate = req.query.end_date || '';
-            
             const offset = (page - 1) * limit;
-            
-            console.log('========== GET ADMIN KUISIONER ==========');
-            console.log('📥 Params:', { page, limit, search, startDate, endDate });
-            
-            // Query dengan LEFT JOIN
+
             let query = `
                 SELECT 
                     k.id,
                     k.submission_id,
-                    k.skor_1, k.skor_2, k.skor_3, k.skor_4, k.skor_5,
-                    k.skor_6, k.skor_7, k.skor_8, k.skor_9, k.skor_10,
+                    k.jawaban_json,
+                    k.pertanyaan_json,
                     k.saran,
                     k.created_at,
                     COALESCE(s.nama_pemohon, '-') as nama_pemohon,
@@ -3121,12 +3152,9 @@ const apiController = {
                 LEFT JOIN submissions s ON k.submission_id = s.id
                 WHERE 1=1
             `;
-            
             let countQuery = `SELECT COUNT(*) as total FROM kuisioner WHERE 1=1`;
-            let params = [];
-            let countParams = [];
-            
-            // Filter tanggal
+            let params = [], countParams = [];
+
             if (startDate) {
                 query += ` AND DATE(k.created_at) >= ?`;
                 countQuery += ` AND DATE(created_at) >= ?`;
@@ -3139,169 +3167,98 @@ const apiController = {
                 params.push(endDate);
                 countParams.push(endDate);
             }
-            
-            // Filter search
             if (search) {
                 query += ` AND (s.nama_pemohon LIKE ? OR s.nama_instansi LIKE ? OR s.no_permohonan LIKE ?)`;
-                countQuery += ` AND (SELECT 1 FROM submissions s WHERE s.id = kuisioner.submission_id AND (s.nama_pemohon LIKE ? OR s.nama_instansi LIKE ? OR s.no_permohonan LIKE ?))`;
+                countQuery += ` AND EXISTS (SELECT 1 FROM submissions s WHERE s.id = kuisioner.submission_id AND (s.nama_pemohon LIKE ? OR s.nama_instansi LIKE ? OR s.no_permohonan LIKE ?))`;
                 const searchPattern = `%${search}%`;
                 params.push(searchPattern, searchPattern, searchPattern);
                 countParams.push(searchPattern, searchPattern, searchPattern);
             }
-            
+
             query += ` ORDER BY k.created_at DESC LIMIT ? OFFSET ?`;
             params.push(limit, offset);
-            
-            console.log('📝 Query:', query);
-            console.log('📦 Params:', params);
-            
+
             const [kuisioner] = await db.query(query, params);
             const [countResult] = await db.query(countQuery, countParams);
-            
-            console.log(`✅ Found ${kuisioner.length} kuisioner`);
+
+            // 🔥 Ambil daftar pertanyaan aktif untuk menentukan jumlah pertanyaan
+            const [questions] = await db.query('SELECT id FROM kuisioner_questions ORDER BY urutan');
+            const questionIds = questions.map(q => String(q.id));
+
+            const kuisionerWithStats = kuisioner.map(row => {
+                // Parse jawaban_json
+                let jawaban = {};
+                try {
+                    if (typeof row.jawaban_json === 'string') {
+                        jawaban = JSON.parse(row.jawaban_json);
+                    } else if (row.jawaban_json && typeof row.jawaban_json === 'object') {
+                        jawaban = row.jawaban_json;
+                    }
+                } catch (e) {
+                    jawaban = {};
+                }
+
+                // Hitung total dari semua pertanyaan aktif (atau dari semua key jika tidak ada pertanyaan)
+                const keys = questionIds.length > 0 ? questionIds : Object.keys(jawaban);
+                let total = 0, count = 0;
+                keys.forEach(key => {
+                    const val = parseInt(jawaban[key]);
+                    if (!isNaN(val) && val >= 1 && val <= 5) {
+                        total += val;
+                        count++;
+                    }
+                });
+
+                // Parse pertanyaan_json
+                let pertanyaanList = [];
+                try {
+                    if (typeof row.pertanyaan_json === 'string') {
+                        pertanyaanList = JSON.parse(row.pertanyaan_json);
+                    } else if (row.pertanyaan_json && typeof row.pertanyaan_json === 'object') {
+                        pertanyaanList = row.pertanyaan_json;
+                    }
+                } catch (e) {
+                    pertanyaanList = [];
+                }
+
+                return {
+                    ...row,
+                    total_nilai: total,
+                    rata_rata: count > 0 ? parseFloat((total / count).toFixed(1)) : 0,
+                    jumlah_pertanyaan: keys.length || 0
+                };
+            });
 
             res.json({
                 success: true,
                 data: {
-                    kuisioner: kuisioner,
+                    kuisioner: kuisionerWithStats,
                     total: countResult[0]?.total || 0,
                     page: page,
                     limit: limit,
                     totalPages: Math.ceil((countResult[0]?.total || 0) / limit)
                 }
             });
-            
+
         } catch (error) {
             console.error('❌ Error getting admin kuisioner:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengambil data kuisioner: ' + error.message,
-                data: {
-                    kuisioner: [],
-                    total: 0,
-                    page: 1,
-                    limit: 10,
-                    totalPages: 0
-                }
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil data kuisioner: ' + error.message
             });
         }
     },
 
-    // GET kuisioner stats untuk admin
-    getAdminKuisionerStats: async (req, res) => {
-        try {
-            const userId = req.user?.id;
-            
-            if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
-            }
-
-            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Forbidden - Admin only'
-                });
-            }
-
-            const startDate = req.query.start_date || '';
-            const endDate = req.query.end_date || '';
-            
-            // Build where clause
-            let whereClause = 'WHERE 1=1';
-            let params = [];
-            
-            if (startDate) {
-                whereClause += ` AND DATE(created_at) >= ?`;
-                params.push(startDate);
-            }
-            if (endDate) {
-                whereClause += ` AND DATE(created_at) <= ?`;
-                params.push(endDate);
-            }
-            
-            // Statistik per pertanyaan (skor_1 - skor_10)
-            const [stats] = await db.query(`
-                SELECT 
-                    COUNT(DISTINCT submission_id) as total_responden,
-                    ROUND(AVG(COALESCE(skor_1,0)), 2) as rata_skor_1,
-                    ROUND(AVG(COALESCE(skor_2,0)), 2) as rata_skor_2,
-                    ROUND(AVG(COALESCE(skor_3,0)), 2) as rata_skor_3,
-                    ROUND(AVG(COALESCE(skor_4,0)), 2) as rata_skor_4,
-                    ROUND(AVG(COALESCE(skor_5,0)), 2) as rata_skor_5,
-                    ROUND(AVG(COALESCE(skor_6,0)), 2) as rata_skor_6,
-                    ROUND(AVG(COALESCE(skor_7,0)), 2) as rata_skor_7,
-                    ROUND(AVG(COALESCE(skor_8,0)), 2) as rata_skor_8,
-                    ROUND(AVG(COALESCE(skor_9,0)), 2) as rata_skor_9,
-                    ROUND(AVG(COALESCE(skor_10,0)), 2) as rata_skor_10,
-                    ROUND(
-                        (AVG(COALESCE(skor_1,0)) + AVG(COALESCE(skor_2,0)) + AVG(COALESCE(skor_3,0)) + 
-                        AVG(COALESCE(skor_4,0)) + AVG(COALESCE(skor_5,0)) + AVG(COALESCE(skor_6,0)) + 
-                        AVG(COALESCE(skor_7,0)) + AVG(COALESCE(skor_8,0)) + AVG(COALESCE(skor_9,0)) + 
-                        AVG(COALESCE(skor_10,0))) / 10, 2
-                    ) as rata_keseluruhan
-                FROM kuisioner
-                ${whereClause}
-            `, params);
-            
-            // Distribusi nilai (1-4)
-            const [distribusi] = await db.query(`
-                SELECT 
-                    COUNT(CASE WHEN skor_1 = 1 OR skor_2 = 1 OR skor_3 = 1 OR skor_4 = 1 OR skor_5 = 1 
-                                OR skor_6 = 1 OR skor_7 = 1 OR skor_8 = 1 OR skor_9 = 1 OR skor_10 = 1 THEN 1 END) as skor_1_count,
-                    COUNT(CASE WHEN skor_1 = 2 OR skor_2 = 2 OR skor_3 = 2 OR skor_4 = 2 OR skor_5 = 2 
-                                OR skor_6 = 2 OR skor_7 = 2 OR skor_8 = 2 OR skor_9 = 2 OR skor_10 = 2 THEN 1 END) as skor_2_count,
-                    COUNT(CASE WHEN skor_1 = 3 OR skor_2 = 3 OR skor_3 = 3 OR skor_4 = 3 OR skor_5 = 3 
-                                OR skor_6 = 3 OR skor_7 = 3 OR skor_8 = 3 OR skor_9 = 3 OR skor_10 = 3 THEN 1 END) as skor_3_count,
-                    COUNT(CASE WHEN skor_1 = 4 OR skor_2 = 4 OR skor_3 = 4 OR skor_4 = 4 OR skor_5 = 4 
-                                OR skor_6 = 4 OR skor_7 = 4 OR skor_8 = 4 OR skor_9 = 4 OR skor_10 = 4 THEN 1 END) as skor_4_count
-                FROM kuisioner
-                ${whereClause}
-            `, params);
-            
-            res.json({
-                success: true,
-                data: {
-                    stats: stats[0] || {},
-                    distribusi: distribusi[0] || {}
-                }
-            });
-            
-        } catch (error) {
-            console.error('❌ Error getting admin kuisioner stats:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengambil statistik kuisioner: ' + error.message,
-                data: {
-                    stats: {},
-                    distribusi: {}
-                }
-            });
-        }
-    },
-
-    // GET kuisioner by ID untuk admin
+    // ==================== GET ADMIN KUIISIONER BY ID ====================
     getAdminKuisionerById: async (req, res) => {
         try {
             const { id } = req.params;
             const userId = req.user?.id;
-            
-            if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+            if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({ success: false, message: 'Forbidden - Admin only' });
             }
 
-            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Forbidden - Admin only'
-                });
-            }
-            
             const [kuisioner] = await db.query(`
                 SELECT 
                     k.*,
@@ -3315,24 +3272,195 @@ const apiController = {
                 LEFT JOIN submissions s ON k.submission_id = s.id
                 WHERE k.id = ?
             `, [id]);
-            
+
             if (kuisioner.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Kuisioner tidak ditemukan'
+                return res.status(404).json({ success: false, message: 'Kuisioner tidak ditemukan' });
+            }
+
+            const data = kuisioner[0];
+
+            let jawaban = {};
+            try {
+                if (typeof data.jawaban_json === 'string') {
+                    jawaban = JSON.parse(data.jawaban_json);
+                } else if (data.jawaban_json && typeof data.jawaban_json === 'object') {
+                    jawaban = data.jawaban_json;
+                }
+            } catch (e) {
+                jawaban = {};
+            }
+
+            let pertanyaan = [];
+            try {
+                if (typeof data.pertanyaan_json === 'string') {
+                    pertanyaan = JSON.parse(data.pertanyaan_json);
+                } else if (data.pertanyaan_json && typeof data.pertanyaan_json === 'object') {
+                    pertanyaan = data.pertanyaan_json;
+                }
+            } catch (e) {
+                pertanyaan = [];
+            }
+
+            // Ambil daftar pertanyaan aktif untuk urutan
+            const [questions] = await db.query('SELECT id FROM kuisioner_questions ORDER BY urutan');
+            const questionIds = questions.map(q => String(q.id));
+
+            let skorList = [];
+            if (questionIds.length > 0) {
+                skorList = questionIds.map(qId => {
+                    const val = parseInt(jawaban[qId]);
+                    return (!isNaN(val) && val >= 1 && val <= 5) ? val : null;
+                });
+            } else {
+                const keys = Object.keys(jawaban).sort((a,b) => parseInt(a)-parseInt(b));
+                skorList = keys.map(key => {
+                    const val = parseInt(jawaban[key]);
+                    return (!isNaN(val) && val >= 1 && val <= 5) ? val : null;
                 });
             }
-            
+
+            if (pertanyaan.length === 0) {
+                if (questions.length > 0) {
+                    const [qTexts] = await db.query('SELECT question_text FROM kuisioner_questions ORDER BY urutan');
+                    pertanyaan = qTexts.map(q => q.question_text);
+                } else {
+                    pertanyaan = skorList.map((_, i) => `Kriteria ${i+1}`);
+                }
+            }
+
             res.json({
                 success: true,
-                data: kuisioner[0]
+                data: {
+                    ...data,
+                    jawaban: jawaban,
+                    pertanyaan: pertanyaan,
+                    skor_list: skorList
+                }
             });
-            
+
         } catch (error) {
             console.error('❌ Error getting admin kuisioner by id:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Gagal mengambil data kuisioner: ' + error.message 
+            res.status(500).json({ success: false, message: error.message });
+        }
+    },
+
+    // ==================== ADMIN KUIISIONER STATS (DINAMIS DARI JSON + FALLBACK) ====================
+    getAdminKuisionerStats: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({ success: false, message: 'Forbidden' });
+            }
+
+            const startDate = req.query.start_date || '';
+            const endDate = req.query.end_date || '';
+
+            let whereClause = 'WHERE 1=1';
+            let params = [];
+            if (startDate) {
+                whereClause += ' AND DATE(created_at) >= ?';
+                params.push(startDate);
+            }
+            if (endDate) {
+                whereClause += ' AND DATE(created_at) <= ?';
+                params.push(endDate);
+            }
+
+            // Ambil semua jawaban_json
+            const [rows] = await db.query(`
+                SELECT jawaban_json
+                FROM kuisioner
+                ${whereClause}
+            `, params);
+
+            if (rows.length === 0) {
+                return res.json({
+                    success: true,
+                    data: {
+                        stats: { total_responden: 0, rata_keseluruhan: 0, rata_skor_array: [] },
+                        distribusi: { skor_1_count: 0, skor_2_count: 0, skor_3_count: 0, skor_4_count: 0, skor_5_count: 0 }
+                    }
+                });
+            }
+
+            // Ambil daftar pertanyaan aktif untuk urutan
+            const [questions] = await db.query('SELECT id FROM kuisioner_questions ORDER BY urutan');
+            const questionIds = questions.map(q => String(q.id));
+
+            const totalPerKriteria = {};
+            const countPerKriteria = {};
+            questionIds.forEach(id => {
+                totalPerKriteria[id] = 0;
+                countPerKriteria[id] = 0;
+            });
+            const distribusi = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            let totalSemua = 0, countSemua = 0;
+
+            rows.forEach(row => {
+                let jawaban = {};
+                try {
+                    if (typeof row.jawaban_json === 'string') {
+                        jawaban = JSON.parse(row.jawaban_json);
+                    } else if (row.jawaban_json && typeof row.jawaban_json === 'object') {
+                        jawaban = row.jawaban_json;
+                    }
+                } catch (e) {
+                    jawaban = {};
+                }
+
+                // Gunakan key dari jawaban jika tidak ada pertanyaan di tabel
+                const keys = questionIds.length > 0 ? questionIds : Object.keys(jawaban);
+                keys.forEach(key => {
+                    const val = parseInt(jawaban[key]);
+                    if (!isNaN(val) && val >= 1 && val <= 5) {
+                        if (!totalPerKriteria[key]) { totalPerKriteria[key] = 0; countPerKriteria[key] = 0; }
+                        totalPerKriteria[key] += val;
+                        countPerKriteria[key] += 1;
+                        totalSemua += val;
+                        countSemua += 1;
+                        distribusi[val] = (distribusi[val] || 0) + 1;
+                    }
+                });
+            });
+
+            // 🔥 Buat rata_skor_array sesuai urutan pertanyaan
+            let rataSkorArray = [];
+            if (questionIds.length > 0) {
+                rataSkorArray = questionIds.map(qId => {
+                    return countPerKriteria[qId] > 0 ? (totalPerKriteria[qId] / countPerKriteria[qId]) : 0;
+                });
+            } else {
+                const keys = Object.keys(totalPerKriteria).sort((a,b) => parseInt(a)-parseInt(b));
+                rataSkorArray = keys.map(key => {
+                    return countPerKriteria[key] > 0 ? (totalPerKriteria[key] / countPerKriteria[key]) : 0;
+                });
+            }
+
+            const stats = {
+                total_responden: rows.length,
+                rata_keseluruhan: countSemua > 0 ? (totalSemua / countSemua) : 0,
+                rata_skor_array: rataSkorArray
+            };
+
+            const distribusiData = {
+                skor_1_count: distribusi[1] || 0,
+                skor_2_count: distribusi[2] || 0,
+                skor_3_count: distribusi[3] || 0,
+                skor_4_count: distribusi[4] || 0,
+                skor_5_count: distribusi[5] || 0
+            };
+
+            res.json({
+                success: true,
+                data: { stats, distribusi: distribusiData }
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting kuisioner stats:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil statistik kuisioner: ' + error.message
             });
         }
     },
@@ -3569,9 +3697,6 @@ const apiController = {
             const { question_text, urutan } = req.body;
             const userId = req.user?.id || 1;
             
-            console.log('========== CREATE KUISIONER QUESTION ==========');
-            console.log('📥 Data:', { question_text, urutan, userId });
-            
             if (!question_text) {
                 return res.status(400).json({
                     success: false,
@@ -3579,28 +3704,38 @@ const apiController = {
                 });
             }
             
-            // Jika urutan tidak diisi, ambil urutan terakhir + 1
             let finalUrutan = urutan;
             if (!finalUrutan) {
                 const [lastOrder] = await db.query(
                     'SELECT MAX(urutan) as max_urutan FROM kuisioner_questions'
                 );
                 finalUrutan = (lastOrder[0].max_urutan || 0) + 1;
-                console.log('📊 Generated urutan:', finalUrutan);
             }
             
+            // Insert pertanyaan
             const [result] = await db.query(
                 `INSERT INTO kuisioner_questions (question_text, urutan) VALUES (?, ?)`,
                 [question_text, finalUrutan]
             );
             
-            console.log('✅ Question created with ID:', result.insertId);
+            const newQuestionId = result.insertId;
+            
+            // 🔥 TAMBAHKAN: Buat kolom skor_{id} di tabel kuisioner
+            try {
+                await db.query(
+                    `ALTER TABLE kuisioner ADD COLUMN skor_${newQuestionId} TINYINT NULL DEFAULT NULL`
+                );
+                console.log(`✅ Kolom skor_${newQuestionId} ditambahkan ke tabel kuisioner`);
+            } catch (alterError) {
+                console.error('⚠️ Gagal menambah kolom skor:', alterError.message);
+                // Lanjutkan saja, jangan gagalkan request karena kolom mungkin sudah ada
+            }
             
             res.json({
                 success: true,
                 message: 'Pertanyaan berhasil ditambahkan',
                 data: {
-                    id: result.insertId,
+                    id: newQuestionId,
                     question_text,
                     urutan: finalUrutan
                 }
@@ -3660,6 +3795,18 @@ const apiController = {
             console.log('========== DELETE KUISIONER QUESTION ==========');
             console.log('📥 ID:', id);
             
+            // 🔥 TAMBAHKAN: Hapus kolom skor_{id} dari tabel kuisioner
+            try {
+                await db.query(
+                    `ALTER TABLE kuisioner DROP COLUMN skor_${id}`
+                );
+                console.log(`✅ Kolom skor_${id} dihapus dari tabel kuisioner`);
+            } catch (alterError) {
+                console.error('⚠️ Gagal menghapus kolom skor:', alterError.message);
+                // Lanjutkan saja, kolom mungkin sudah tidak ada
+            }
+            
+            // Hapus pertanyaan
             const [result] = await db.query(
                 'DELETE FROM kuisioner_questions WHERE id = ?',
                 [id]

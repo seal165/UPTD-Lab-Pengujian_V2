@@ -360,7 +360,6 @@ III. **KAJI ULANG PERMINTAAN**
             // Jika tidak ditemukan, set ke default
             if (!found) {
                 console.log('⚠️ Status not found in select options:', data.status);
-                // Coba cari dengan mapping
                 const statusMapping = {
                     'Menunggu Verifikasi': 'Menunggu Verifikasi',
                     'Pengecekan Sampel': 'Pengecekan Sampel',
@@ -372,7 +371,6 @@ III. **KAJI ULANG PERMINTAAN**
                     'Selesai': 'Selesai',
                     'Dibatalkan': 'Dibatalkan'
                 };
-                
                 const mappedStatus = statusMapping[data.status] || 'Menunggu Verifikasi';
                 for (let i = 0; i < statusSelect.options.length; i++) {
                     if (statusSelect.options[i].value === mappedStatus) {
@@ -381,6 +379,43 @@ III. **KAJI ULANG PERMINTAAN**
                         break;
                     }
                 }
+            }
+
+            // 🔥 TAMBAHKAN INI: Sembunyikan opsi "Dibatalkan" jika laporan sudah ada
+            if (data.report && data.report.file_laporan) {
+                for (let option of statusSelect.options) {
+                    if (option.value === 'Dibatalkan') {
+                        option.style.display = 'none';
+                        // Jika opsi "Dibatalkan" sedang dipilih, pindahkan ke status lain
+                        if (option.selected) {
+                            for (let opt of statusSelect.options) {
+                                if (opt.value !== 'Dibatalkan' && opt.style.display !== 'none') {
+                                    opt.selected = true;
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+                // Tambahkan pesan info
+                const existingMsg = statusSelect.parentNode.querySelector('.laporan-warning');
+                if (!existingMsg) {
+                    const msg = document.createElement('small');
+                    msg.className = 'text-muted d-block mt-1 laporan-warning';
+                    msg.innerHTML = '<i class="fas fa-info-circle me-1"></i> Opsi "Dibatalkan" tidak tersedia karena laporan sudah diupload.';
+                    statusSelect.parentNode.appendChild(msg);
+                }
+            } else {
+                // Jika laporan belum ada, pastikan opsi "Dibatalkan" tampil
+                for (let option of statusSelect.options) {
+                    if (option.value === 'Dibatalkan') {
+                        option.style.display = '';
+                        break;
+                    }
+                }
+                const existingMsg = statusSelect.parentNode.querySelector('.laporan-warning');
+                if (existingMsg) existingMsg.remove();
             }
         }
         
@@ -442,6 +477,7 @@ III. **KAJI ULANG PERMINTAAN**
 
         // Blok status kuisioner (hanya tampil jika laporan sudah ada)
         renderKuisionerStatusBlock(data);
+        renderKuisionerDetail(data);
     }
 
     // ==================== BLOK STATUS KUISIONER UNTUK ADMIN ====================
@@ -498,6 +534,117 @@ III. **KAJI ULANG PERMINTAAN**
         const updateForm = document.getElementById('updateForm');
         if (updateForm && updateForm.parentElement) {
             updateForm.parentElement.insertAdjacentHTML('beforeend', blockHtml);
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ==================== RENDER DETAIL KUIISIONER (ADMIN) ====================
+    function renderKuisionerDetail(data) {
+        // Hapus elemen lama jika ada
+        const existingDetail = document.getElementById('kuisionerDetailBlock');
+        if (existingDetail) existingDetail.remove();
+
+        if (!data.kuisioner) return; // Tidak ada data kuisioner
+
+        const k = data.kuisioner;
+
+        // Daftar pertanyaan (default, bisa disesuaikan dengan database)
+        const questions = [
+            'Kemudahan dalam pelayanan pelanggan',
+            'Kemudahan informasi tentang sistem, mekanisme, dan prosedur pelayanan pengujian',
+            'Ketepatan waktu pelayanan pengujian',
+            'Biaya pengujian yang kompetitif',
+            'Kualitas dan mutu layanan sesuai ketentuan',
+            'Tenaga teknis yang handal, berpengalaman, dan bersertifikasi',
+            'Keramahan pelayanan petugas',
+            'Kecepatan tanggapan dan tindak lanjut terhadap keluhan',
+            'Kenyamanan dan kebersihan lingkungan',
+            'Dukungan peralatan yang memadai, terpelihara serta mutakhir'
+        ];
+
+        // Kumpulkan skor
+        const scores = [];
+        for (let i = 1; i <= 10; i++) {
+            const key = `skor_${i}`;
+            scores.push(k[key] || 0);
+        }
+
+        // Buat HTML tabel
+        let html = `
+            <div class="card-custom mt-3" id="kuisionerDetailBlock" style="border-top: 3px solid #198754;">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-success-subtle p-2 rounded me-2 text-success">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <h6 class="fw-bold m-0">Detail Hasil Kuisioner</h6>
+                    <span class="badge bg-success ms-auto">Diisi: ${formatDate(k.created_at)}</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead class="bg-light">
+                            <tr>
+                                <th style="width: 5%;">No</th>
+                                <th>Pertanyaan</th>
+                                <th style="width: 20%;" class="text-center">Skor (1-5)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        questions.forEach((q, index) => {
+            const score = scores[index] || 0;
+            const stars = '★'.repeat(score) + '☆'.repeat(5 - score);
+            const color = score >= 4 ? 'success' : score >= 3 ? 'warning' : 'danger';
+            html += `
+                <tr>
+                    <td class="text-center">${index + 1}</td>
+                    <td>${q}</td>
+                    <td class="text-center">
+                        <span class="badge bg-${color}">${score}</span>
+                        <small class="text-muted ms-1">${stars}</small>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+        `;
+
+        // Tampilkan saran jika ada
+        if (k.saran) {
+            html += `
+                <div class="mt-3 p-3 bg-light rounded">
+                    <h6 class="fw-bold small">📝 Saran / Masukan</h6>
+                    <p class="mb-0">${escapeHtml(k.saran)}</p>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+
+        // Sisipkan setelah status block atau sebelum timeline
+        const statusBlock = document.getElementById('kuisionerStatusBlock');
+        if (statusBlock) {
+            statusBlock.insertAdjacentHTML('afterend', html);
+        } else {
+            // Jika status block tidak ada (misal laporan belum diupload), cari tempat lain
+            const timeline = document.getElementById('statusTimeline');
+            if (timeline) {
+                const parent = timeline.closest('.card-custom');
+                if (parent) {
+                    parent.insertAdjacentHTML('beforebegin', html);
+                }
+            }
         }
     }
 

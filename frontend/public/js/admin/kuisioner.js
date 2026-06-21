@@ -170,14 +170,12 @@
         }
     }
 
-    // ==================== UPDATE STATISTIK ====================
     function updateStats(data) {
         const stats = data.stats || {};
         const distribusi = data.distribusi || {};
         
         console.log('📊 Updating stats:', stats);
         
-        // Update stats cards
         const totalResponden = document.getElementById('totalResponden');
         const rataKeseluruhan = document.getElementById('rataKeseluruhan');
         const nilaiTertinggi = document.getElementById('nilaiTertinggi');
@@ -188,53 +186,32 @@
         if (totalResponden) totalResponden.textContent = stats.total_responden || 0;
         if (rataKeseluruhan) rataKeseluruhan.textContent = (stats.rata_keseluruhan || 0).toFixed(1);
         
-        // Hitung nilai tertinggi dan terendah dari semua kriteria
-        const nilaiArray = [
-            { nilai: stats.rata_skor_1, index: 1 },
-            { nilai: stats.rata_skor_2, index: 2 },
-            { nilai: stats.rata_skor_3, index: 3 },
-            { nilai: stats.rata_skor_4, index: 4 },
-            { nilai: stats.rata_skor_5, index: 5 },
-            { nilai: stats.rata_skor_6, index: 6 },
-            { nilai: stats.rata_skor_7, index: 7 },
-            { nilai: stats.rata_skor_8, index: 8 },
-            { nilai: stats.rata_skor_9, index: 9 },
-            { nilai: stats.rata_skor_10, index: 10 }
-        ].filter(n => n.nilai !== null && n.nilai !== undefined);
+        // 🔥 Gunakan rata_skor_array dari backend (dinamis)
+        const rataSkorArray = stats.rata_skor_array || [];
         
-        if (nilaiArray.length > 0) {
+        if (rataSkorArray.length > 0) {
+            const nilaiArray = rataSkorArray.map((nilai, index) => ({ nilai, index }));
             const tertinggi = nilaiArray.reduce((max, item) => item.nilai > max.nilai ? item : max, nilaiArray[0]);
             const terendah = nilaiArray.reduce((min, item) => item.nilai < min.nilai ? item : min, nilaiArray[0]);
             
             if (nilaiTertinggi) nilaiTertinggi.textContent = tertinggi.nilai.toFixed(1);
             if (nilaiTerendah) nilaiTerendah.textContent = terendah.nilai.toFixed(1);
-            
             if (kriteriaTertinggi) {
-                kriteriaTertinggi.textContent = kriteriaList[tertinggi.index - 1] || `Kriteria ${tertinggi.index}`;
+                kriteriaTertinggi.textContent = kriteriaList[tertinggi.index] || `Kriteria ${tertinggi.index + 1}`;
             }
-            
             if (kriteriaTerendah) {
-                kriteriaTerendah.textContent = kriteriaList[terendah.index - 1] || `Kriteria ${terendah.index}`;
+                kriteriaTerendah.textContent = kriteriaList[terendah.index] || `Kriteria ${terendah.index + 1}`;
             }
         }
         
-        updateCharts(stats, distribusi);
+        // Panggil updateCharts dengan rataSkorArray
+        updateCharts(rataSkorArray, distribusi);
     }
 
     // ==================== UPDATE CHART ====================
-    function updateCharts(stats, distribusi) {
-        const kriteriaValues = [
-            stats.rata_skor_1 || 0,
-            stats.rata_skor_2 || 0,
-            stats.rata_skor_3 || 0,
-            stats.rata_skor_4 || 0,
-            stats.rata_skor_5 || 0,
-            stats.rata_skor_6 || 0,
-            stats.rata_skor_7 || 0,
-            stats.rata_skor_8 || 0,
-            stats.rata_skor_9 || 0,
-            stats.rata_skor_10 || 0
-        ].slice(0, kriteriaList.length || 10);
+    function updateCharts(rataSkorArray, distribusi) {
+        // rataSkorArray adalah array rata-rata per pertanyaan (sesuai urutan)
+        const kriteriaValues = rataSkorArray || [];
         
         let labels = [];
         if (kriteriaList.length > 0) {
@@ -245,10 +222,10 @@
             labels = kriteriaValues.map((_, i) => `Kriteria ${i+1}`);
         }
         
+        // Chart Kriteria (Bar)
         if (kriteriaChart) {
             kriteriaChart.destroy();
         }
-        
         const ctx = document.getElementById('kriteriaChart')?.getContext('2d');
         if (ctx) {
             kriteriaChart = new Chart(ctx, {
@@ -270,7 +247,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: 4,
+                            max: 5,
                             ticks: { stepSize: 1 }
                         }
                     },
@@ -281,23 +258,23 @@
             });
         }
         
+        // Chart Distribusi (Doughnut)
         if (distribusiChart) {
             distribusiChart.destroy();
         }
-        
         const distribusiData = [
             distribusi.skor_1_count || 0,
             distribusi.skor_2_count || 0,
             distribusi.skor_3_count || 0,
-            distribusi.skor_4_count || 0
+            distribusi.skor_4_count || 0,
+            distribusi.skor_5_count || 0   // tambahkan ini
         ];
-        
         const ctx2 = document.getElementById('distribusiChart')?.getContext('2d');
         if (ctx2) {
             distribusiChart = new Chart(ctx2, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Sangat Tidak Puas (1)', 'Tidak Puas (2)', 'Puas (3)', 'Sangat Puas (4)'],
+                    labels: ['Sangat Tidak Puas (1)', 'Tidak Puas (2)', 'Puas (3)', 'Sangat Puas (4)', 'Sangat Puas (5)'],
                     datasets: [{
                         data: distribusiData,
                         backgroundColor: ['#dc2626', '#f97316', '#2563eb', '#059669'],
@@ -327,12 +304,11 @@
 
         let html = '';
         kuisioner.forEach((item, index) => {
-            // Hitung rata-rata dari jawaban_json
-            const jawaban = item.jawaban || {};
-            const nilaiList = Object.values(jawaban).filter(n => n !== null);
-            const rataRata = nilaiList.length > 0 
-                ? (nilaiList.reduce((a, b) => a + b, 0) / nilaiList.length).toFixed(1)
-                : '-';
+            // 🔥 Gunakan total_nilai dan rata_rata yang sudah dikirim backend
+            const totalNilai = item.total_nilai !== undefined ? item.total_nilai : '-';
+            const jumlahPertanyaan = item.jumlah_pertanyaan || 0;
+            const rataRata = item.rata_rata !== undefined ? item.rata_rata.toFixed(1) : '-';
+            const nilaiDisplay = totalNilai !== '-' ? `${totalNilai} / ${jumlahPertanyaan * 5}` : '-';
             
             html += `
                 <tr>
@@ -340,10 +316,15 @@
                     <td>${item.nama_pemohon || '-'}</td>
                     <td>${item.nama_instansi || '-'}</td>
                     <td>${formatDate(item.created_at)}</td>
-                    <td class="text-center">${rataRata}</td>
+                    <td class="text-center">
+                        <strong>${nilaiDisplay}</strong>
+                        <br><small class="text-muted">(rata-rata ${rataRata})</small>
+                    </td>
                     <td>${item.saran ? item.saran.substring(0, 50) + '...' : '-'}</td>
                     <td>
-                        <button onclick="previewKuisioner(${item.id})">Preview</button>
+                        <button class="btn btn-sm btn-light action-btn" onclick="previewKuisioner(${item.id})">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
                     </td>
                 </tr>
             `;
@@ -409,36 +390,46 @@
                 const data = result.data;
                 currentPreviewData = data;
                 
-                // Isi data
+                // Isi info pemohon
                 document.getElementById('previewNamaPemohon').textContent = data.nama_pemohon || '-';
                 document.getElementById('previewInstansi').textContent = data.nama_instansi || '-';
                 document.getElementById('previewTelepon').textContent = data.nomor_telepon || '-';
                 document.getElementById('previewTanggal').textContent = formatDate(data.created_at);
                 document.getElementById('previewSaran').textContent = data.saran || '-';
                 
-                // Tampilkan nilai dari JSON
-                const jawaban = data.jawaban || {};
-                const pertanyaan = data.pertanyaan || [];
+                // 🔥 Gunakan skor_list dan pertanyaan yang sudah dikirim server
+                const skorList = data.skor_list || [];
+                const pertanyaanList = data.pertanyaan || [];
                 
                 const tbody = document.getElementById('previewNilaiBody');
                 let html = '';
+                let total = 0, count = 0;
                 
-                for (let i = 1; i <= pertanyaan.length; i++) {
-                    const nilai = jawaban[i];
-                    if (nilai !== undefined) {
+                pertanyaanList.forEach((qText, idx) => {
+                    const nilai = skorList[idx] !== undefined ? skorList[idx] : null;
+                    if (nilai !== null && !isNaN(nilai)) {
+                        total += nilai;
+                        count++;
                         html += `
                             <tr>
-                                <td>${i}</td>
-                                <td>${pertanyaan[i-1] || `Kriteria ${i}`}</td>
+                                <td>${idx + 1}</td>
+                                <td>${qText}</td>
                                 <td class="text-center">
                                     <span class="nilai-box nilai-${nilai}">${nilai}</span>
                                 </td>
                             </tr>
                         `;
                     }
-                }
+                });
                 
-                tbody.innerHTML = html || '<tr><td colspan="3">Tidak ada nilai</td></tr>';
+                if (html === '') {
+                    html = '<tr><td colspan="3" class="text-center text-muted">Belum ada nilai</td></tr>';
+                }
+                tbody.innerHTML = html;
+                
+                // Tampilkan total & rata-rata
+                const avg = count > 0 ? (total / count).toFixed(1) : '-';
+                document.getElementById('previewTotalNilai').textContent = `Total: ${total} / ${pertanyaanList.length * 5}, Rata-rata: ${avg}`;
                 
                 new bootstrap.Modal(document.getElementById('previewModal')).show();
             }
@@ -768,11 +759,14 @@
             doc.setFont(undefined, 'bold');
             doc.text('Hasil Penilaian', 14, 62);
             
-            const tableData = [];
-            for (let i = 1; i <= 10; i++) {
-                const nilai = currentPreviewData[`skor_${i}`] || '-';
-                tableData.push([i, kriteriaList[i-1] || `Kriteria ${i}`, nilai]);
-            }
+            // 🔥 Gunakan skor_list dan pertanyaan dari currentPreviewData
+            const skorList = currentPreviewData.skor_list || [];
+            const pertanyaanList = currentPreviewData.pertanyaan || [];
+            
+            const tableData = pertanyaanList.map((qText, idx) => {
+                const nilai = skorList[idx] !== undefined ? skorList[idx] : '-';
+                return [idx + 1, qText, nilai];
+            });
             
             doc.autoTable({
                 startY: 66,
@@ -795,7 +789,7 @@
             const saranLines = doc.splitTextToSize(currentPreviewData.saran || '-', 180);
             doc.text(saranLines, 14, finalY + 6);
             
-            doc.save(`kuisioner_${currentPreviewData.nama_pemohon}_${formatDateForFilename(new Date())}.pdf`);
+            doc.save(`kuisioner_${currentPreviewData.nama_pemohon || 'pemohon'}_${formatDateForFilename(new Date())}.pdf`);
             
             showAlert('PDF berhasil didownload', 'success');
             
@@ -884,7 +878,7 @@
         }
         
         loadKuisioner();
-        loadQuestions();
+        loadQuestions().then(() => loadStats());
         
         const btnTambah = document.getElementById('btnTambahPertanyaan');
         if (btnTambah) {
