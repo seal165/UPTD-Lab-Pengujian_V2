@@ -420,7 +420,7 @@ III. **KAJI ULANG PERMINTAAN**
             const reportName = normalizeFilename(data.report.file_laporan);
             const reportUrl = buildProtectedFileUrl('laporan', data.report.file_laporan);
             const reportInfo = `
-                <div class="alert alert-success mt-2">
+                <div class="alert alert-success mt-2" id="reportInfoBlock">
                     <i class="fas fa-check-circle me-2"></i>
                     Laporan sudah diupload: ${reportName}
                     <div class="mt-2">
@@ -435,9 +435,69 @@ III. **KAJI ULANG PERMINTAAN**
             `;
             
             const uploadArea = document.getElementById('uploadArea');
-            const existingInfo = document.querySelector('.alert-success.mt-2');
+            const existingInfo = document.getElementById('reportInfoBlock');
             if (existingInfo) existingInfo.remove();
             uploadArea.insertAdjacentHTML('afterend', reportInfo);
+        }
+
+        // Blok status kuisioner (hanya tampil jika laporan sudah ada)
+        renderKuisionerStatusBlock(data);
+    }
+
+    // ==================== BLOK STATUS KUISIONER UNTUK ADMIN ====================
+    function renderKuisionerStatusBlock(data) {
+        // Hapus blok lama jika ada
+        const existingBlock = document.getElementById('kuisionerStatusBlock');
+        if (existingBlock) existingBlock.remove();
+
+        // Hanya tampilkan jika laporan sudah ada
+        if (!data.report || !data.report.file_laporan) return;
+
+        let blockHtml = '';
+
+        if (data.kuisioner) {
+            // Kuisioner sudah diisi oleh user
+            const tanggalIsi = formatDate(data.kuisioner.created_at);
+            blockHtml = `
+                <div class="card-custom mt-3" id="kuisionerStatusBlock" style="border-top: 3px solid #198754;">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-success-subtle p-2 rounded me-2 text-success">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <h6 class="fw-bold m-0">Kuisioner Kepuasan</h6>
+                    </div>
+                    <div class="alert alert-success py-2">
+                        <i class="fas fa-check-circle me-1"></i>
+                        <strong>Sudah diisi</strong> pada ${tanggalIsi}
+                    </div>
+                    <button class="btn btn-outline-success w-100" onclick="downloadKuisionerPDFAdmin()">
+                        <i class="fas fa-file-pdf me-2"></i>Download PDF Kuisioner
+                    </button>
+                </div>
+            `;
+        } else {
+            // Kuisioner belum diisi user
+            blockHtml = `
+                <div class="card-custom mt-3" id="kuisionerStatusBlock" style="border-top: 3px solid #ffc107;">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-warning-subtle p-2 rounded me-2 text-warning">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <h6 class="fw-bold m-0">Kuisioner Kepuasan</h6>
+                    </div>
+                    <div class="alert alert-warning py-2">
+                        <i class="fas fa-clock me-1"></i>
+                        <strong>Belum diisi</strong> – Menunggu user mengisi kuisioner setelah download laporan
+                    </div>
+                    <small class="text-muted">Laporan tersedia untuk user setelah mengisi kuisioner</small>
+                </div>
+            `;
+        }
+
+        // Sisipkan setelah form update
+        const updateForm = document.getElementById('updateForm');
+        if (updateForm && updateForm.parentElement) {
+            updateForm.parentElement.insertAdjacentHTML('beforeend', blockHtml);
         }
     }
 
@@ -950,6 +1010,123 @@ III. **KAJI ULANG PERMINTAAN**
             document.getElementById('updateBtn').disabled = false;
             document.getElementById('updateBtnText').style.display = 'inline';
             document.getElementById('updateBtnSpinner').style.display = 'none';
+        }
+    };
+
+    // 🔥 FUNGSI DOWNLOAD KUISIONER PDF (ADMIN)
+    window.downloadKuisionerPDFAdmin = async function() {
+        const data = detailCache.data;
+        if (!data || !data.kuisioner) {
+            showToast('Data kuisioner tidak ditemukan', 'warning');
+            return;
+        }
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const k = data.kuisioner;
+
+            // Header
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Hasil Kuisioner Kepuasan Pelanggan', 105, 18, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('UPTD Laboratorium Pengujian Bahan Konstruksi', 105, 25, { align: 'center' });
+
+            // Garis separator
+            doc.setLineWidth(0.5);
+            doc.line(14, 30, 196, 30);
+
+            // Info pemohon
+            let y = 38;
+            doc.setFont('helvetica', 'bold');
+            doc.text('Informasi Pengajuan', 14, y);
+            y += 7;
+
+            doc.setFont('helvetica', 'normal');
+            doc.text(`No. Pengajuan : ${data.no_permohonan || '-'}`, 14, y); y += 6;
+            doc.text(`Nama Pemohon  : ${data.nama_pemohon || data.pic_name || '-'}`, 14, y); y += 6;
+            doc.text(`Instansi       : ${data.nama_instansi || data.company_name || '-'}`, 14, y); y += 6;
+            doc.text(`Tanggal Isi    : ${formatDate(k.created_at)}`, 14, y); y += 12;
+
+            // Tabel penilaian
+            doc.setFont('helvetica', 'bold');
+            doc.text('Hasil Penilaian', 14, y);
+            y += 5;
+
+            // Ambil pertanyaan dari kuisioner admin (sudah ada di admin kuisioner page)
+            // Gunakan label default jika tidak ada
+            const defaultLabels = [
+                'Persyaratan dan prosedur pelayanan jelas',
+                'Kemudahan dalam persyaratan pelayanan',
+                'Ketepatan pelaksanaan terhadap jadwal waktu',
+                'Kemampuan dan keahlian petugas dalam pelayanan',
+                'Kesopanan dan keramahan petugas',
+                'Kewajaran biaya/tarif dalam pelayanan',
+                'Kesesuaian biaya yang dibayarkan',
+                'Kesesuaian jadwal pelayanan',
+                'Kenyamanan di lingkungan unit pelayanan',
+                'Keamanan pelayanan'
+            ];
+
+            const tableData = [];
+            for (let i = 1; i <= 10; i++) {
+                const nilai = k[`skor_${i}`];
+                if (nilai !== null && nilai !== undefined) {
+                    const nilaiLabel = nilai === 1 ? '1 - Sangat Tidak Puas'
+                        : nilai === 2 ? '2 - Tidak Puas'
+                        : nilai === 3 ? '3 - Puas'
+                        : nilai === 4 ? '4 - Sangat Puas'
+                        : String(nilai);
+                    tableData.push([i, defaultLabels[i-1] || `Kriteria ${i}`, nilaiLabel]);
+                }
+            }
+
+            if (tableData.length === 0) {
+                // Fallback jika tidak ada skor
+                doc.setFont('helvetica', 'normal');
+                doc.text('(Tidak ada data penilaian tersedia)', 14, y);
+                y += 10;
+            } else {
+                doc.autoTable({
+                    startY: y,
+                    head: [['No', 'Kriteria Penilaian', 'Nilai']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [67, 97, 238], textColor: 255, fontStyle: 'bold' },
+                    columnStyles: {
+                        0: { cellWidth: 12, halign: 'center' },
+                        1: { cellWidth: 120 },
+                        2: { cellWidth: 50, halign: 'center' }
+                    },
+                    styles: { fontSize: 9, cellPadding: 3 }
+                });
+                y = doc.lastAutoTable.finalY + 10;
+            }
+
+            // Saran
+            doc.setFont('helvetica', 'bold');
+            doc.text('Saran / Komentar:', 14, y);
+            y += 6;
+            doc.setFont('helvetica', 'normal');
+            const saranLines = doc.splitTextToSize(k.saran || '(Tidak ada saran)', 180);
+            doc.text(saranLines, 14, y);
+
+            // Footer
+            const pageHeight = doc.internal.pageSize.height;
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Dicetak pada: ${new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}`, 14, pageHeight - 10);
+
+            const filename = `Kuisioner_${data.nama_pemohon || 'Pemohon'}_${data.no_permohonan || data.id}.pdf`;
+            doc.save(filename);
+            showToast('PDF Kuisioner berhasil didownload!', 'success');
+
+        } catch (error) {
+            console.error('Error generating kuisioner PDF:', error);
+            showToast('Gagal membuat PDF: ' + error.message, 'danger');
         }
     };
 

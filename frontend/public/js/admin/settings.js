@@ -627,7 +627,7 @@
                             <td>${backup.size || '-'}</td>
                             <td><span class="badge bg-${backup.status === 'success' ? 'success' : 'danger'}">${backup.status}</span></td>
                             <td>
-                                <a href="${API_BASE_URL}/settings/backup/download/${backup.id}" class="btn btn-sm btn-outline-primary" title="Download">
+                                <a href="${API_BASE_URL}/backups/${backup.filename}" class="btn btn-sm btn-outline-primary" title="Download" target="_blank">
                                     <i class="fas fa-download"></i>
                                 </a>
                             </td>
@@ -691,7 +691,7 @@
         showAlert('Mengembalikan database... Mohon tunggu', 'info');
 
         const formData = new FormData();
-        formData.append('backup', file);
+        formData.append('backup_file', file);
 
         try {
             const response = await fetch(`${API_BASE_URL}/settings/restore`, {

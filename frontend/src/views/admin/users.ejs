@@ -3,195 +3,114 @@
 <head>
     <%- include('partials/head') %>
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-        .filter-badge {
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .filter-badge.active {
-            background-color: #4361ee !important;
-            color: white !important;
-        }
-        .stats-card {
-            background: white;
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            border: 1px solid #f0f0f0;
-            transition: all 0.3s;
-        }
-        .stats-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-        }
-        .avatar-initials {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 16px;
-            background-color: #e9ecef;
-            color: #495057;
-        }
-        .badge-soft-success {
-            background: #d1fae5;
-            color: #059669;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-        }
-        .badge-soft-warning {
-            background: #fff3cd;
-            color: #856404;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-        }
-        .badge-soft-secondary {
-            background: #e2e8f0;
-            color: #475569;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-        }
-        .badge-soft-primary {
-            background: #dbeafe;
-            color: #1e40af;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-        }
-        .action-btn {
-            width: 32px;
-            height: 32px;
-            padding: 0;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            transition: all 0.2s;
-        }
-        .action-btn:hover {
-            background-color: #f8f9fa;
-            transform: translateY(-2px);
-        }
-        .bg-primary-subtle {
-            background-color: #e9ecef;
-        }
-        .bg-success-subtle {
-            background-color: #d1fae5;
-        }
-        .bg-warning-subtle {
-            background-color: #fff3cd;
-        }
-        .bg-info-subtle {
-            background-color: #dbeafe;
-        }
-    </style>
+
 </head>
 <body>
     
-    <%- include('partials/sidebar', { page: 'users' }) %>
+    <div class="app-wrapper">
+        <%- include('partials/sidebar', { page: 'users' }) %>
 
-    <div class="main-content">
-        <!-- Alert Message -->
-        <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
+        <main class="main-content">
+            <%- include('partials/top-navbar', { pageTitle: 'Data Pemohon' }) %>
 
-        <!-- Header -->
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-            <div>
-                <h4 class="fw-bold text-dark m-0">Data Pemohon</h4>
-                <p class="text-muted small m-0">Kelola akun perusahaan dan pemohon perorangan.</p>
-            </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-success btn-sm text-white action-btn" onclick="exportToExcel()">
-                    <i class="fas fa-file-excel me-2"></i>Export Data
-                </button>
-            </div>
-        </div>
+            <div class="content-body">
+                <!-- Alert Message -->
+                <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
 
-        <!-- Stats Cards -->
-        <div class="row g-3 mb-4" id="statsCards">
-            <!-- Akan diisi JavaScript -->
-        </div>
-
-        <!-- Filter Section -->
-        <div class="card-custom mb-4">
-            <div class="card-body p-3">
-                <!-- Quick Status Filters -->
-                <div class="d-flex gap-2 mb-3 flex-wrap">
-                    <span class="badge bg-light text-dark filter-badge active" data-status="">Semua</span>
-                    <span class="badge badge-soft-success filter-badge" data-status="active">Aktif</span>
-                    <span class="badge badge-soft-warning filter-badge" data-status="pending">Pending</span>
-                    <span class="badge badge-soft-secondary filter-badge" data-status="inactive">Nonaktif</span>
+                <!-- Header -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold text-dark m-0">Data Pemohon</h4>
+                        <p class="text-muted small m-0">Kelola akun perusahaan dan pemohon perorangan.</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success btn-sm text-white action-btn" onclick="exportToExcel()">
+                            <i class="fas fa-file-excel me-2"></i>Export Data
+                        </button>
+                    </div>
                 </div>
 
-                <div class="row g-2">
-                    <div class="col-md-12">
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-0">
-                                <i class="fas fa-search text-muted"></i>
-                            </span>
-                            <input type="text" class="form-control bg-light border-0 shadow-none" 
-                                   id="searchInput" placeholder="Cari nama pemohon, perusahaan, atau email...">
+                <!-- Stats Cards -->
+                <div class="row g-3 mb-4" id="statsCards">
+                    <!-- Akan diisi JavaScript -->
+                </div>
+
+                <!-- Filter Section -->
+                <div class="card-custom mb-4">
+                    <div class="card-body p-3">
+                        <!-- Quick Status Filters -->
+                        <div class="d-flex gap-2 mb-3 flex-wrap">
+                            <span class="badge bg-light text-dark filter-badge active" data-status="">Semua</span>
+                            <span class="badge badge-soft-success filter-badge" data-status="active">Aktif</span>
+                            <span class="badge badge-soft-warning filter-badge" data-status="pending">Pending</span>
+                            <span class="badge badge-soft-secondary filter-badge" data-status="inactive">Nonaktif</span>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-md-12">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-0">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" class="form-control bg-light border-0 shadow-none" 
+                                        id="searchInput" placeholder="Cari nama pemohon, perusahaan, atau email...">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Users Table -->
-        <div class="card-custom p-0 overflow-hidden">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 py-3">
-                                <input type="checkbox" class="form-check-input" id="selectAll">
-                            </th>
-                            <th class="py-3">Identitas Pemohon</th>
-                            <th class="py-3">Kontak</th>
-                            <th class="py-3">Status Akun</th>
-                            <th class="py-3">Terdaftar Sejak</th>
-                            <th class="py-3">Total Transaksi</th>
-                            <th class="text-end pe-4 py-3">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersTableBody">
-                        <!-- Loading State -->
-                        <tr id="loadingRow">
-                            <td colspan="7" class="text-center py-5">
-                                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="text-muted mt-2">Memuat data pemohon...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                <!-- Users Table -->
+                <div class="card-custom p-0 overflow-hidden">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4 py-3">
+                                        <input type="checkbox" class="form-check-input" id="selectAll">
+                                    </th>
+                                    <th class="py-3">Identitas Pemohon</th>
+                                    <th class="py-3">Kontak</th>
+                                    <th class="py-3">Status Akun</th>
+                                    <th class="py-3">Terdaftar Sejak</th>
+                                    <th class="py-3">Total Transaksi</th>
+                                    <th class="text-end pe-4 py-3">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Loading State -->
+                                <tr id="loadingRow">
+                                    <td colspan="7" class="text-center py-5">
+                                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="text-muted mt-2">Memuat data pemohon...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-            <!-- Empty State -->
-            <div id="emptyState" style="display: none;">
-                <div class="text-center p-5">
-                    <i class="fas fa-users fa-4x text-muted mb-3"></i>
-                    <p class="text-muted">Belum ada data pemohon.</p>
+                    <!-- Empty State -->
+                    <div id="emptyState" style="display: none;">
+                        <div class="text-center p-5">
+                            <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                            <p class="text-muted">Belum ada data pemohon.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-top bg-white">
+                        <small class="text-muted" id="paginationInfo"></small>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0" id="pagination">
+                                <!-- Akan diisi JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Pagination -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-top bg-white">
-                <small class="text-muted" id="paginationInfo"></small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0" id="pagination">
-                        <!-- Akan diisi JavaScript -->
-                    </ul>
-                </nav>
-            </div>
-        </div>
+        </main>
     </div>
 
     <!-- Detail User Modal -->

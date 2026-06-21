@@ -296,9 +296,7 @@ const pageController = {
         console.log('➡️ Mengakses halaman login');
         
         if (req.session && req.session.user) {
-            if (req.session.user.role === 'admin' || req.session.user.role === 'petugas') {
-                return res.redirect('/admin/dashboard');
-            } else {
+            if (req.session.user.role === 'pelanggan') {
                 return res.redirect('/user/dashboard');
             }
         }
@@ -388,9 +386,7 @@ const pageController = {
         console.log('➡️ Mengakses halaman register');
         
         if (req.session && req.session.user) {
-            if (req.session.user.role === 'admin' || req.session.user.role === 'petugas') {
-                return res.redirect('/admin/dashboard');
-            } else {
+            if (req.session.user.role === 'pelanggan') {
                 return res.redirect('/user/dashboard');
             }
         }

@@ -13,6 +13,13 @@ const authMiddleware = {
                 req.session.user.role === 'superadmin' ||
                 req.session.user.role === 'petugas'
             ) {
+                // Jika Admin mengakses halaman login user biasa (/login), hapus sesinya agar bisa melihat halaman login
+                if (req.path === '/login' || req.path === '/register') {
+                    console.log('⚠️ Admin mengakses halaman login user. Menghapus sesi admin.');
+                    req.session.destroy();
+                    res.clearCookie('uptd.sid', { path: '/' });
+                    return next();
+                }
                 return res.redirect('/admin/dashboard');
             } else if (req.session.user.role === 'pelanggan') {
                 return res.redirect('/user/dashboard');

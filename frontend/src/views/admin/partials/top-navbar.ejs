@@ -1,0 +1,99 @@
+<div class="top-navbar">
+    <div class="navbar-left">
+        <% if (locals.backLink) { %>
+            <a href="<%= backLink.url %>" class="back-link me-2" title="<%= backLink.text || 'Kembali' %>">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+        <% } %>
+        <div class="page-heading">
+            <h2 class="page-title"><%= locals.pageTitle || 'Admin Panel' %></h2>
+            <p class="page-datetime" id="currentDateTime">Loading...</p>
+        </div>
+    </div>
+    
+    <div class="navbar-right">
+        <!-- Notification -->
+        <div class="notification-wrapper">
+            <button class="notification-bell" id="notificationBtn" onclick="toggleNotificationPanel()">
+                <i class="far fa-bell"></i>
+                <% if (locals.notificationCount > 0) { %>
+                    <span class="notification-badge"><%= notificationCount %></span>
+                <% } %>
+            </button>
+            
+            <div class="notification-panel" id="notificationPanel" style="display: none;">
+                <div class="notification-panel-header">
+                    <h4>Notifikasi</h4>
+                    <button class="notification-action" onclick="markAllAsRead()">Tandai dibaca</button>
+                </div>
+                <div class="notification-panel-body" id="notificationList">
+                    <div class="notification-empty">
+                        <i class="far fa-bell-slash"></i>
+                        <p>Tidak ada notifikasi baru</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Account -->
+        <div class="account-dropdown ms-2">
+            <div class="account-info">
+                <div class="account-details text-end d-none d-md-flex me-2">
+                    <span class="account-name"><%= locals.user?.full_name || 'Admin User' %></span>
+                    <span class="account-role text-primary"><%= locals.user?.role || 'Administrator' %></span>
+                </div>
+                <div class="account-avatar">
+                    <img src="https://ui-avatars.com/api/?name=Admin+User&background=047857&color=fff" class="avatar-image">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update DateTime
+    function updateDateTime() {
+        const dtElement = document.getElementById('currentDateTime');
+        if (!dtElement) return;
+        
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        dtElement.textContent = now.toLocaleDateString('id-ID', options).replace('pukul', '|');
+    }
+    
+    setInterval(updateDateTime, 60000);
+    updateDateTime();
+    
+    // Toggle Notification
+    function toggleNotificationPanel() {
+        const panel = document.getElementById('notificationPanel');
+        if (panel) {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+    
+    function markAllAsRead() {
+        const list = document.getElementById('notificationList');
+        if (list) {
+            list.innerHTML = `
+                <div class="notification-empty">
+                    <i class="far fa-bell-slash"></i>
+                    <p>Tidak ada notifikasi baru</p>
+                </div>
+            `;
+            
+            const badge = document.querySelector('.notification-badge');
+            if (badge) badge.remove();
+        }
+    }
+    
+    // Close panel when click outside
+    document.addEventListener('click', function(e) {
+        const wrapper = document.querySelector('.notification-wrapper');
+        const panel = document.getElementById('notificationPanel');
+        
+        if (wrapper && panel && !wrapper.contains(e.target) && panel.style.display === 'block') {
+            panel.style.display = 'none';
+        }
+    });
+</script>

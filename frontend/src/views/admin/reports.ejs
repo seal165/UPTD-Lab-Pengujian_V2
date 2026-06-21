@@ -3,323 +3,184 @@
 <head>
     <%- include('partials/head') %>
     <link rel="stylesheet" href="/css/style.css">
-    <style>
-        /* SIMPLE CLEAN LAYOUT - hanya tambahan CSS, tidak mengubah fungsi */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .stat-box {
-            background: white;
-            border-radius: 12px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border: 1px solid #f0f0f0;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.85rem;
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .stat-value {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #2b2d42;
-            line-height: 1.2;
-        }
-        
-        .chart-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .chart-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            border: 1px solid #f0f0f0;
-        }
-        
-        .chart-title {
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #2b2d42;
-        }
-        
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .data-list {
-            max-height: 200px;
-            overflow-y: auto;
-            padding-right: 0.5rem;
-        }
-        
-        .data-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.6rem 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .data-item:last-child {
-            border-bottom: none;
-        }
-        
-        .item-name {
-            font-weight: 500;
-        }
-        
-        .item-value {
-            font-weight: 600;
-            color: #4361ee;
-        }
-        
-        .growth-positive {
-            color: #10b981;
-        }
-        
-        .growth-negative {
-            color: #ef4444;
-        }
-        
-        .table-clean {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .table-clean th {
-            text-align: left;
-            padding: 0.75rem;
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #495057;
-        }
-        
-        .table-clean td {
-            padding: 0.75rem;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .badge-status {
-            padding: 0.35rem 0.65rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        
-        .badge-lunas { background: #d1fae5; color: #065f46; }
-        .badge-menunggu { background: #fee2e2; color: #991b1b; }
-        .badge-proses { background: #dbeafe; color: #1e40af; }
-        .badge-selesai { background: #e0f2fe; color: #0369a1; }
-        
-        .filter-badge {
-            cursor: pointer;
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            background: #f8f9fa;
-            color: #495057;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
-        
-        .filter-badge:hover {
-            background: #e9ecef;
-        }
-        
-        @media (max-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .chart-row { grid-template-columns: 1fr; }
-            .stats-row { grid-template-columns: 1fr; }
-        }
-    </style>
 </head>
 <body>
     
-    <%- include('partials/sidebar', { page: 'reports' }) %>
+    <div class="app-wrapper">
+        <%- include('partials/sidebar', { page: 'reports' }) %>
 
-    <div class="main-content">
-        <!-- Alert Message -->
-        <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
+        <main class="main-content">
+            <%- include('partials/top-navbar', { pageTitle: 'Laporan & Statistik' }) %>
 
-        <!-- Header -->
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-            <div>
-                <h4 class="fw-bold text-dark m-0">Laporan & Statistik</h4>
-                <p class="text-muted small m-0">Analisis kinerja laboratorium dan rekapitulasi pendapatan.</p>
-            </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary btn-sm bg-white btn-export" onclick="exportToPDF()">
-                    <i class="fas fa-print me-2"></i>Cetak PDF
-                </button>
-                <button class="btn btn-success btn-sm text-white btn-export" onclick="exportToExcel()">
-                    <i class="fas fa-file-excel me-2"></i>Export Excel
-                </button>
-            </div>
-        </div>
+            <div class="content-body">
+                <!-- Alert Message -->
+                <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
 
-        <!-- Filter Section -->
-        <div class="card-custom mb-4">
-            <div class="card-body p-4">
-                <h6 class="fw-bold mb-3 text-uppercase small text-muted">
-                    <i class="fas fa-filter me-2"></i>Filter Data
-                </h6>
-                
-                <!-- Quick Date Filters -->
-                <div class="d-flex gap-2 mb-3 flex-wrap">
-                    <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('today')">Hari Ini</span>
-                    <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('yesterday')">Kemarin</span>
-                    <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('week')">7 Hari Terakhir</span>
-                    <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('month')">30 Hari Terakhir</span>
-                    <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('quarter')">3 Bulan Terakhir</span>
-                    <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('year')">Tahun Ini</span>
-                </div>
-
-                <!-- Filter Form (tanpa tombol) -->
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted">Periode Awal</label>
-                        <input type="date" class="form-control bg-light border-0 shadow-none" 
-                            id="startDate" onchange="applyFilter()" required>
+                <!-- Header -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold text-dark m-0">Laporan & Statistik</h4>
+                        <p class="text-muted small m-0">Analisis kinerja laboratorium dan rekapitulasi pendapatan.</p>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted">Periode Akhir</label>
-                        <input type="date" class="form-control bg-light border-0 shadow-none" 
-                            id="endDate" onchange="applyFilter()" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted">Kategori Uji</label>
-                        <select class="form-select bg-light border-0 shadow-none" id="category" onchange="applyFilter()">
-                            <option value="">Semua Kategori</option>
-                            <option value="Beton">Uji Beton</option>
-                            <option value="Tanah">Uji Tanah</option>
-                            <option value="Aspal">Uji Aspal</option>
-                            <option value="Baja">Uji Baja</option>
-                        </select>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm bg-white btn-export" onclick="exportToPDF()">
+                            <i class="fas fa-print me-2"></i>Cetak PDF
+                        </button>
+                        <button class="btn btn-success btn-sm text-white btn-export" onclick="exportToExcel()">
+                            <i class="fas fa-file-excel me-2"></i>Export Excel
+                        </button>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Summary Stats - TAMPILAN BARU (lebih sederhana) -->
-        <div class="stats-grid" id="summaryStats">
-            <!-- Akan diisi JavaScript (fungsi updateSummaryStats sudah ada) -->
-        </div>
+                <!-- Filter Section -->
+                <div class="card-custom mb-4">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold mb-3 text-uppercase small text-muted">
+                            <i class="fas fa-filter me-2"></i>Filter Data
+                        </h6>
+                        
+                        <!-- Quick Date Filters -->
+                        <div class="d-flex gap-2 mb-3 flex-wrap">
+                            <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('today')">Hari Ini</span>
+                            <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('yesterday')">Kemarin</span>
+                            <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('week')">7 Hari Terakhir</span>
+                            <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('month')">30 Hari Terakhir</span>
+                            <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('quarter')">3 Bulan Terakhir</span>
+                            <span class="badge bg-light text-dark filter-badge" onclick="setQuickFilter('year')">Tahun Ini</span>
+                        </div>
 
-        <!-- Charts Row - TAMPILAN BARU -->
-        <div class="chart-row">
-            <!-- Bar Chart - Tren Pendapatan -->
-            <div class="chart-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="chart-title">Tren Pendapatan</h6>
-                    <select class="form-select form-select-sm w-auto" id="chartType" onchange="updateChartType()">
-                        <option value="bar">Bar</option>
-                        <option value="line">Line</option>
-                        <option value="area">Area</option>
-                    </select>
+                        <!-- Filter Form (tanpa tombol) -->
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Periode Awal</label>
+                                <input type="date" class="form-control bg-light border-0 shadow-none" 
+                                    id="startDate" onchange="applyFilter()" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Periode Akhir</label>
+                                <input type="date" class="form-control bg-light border-0 shadow-none" 
+                                    id="endDate" onchange="applyFilter()" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Kategori Uji</label>
+                                <select class="form-select bg-light border-0 shadow-none" id="category" onchange="applyFilter()">
+                                    <option value="">Semua Kategori</option>
+                                    <option value="Beton">Uji Beton</option>
+                                    <option value="Tanah">Uji Tanah</option>
+                                    <option value="Aspal">Uji Aspal</option>
+                                    <option value="Baja">Uji Baja</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div style="height: 250px;">
-                    <canvas id="revenueChart"></canvas>
-                </div>
-                <div class="row g-3 mt-3 text-center" id="revenueStats">
-                    <!-- Akan diisi JavaScript -->
-                </div>
-            </div>
 
-            <!-- Pie Chart - Proporsi Layanan -->
-            <div class="chart-card">
-                <h6 class="chart-title">Proporsi Layanan</h6>
-                <div style="height: 200px;">
-                    <canvas id="serviceChart"></canvas>
+                <!-- Summary Stats - TAMPILAN BARU (lebih sederhana) -->
+                <div class="stats-grid" id="summaryStats">
+                    <!-- Akan diisi JavaScript (fungsi updateSummaryStats sudah ada) -->
                 </div>
-                <div class="mt-3" id="serviceLegend">
-                    <!-- Akan diisi JavaScript -->
-                </div>
-            </div>
-        </div>
 
-        <!-- Additional Stats Row - TAMPILAN BARU -->
-        <div class="stats-row">
-            <!-- Status Distribution -->
-            <div class="chart-card">
-                <h6 class="chart-title">Status Pengajuan</h6>
-                <div style="height: 200px;">
-                    <canvas id="statusChart"></canvas>
+                <!-- Charts Row - TAMPILAN BARU -->
+                <div class="chart-row">
+                    <!-- Bar Chart - Tren Pendapatan -->
+                    <div class="chart-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="chart-title">Tren Pendapatan</h6>
+                            <select class="form-select form-select-sm w-auto" id="chartType" onchange="updateChartType()">
+                                <option value="bar">Bar</option>
+                                <option value="line">Line</option>
+                                <option value="area">Area</option>
+                            </select>
+                        </div>
+                        <div style="height: 250px;">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                        <div class="row g-3 mt-3 text-center" id="revenueStats">
+                            <!-- Akan diisi JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Pie Chart - Proporsi Layanan -->
+                    <div class="chart-card">
+                        <h6 class="chart-title">Proporsi Layanan</h6>
+                        <div style="height: 200px;">
+                            <canvas id="serviceChart"></canvas>
+                        </div>
+                        <div class="mt-3" id="serviceLegend">
+                            <!-- Akan diisi JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Stats Row - TAMPILAN BARU -->
+                <div class="stats-row">
+                    <!-- Status Distribution -->
+                    <div class="chart-card">
+                        <h6 class="chart-title">Status Pengajuan</h6>
+                        <div style="height: 200px;">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top Clients -->
+                    <div class="chart-card">
+                        <h6 class="chart-title">Top 5 Perusahaan</h6>
+                        <div class="data-list" id="topClients">
+                            <!-- Akan diisi JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Monthly Growth -->
+                    <div class="chart-card">
+                        <h6 class="chart-title">Pertumbuhan Bulanan</h6>
+                        <div class="data-list" id="monthlyGrowth">
+                            <!-- Akan diisi JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transactions Table (HAPUS TOMBOL DOWNLOAD) -->
+                <div class="chart-card mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="chart-title">Rincian Transaksi</h6>
+                        <span class="text-muted small" id="transactionCount"></span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table-clean">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>No. Referensi</th>
+                                    <th>Perusahaan</th>
+                                    <th>Uraian</th>
+                                    <th>Kategori</th>
+                                    <th class="text-end">Nilai</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <div class="spinner-border spinner-border-sm me-2"></div>
+                                        Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot id="tableFooter">
+                                <!-- Akan diisi JavaScript -->
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted" id="paginationInfo"></small>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0" id="pagination">
+                                <!-- Akan diisi JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
                 </div>
             </div>
-
-            <!-- Top Clients -->
-            <div class="chart-card">
-                <h6 class="chart-title">Top 5 Perusahaan</h6>
-                <div class="data-list" id="topClients">
-                    <!-- Akan diisi JavaScript -->
-                </div>
-            </div>
-
-            <!-- Monthly Growth -->
-            <div class="chart-card">
-                <h6 class="chart-title">Pertumbuhan Bulanan</h6>
-                <div class="data-list" id="monthlyGrowth">
-                    <!-- Akan diisi JavaScript -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Transactions Table (HAPUS TOMBOL DOWNLOAD) -->
-        <div class="chart-card mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="chart-title">Rincian Transaksi</h6>
-                <span class="text-muted small" id="transactionCount"></span>
-            </div>
-            <div class="table-responsive">
-                <table class="table-clean">
-                    <thead>
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>No. Referensi</th>
-                            <th>Perusahaan</th>
-                            <th>Uraian</th>
-                            <th>Kategori</th>
-                            <th class="text-end">Nilai</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transactionsTableBody">
-                        <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">
-                                <div class="spinner-border spinner-border-sm me-2"></div>
-                                Memuat data...
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot id="tableFooter">
-                        <!-- Akan diisi JavaScript -->
-                    </tfoot>
-                </table>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mt-3">
-                <small class="text-muted" id="paginationInfo"></small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0" id="pagination">
-                        <!-- Akan diisi JavaScript -->
-                    </ul>
-                </nav>
-            </div>
-        </div>
+        </main>
     </div>
 
     <!-- Chart.js - LOAD DULU -->

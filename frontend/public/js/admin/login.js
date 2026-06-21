@@ -60,7 +60,7 @@ async function handleLogin(event) {
         
         console.log('📡 Mencoba login admin dengan:', email);
 
-        const response = await fetch('/auth/login', {  // PAKAI RELATIVE PATH
+        const response = await fetch('/auth/admin/login', {  // PAKAI RELATIVE PATH
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

@@ -2,140 +2,25 @@
 <html lang="id">
 <head>
     <%- include('partials/head') %>
-    <style>
-        .profile-card {
-            background: white;
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 1.5rem;
-        }
-        
-        .profile-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0 auto 1rem;
-        }
-        
-        .info-label {
-            color: #6c757d;
-            font-size: 0.85rem;
-            margin-bottom: 0.25rem;
-        }
-        
-        .info-value {
-            font-weight: 600;
-            color: #2b2d42;
-            margin-bottom: 1rem;
-        }
-        
-        .stat-card-small {
-            background: white;
-            border-radius: 12px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            text-align: center;
-            border: 1px solid #f0f0f0;
-        }
-        
-        .stat-number {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #4361ee;
-            line-height: 1.2;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-        
-        .badge-status {
-            padding: 0.35rem 0.65rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        
-        .badge-aktif { background: #d1fae5; color: #065f46; }
-        .badge-pending { background: #fee2e2; color: #991b1b; }
-        .badge-nonaktif { background: #e5e7eb; color: #4b5563; }
-        
-        .table-submissions {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .table-submissions th {
-            text-align: left;
-            padding: 0.75rem;
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #495057;
-            border-bottom: 2px solid #dee2e6;
-        }
-        
-        .table-submissions td {
-            padding: 0.75rem;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .table-submissions tr:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .btn-detail {
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
-            background: #e9ecef;
-            color: #495057;
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
-        
-        .btn-detail:hover {
-            background: #4361ee;
-            color: white;
-        }
-        
-        /* Nonaktifkan loading */
-        #loadingOverlay {
-            display: none !important;
-        }
-    </style>
+
 </head>
-<body>
-    <%- include('partials/sidebar', { page: 'users' }) %>
+<body class="bg-light">
+    <div class="app-wrapper">
+        <%- include('partials/sidebar', { page: 'users' }) %>
 
-    <div class="main-content">
-        <!-- Loading Overlay - DINONAKTIFKAN -->
-        <!--
-        <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 9999; display: none;">
-            <div class="text-center">
-                <div class="spinner-border text-primary mb-3" role="status"></div>
-                <p class="text-muted">Memuat data pemohon...</p>
-            </div>
-        </div>
-        -->
+        <main class="main-content">
+            <%- include('partials/top-navbar', { pageTitle: 'Detail Pemohon' }) %>
 
-        <!-- Alert Message -->
-        <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
+            <div class="content-body">
+                <!-- Alert Message -->
+                <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
 
-        <!-- Navigation -->
-        <div class="mb-4">
-            <a href="/admin/users" class="text-decoration-none text-muted">
-                <i class="fas fa-arrow-left me-2"></i>Kembali ke Daftar Pemohon
-            </a>
-        </div>
+                <!-- Navigation -->
+                <div class="mb-4">
+                    <a href="/admin/users" class="text-decoration-none text-muted">
+                        <i class="fas fa-arrow-left me-2"></i>Kembali ke Daftar Pemohon
+                    </a>
+                </div>
 
         <!-- Profile Card -->
         <div class="profile-card" id="profileCard">
@@ -179,16 +64,18 @@
                 </table>
             </div>
 
-            <!-- Pagination -->
-            <div class="d-flex justify-content-between align-items-center mt-4">
-                <small class="text-muted" id="paginationInfo"></small>
-                <nav>
-                    <ul class="pagination pagination-sm mb-0" id="pagination">
-                        <!-- Akan diisi JavaScript -->
-                    </ul>
-                </nav>
+                <!-- Pagination -->
+                <div class="d-flex justify-content-between align-items-center mt-4">
+                    <small class="text-muted" id="paginationInfo"></small>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0" id="pagination">
+                            <!-- Akan diisi JavaScript -->
+                        </ul>
+                    </nav>
+                </div>
             </div>
-        </div>
+            </div>
+        </main>
     </div>
 
     <!-- Bootstrap JS -->

@@ -8,150 +8,320 @@
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* ================================================
+           REGISTER PAGE — Override padding & ikon
+        ================================================ */
+
+        /*
+         * Global: semua .form-input punya ikon kiri.
+         * Padding kiri = 38px (ruang ikon), kanan = 14px default.
+         */
+        .form-input {
+            padding-top:    10px;
+            padding-bottom: 10px;
+            padding-left:   38px;   /* ruang ikon kiri */
+            padding-right:  14px;   /* default — tanpa ikon kanan */
+            font-size: 0.93rem;
+            border-radius: 8px;
+        }
+
+        /* Tambahkan padding kanan hanya jika ada ikon toggle (password) */
+        .has-icon-end .form-input {
+            padding-right: 38px;
+        }
+
+        /* Ikon kiri — vertikal-center untuk input biasa */
+        .input-wrapper .icon-start {
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.88rem;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        /* Ikon kiri — kunci ke atas untuk textarea */
+        .textarea-wrapper .icon-start {
+            top: 12px;
+            transform: none;
+        }
+
+        /* ---- Textarea ---- */
+        .form-textarea {
+            width: 100%;
+            padding-top:    10px;
+            padding-bottom: 10px;
+            padding-left:   38px;   /* sama dengan .form-input */
+            padding-right:  14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.93rem;
+            font-family: 'Inter', sans-serif;
+            color: #0F172A;
+            background: #f8fafc;
+            resize: vertical;
+            min-height: 88px;
+            outline: none;
+            line-height: 1.55;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .form-textarea::placeholder { color: #94a3b8; }
+        .form-textarea:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.1);
+        }
+
+        /* ---- Teks hint di bawah field ---- */
+        .field-hint {
+            font-size: 0.74rem;
+            color: #94a3b8;
+            margin-top: 4px;
+            margin-left: 2px;
+            line-height: 1.4;
+        }
+
+        /* ---- Asterisk wajib ---- */
+        .req { color: #ef4444; margin-left: 2px; }
+
+        /* ---- Alert ---- */
+        .alert-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            padding: 11px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+            line-height: 1.5;
+            text-align: left;
+        }
+        .alert-box i { flex-shrink: 0; margin-top: 1px; }
+        .alert-error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .alert-success { background: #f0fdf4; color: #14532d; border: 1px solid #bbf7d0; }
+
+
+    </style>
 </head>
 <body class="login-body">
 
     <div class="login-card register-card">
+
+        <!-- Header -->
         <div class="auth-icon-wrapper">
             <img src="/img/logo-banten.png" alt="Logo Banten" style="width: 100%; height: auto;">
         </div>
-        
         <h2 class="auth-title">UPTD Pengujian</h2>
-        <p class="auth-subtitle">Bahan Kontruksi Bangunan & Informasi Kontruksi</p>
+        <p class="auth-subtitle">Bahan Konstruksi Bangunan &amp; Informasi Konstruksi</p>
 
+        <!-- Tabs -->
         <div class="auth-tabs">
             <a href="/login" class="auth-tab">Login</a>
             <a href="/register" class="auth-tab active">Register</a>
         </div>
 
+        <!-- Alert: Error -->
+        <% if (locals.error) { %>
+            <div class="alert-box alert-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <span><%= error %></span>
+            </div>
+        <% } %>
+
+        <!-- Alert: Success -->
+        <% if (locals.success) { %>
+            <div class="alert-box alert-success">
+                <i class="fas fa-check-circle"></i>
+                <span><%= success %></span>
+            </div>
+        <% } %>
+
+        <!-- Form -->
         <form action="/auth/register" method="POST">
-    
-    <!-- TAMPILKAN PESAN ERROR JIKA ADA -->
-    <% if (locals.error) { %>
-        <div style="color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-exclamation-circle"></i>
-            <span><%= error %></span>
-        </div>
-    <% } %>
 
-    <!-- TAMPILKAN PESAN SUKSES JIKA ADA (DARI REGISTER) -->
-    <% if (locals.success) { %>
-        <div style="color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-check-circle"></i>
-            <span><%= success %></span>
-        </div>
-    <% } %>
+            <!-- ===== Personal Information ===== -->
+            <div class="form-section-label">
+                <i class="fas fa-user" style="margin-right: 6px; color: var(--primary);"></i>
+                Informasi Pribadi
+            </div>
 
-    <!-- PERSONAL INFORMATION -->
-    <div class="form-section-label">Personal Information</div>
+            <!-- Nama Lengkap -->
+            <div class="form-group">
+                <label class="form-label">Nama Lengkap <span class="req">*</span></label>
+                <div class="input-wrapper">
+                    <i class="fas fa-user icon-start"></i>
+                    <input
+                        type="text"
+                        name="full_name"
+                        class="form-input"
+                        placeholder="Nama lengkap penanggung jawab"
+                        required
+                        value="<%= locals.formData ? formData.full_name : '' %>">
+                </div>
+                <p class="field-hint">Nama lengkap penanggung jawab / kontak person</p>
+            </div>
 
-    <div class="form-group">
-        <label class="form-label">Nama Lengkap <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-user icon-start"></i>
-            <input type="text" name="full_name" class="form-input" placeholder="Nama lengkap penanggung jawab" required value="<%= locals.formData ? formData.full_name : '' %>">
-        </div>
-        <small style="color: #6c757d; font-size: 0.75rem;">Nama lengkap penanggung jawab / kontak person</small>
-    </div>
-    
-    <div class="form-group">
-        <label class="form-label">Email Address <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-envelope icon-start"></i>
-            <input type="email" name="email" class="form-input" placeholder="name@company.com" required value="<%= locals.formData ? formData.email : '' %>">
-        </div>
-    </div>
+            <!-- Email -->
+            <div class="form-group">
+                <label class="form-label">Email Address <span class="req">*</span></label>
+                <div class="input-wrapper">
+                    <i class="fas fa-envelope icon-start"></i>
+                    <input
+                        type="email"
+                        name="email"
+                        class="form-input"
+                        placeholder="name@company.com"
+                        required
+                        value="<%= locals.formData ? formData.email : '' %>">
+                </div>
+            </div>
 
-    <div class="form-group">
-        <label class="form-label">Password <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-lock icon-start"></i>
-            <input type="password" name="password" class="form-input" placeholder="Minimal 6 karakter" required minlength="6">
-            <i class="fas fa-eye-slash icon-end" onclick="togglePassword(this)"></i>
-        </div>
-        <small style="color: #6c757d; font-size: 0.75rem;">Minimal 6 karakter</small>
-    </div>
+            <!-- Password -->
+            <div class="form-group">
+                <label class="form-label">Password <span class="req">*</span></label>
+                <div class="input-wrapper has-icon-end">
+                    <i class="fas fa-lock icon-start"></i>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        class="form-input"
+                        placeholder="Minimal 6 karakter"
+                        required
+                        minlength="6">
+                    <i class="fas fa-eye-slash icon-end" onclick="togglePassword(this)"></i>
+                </div>
+                <p class="field-hint">Minimal 6 karakter</p>
+            </div>
 
-    <div class="form-group">
-        <label class="form-label">Konfirmasi Password <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-lock icon-start"></i>
-            <input type="password" name="confirm_password" class="form-input" placeholder="Ketik ulang password" required minlength="6">
-            <i class="fas fa-eye-slash icon-end" onclick="togglePassword(this)"></i>
-        </div>
-    </div>
+            <!-- Konfirmasi Password -->
+            <div class="form-group">
+                <label class="form-label">Konfirmasi Password <span class="req">*</span></label>
+                <div class="input-wrapper has-icon-end">
+                    <i class="fas fa-lock icon-start"></i>
+                    <input
+                        type="password"
+                        id="confirm_password"
+                        name="confirm_password"
+                        class="form-input"
+                        placeholder="Ketik ulang password"
+                        required
+                        minlength="6">
+                    <i class="fas fa-eye-slash icon-end" onclick="togglePassword(this)"></i>
+                </div>
+            </div>
 
-    <div class="form-section-label">Company Information</div>
+            <!-- ===== Company Information ===== -->
+            <div class="form-section-label" style="margin-top: 18px;">
+                <i class="fas fa-building" style="margin-right: 6px; color: var(--primary);"></i>
+                Informasi Instansi
+            </div>
 
-    <div class="form-group">
-        <label class="form-label">Nama Instansi/Perusahaan <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-building icon-start"></i>
-            <input type="text" name="nama_instansi" class="form-input" placeholder="Contoh: PT. Konstruksi Maju" required value="<%= locals.formData ? formData.nama_instansi : '' %>">
-        </div>
-    </div>
+            <!-- Nama Instansi -->
+            <div class="form-group">
+                <label class="form-label">Nama Instansi/Perusahaan <span class="req">*</span></label>
+                <div class="input-wrapper">
+                    <i class="fas fa-building icon-start"></i>
+                    <input
+                        type="text"
+                        name="nama_instansi"
+                        class="form-input"
+                        placeholder="Contoh: PT. Konstruksi Maju"
+                        required
+                        value="<%= locals.formData ? formData.nama_instansi : '' %>">
+                </div>
+            </div>
 
-    <div class="form-group">
-        <label class="form-label">Alamat Instansi <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-map-marker-alt icon-start"></i>
-            <textarea name="alamat" class="form-input" placeholder="Alamat lengkap perusahaan" required rows="3" style="padding-top: 12px; min-height: 80px;"><%= locals.formData ? formData.alamat : '' %></textarea>
-        </div>
-    </div>
+            <!-- Alamat -->
+            <div class="form-group">
+                <label class="form-label">Alamat Instansi <span class="req">*</span></label>
+                <div class="input-wrapper textarea-wrapper">
+                    <i class="fas fa-map-marker-alt icon-start"></i>
+                    <textarea
+                        name="alamat"
+                        class="form-textarea"
+                        placeholder="Alamat lengkap perusahaan"
+                        required
+                        rows="3"><%= locals.formData ? formData.alamat : '' %></textarea>
+                </div>
+            </div>
 
-    <div class="form-group">
-        <label class="form-label">Nomor Telepon <span style="color: #dc3545;">*</span></label>
-        <div class="input-wrapper">
-            <i class="fas fa-phone icon-start"></i>
-            <input type="text" name="nomor_telepon" class="form-input" placeholder="Contoh: 081234567890" required value="<%= locals.formData ? formData.nomor_telepon : '' %>">
-        </div>
-    </div>
+            <!-- Nomor Telepon -->
+            <div class="form-group">
+                <label class="form-label">Nomor Telepon <span class="req">*</span></label>
+                <div class="input-wrapper">
+                    <i class="fas fa-phone icon-start"></i>
+                    <input
+                        type="tel"
+                        name="nomor_telepon"
+                        class="form-input"
+                        placeholder="Contoh: 081234567890"
+                        required
+                        value="<%= locals.formData ? formData.nomor_telepon : '' %>">
+                </div>
+            </div>
 
-    <button type="submit" class="btn-auth-base btn-action-register btn-full">
-        Daftar <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
-    </button>
+            <!-- Submit -->
+            <button type="submit" class="btn-auth-base btn-action-register btn-full">
+                Buat Akun
+            </button>
 
-    <p class="terms-text">
-        Dengan mendaftar, Anda menyetujui <a href="/terms" style="color: var(--primary);">Syarat & Ketentuan</a> yang berlaku.
-    </p>
+            <!-- Terms -->
+            <p class="terms-text" style="margin-top: 14px;">
+                Dengan mendaftar, Anda menyetujui
+                <a href="/terms">Syarat &amp; Ketentuan</a> yang berlaku.
+            </p>
 
-    <p class="terms-text" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eef2f6;">
-        © 2026 UPTD Pengujian Bahan Konstruksi Bangunan Provinsi Banten.
-    </p>
+            <!-- Footer -->
+            <p class="terms-text" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef2f6;">
+                © 2026 UPTD Pengujian Bahan Konstruksi Bangunan Provinsi Banten.
+            </p>
 
         </form>
+    </div>
 
-        <script>
+    <script>
         function togglePassword(icon) {
-            const input = icon.parentElement.querySelector('input');
+            const input = icon.previousElementSibling;
             if (input.type === 'password') {
                 input.type = 'text';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
             } else {
                 input.type = 'password';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
             }
         }
 
-        // Client-side validation
-        document.querySelector('form').addEventListener('submit', function(e) {
-            const password = document.querySelector('input[name="password"]').value;
-            const confirm = document.querySelector('input[name="confirm_password"]').value;
-            
-            if (password !== confirm) {
-                e.preventDefault();
-                alert('Password dan konfirmasi password tidak cocok!');
-            }
-            
+        document.querySelector('form').addEventListener('submit', function (e) {
+            const password = document.getElementById('password').value;
+            const confirm  = document.getElementById('confirm_password').value;
+
             if (password.length < 6) {
                 e.preventDefault();
-                alert('Password minimal 6 karakter!');
+                showInlineAlert('error', 'Password minimal 6 karakter!');
+                return;
+            }
+            if (password !== confirm) {
+                e.preventDefault();
+                showInlineAlert('error', 'Password dan konfirmasi password tidak cocok!');
             }
         });
-        </script>
-    </div>
+
+        function showInlineAlert(type, message) {
+            const existing = document.querySelector('.alert-box.js-alert');
+            if (existing) existing.remove();
+
+            const div = document.createElement('div');
+            div.className = `alert-box alert-${type} js-alert`;
+            const icon = type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle';
+            div.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+
+            const form = document.querySelector('form');
+            form.insertAdjacentElement('beforebegin', div);
+            div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    </script>
 
 </body>
 </html>

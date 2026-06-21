@@ -122,9 +122,10 @@ router.post('/user/profile', authMiddleware.verifyUserAccess, pageController.upd
 
 // ==================== HALAMAN KHUSUS (PUBLIC) ====================
 router.get('/kuisioner/:submissionId', (req, res) => {
-    res.render('public/kuisioner', {
-        title: 'Kuesioner Kepuasan - UPTD Laboratorium',
-        submissionId: req.params.submissionId
+    res.render('kuisioner', {
+        title: 'Kuisioner Kepuasan - UPTD Laboratorium',
+        submissionId: req.params.submissionId,
+        layout: false
     });
 });
 
@@ -188,7 +189,7 @@ router.post('/auth/login', async (req, res) => {
         
         const { email, password } = req.body;
         
-        console.log('📝 Login attempt:', { email });
+        console.log('📝 User Login attempt:', { email });
         
         const response = await axios.post(`${API_URL}/auth/login`, { email, password });
         
@@ -231,9 +232,77 @@ router.post('/auth/login', async (req, res) => {
                             avatar: userData.avatar || null,
                             token: token
                         },
-                        redirect: (userData.role === 'admin' || userData.role === 'petugas')
-                            ? '/admin/dashboard'
-                            : '/user/dashboard'
+                        redirect: '/user/dashboard'
+                    });
+                });
+            });
+        } else {
+            console.log('❌ Login failed:', response.data.message);
+            res.json({
+                success: false,
+                message: response.data.message || 'Email atau password salah'
+            });
+        }
+    } catch (error) {
+        console.error('❌ Login error:', error.message);
+        res.json({
+            success: false,
+            message: error.response?.data?.message || 'Terjadi kesalahan saat login'
+        });
+    }
+});
+
+router.post('/auth/admin/login', async (req, res) => {
+    try {
+        const axios = require('axios');
+        const API_URL = process.env.API_URL || 'http://localhost:5000/api';
+        
+        const { email, password } = req.body;
+        
+        console.log('📝 Admin Login attempt:', { email });
+        
+        const response = await axios.post(`${API_URL}/auth/admin/login`, { email, password });
+        
+        console.log('📦 API Response:', response.data);
+        
+        if (response.data.success) {
+            const userData = response.data.data.user || response.data.data;
+            const token = response.data.data.token || response.data.data;
+
+            return req.session.regenerate((regenerateError) => {
+                if (regenerateError) {
+                    console.error('❌ Failed to regenerate login session:', regenerateError);
+                    return res.json({ success: false, message: 'Gagal membuat sesi login baru' });
+                }
+
+                req.session.token = token;
+                req.session.user = {
+                    id: userData.id,
+                    email: userData.email,
+                    full_name: userData.full_name || userData.name,
+                    nama_instansi: userData.nama_instansi || null,
+                    role: userData.role || 'admin',
+                    avatar: userData.avatar || null
+                };
+
+                return req.session.save((sessionError) => {
+                    if (sessionError) {
+                        console.error('❌ Failed to save login session:', sessionError);
+                        return res.json({ success: false, message: 'Gagal menyimpan sesi login' });
+                    }
+
+                    return res.json({
+                        success: true,
+                        data: {
+                            id: userData.id,
+                            email: userData.email,
+                            full_name: userData.full_name || userData.name,
+                            nama_instansi: userData.nama_instansi || null,
+                            role: userData.role || 'admin',
+                            avatar: userData.avatar || null,
+                            token: token
+                        },
+                        redirect: '/admin/dashboard'
                     });
                 });
             });

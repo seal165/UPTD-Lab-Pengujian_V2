@@ -545,8 +545,10 @@
     }
 
     function confirmDeleteQuestion(id) {
+        const questionId = id || document.getElementById('questionId').value;
+        if (!questionId) return;
         if (!confirm('Hapus pertanyaan ini? Data jawaban yang sudah ada akan tetap tersimpan.')) return;
-        deleteQuestion(id);
+        deleteQuestion(questionId);
     }
 
     async function deleteQuestion(id) {

@@ -15,7 +15,7 @@ router.get('/jadwal-sibuk', apiController.getJadwalSibuk);
 // ==================== AUTH API ====================
 router.post('/auth/register', apiController.register);
 router.post('/auth/login', apiController.login);
-router.post('/login', apiController.login);
+router.post('/auth/admin/login', apiController.adminLogin);
 
 // ==================== ADMIN DASHBOARD API ====================
 router.get('/admin/dashboard/stats', authMiddleware, apiController.getAdminDashboardStats);
@@ -65,6 +65,10 @@ router.get('/skrd/:id/download-skrd', authMiddleware, apiController.downloadSkrd
 // ==================== KUISIONER API ====================
 // PENTING: URUTKAN DARI YANG PALING SPESIFIK
 
+// PUBLIC ROUTES (tanpa auth - untuk halaman kuisioner user)
+router.get('/kuisioner/public/questions', apiController.getKuisionerQuestions); // public
+router.post('/kuisioner/public/submit', apiController.submitKuisionerPublic);   // public
+
 // 1. QUESTIONS ROUTES (PALING ATAS - PALING SPESIFIK)
 router.get('/kuisioner/questions', authMiddleware, apiController.getKuisionerQuestions);
 router.get('/kuisioner/questions/:id', authMiddleware, apiController.getKuisionerQuestionById);
@@ -72,6 +76,7 @@ router.post('/kuisioner/questions', authMiddleware, apiController.createKuisione
 router.put('/kuisioner/questions/:id', authMiddleware, apiController.updateKuisionerQuestion);
 router.delete('/kuisioner/questions/:id', authMiddleware, apiController.deleteKuisionerQuestion);
 router.post('/kuisioner/questions/reorder', authMiddleware, apiController.reorderKuisionerQuestions);
+
 
 // 2. BARU ROUTES GENERIK
 router.get('/kuisioner', authMiddleware, apiController.getKuisioner);

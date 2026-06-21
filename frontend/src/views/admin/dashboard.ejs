@@ -2,44 +2,22 @@
 <html lang="id">
 <head>
     <%- include('partials/head') %>
-    <style>
-        .loading-skeleton {
-            animation: skeleton-loading 1s linear infinite alternate;
-        }
-        
-        @keyframes skeleton-loading {
-            0% { background-color: #e0e0e0; }
-            100% { background-color: #f0f0f0; }
-        }
-        
-        .skeleton-text {
-            height: 1.5rem;
-            width: 100%;
-            border-radius: 0.25rem;
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+
 </head>
 <body class="admin-dashboard-page">
+    <div class="app-wrapper">
+        <%- include('partials/sidebar', { page: 'dashboard' }) %>
 
-    <%- include('partials/sidebar', { page: 'dashboard' }) %>
+        <main class="main-content admin-dashboard-content">
+            <%- include('partials/top-navbar', { pageTitle: 'Dashboard Summary' }) %>
+            
+            <div class="content-body">
+                <div class="dashboard-shell">
 
-    <div class="main-content admin-dashboard-content">
-        <div class="dashboard-shell">
-            <%- include('partials/header', { title: 'Dashboard Summary' }) %>
-
-            <div class="dashboard-intro mb-4">
-                <h5 class="fw-bold text-dark mb-1">Selamat Datang, <span id="adminName"><%= user?.full_name || 'Admin' %></span></h5>
-                <p class="text-muted mb-0">Ringkasan aktivitas laboratorium dan status pembayaran terkini.</p>
-            </div>
+                    <div class="dashboard-intro mb-4">
+                        <h5 class="fw-bold text-dark mb-1">Selamat Datang, <span id="adminName"><%= locals.user?.full_name || 'Admin' %></span></h5>
+                        <p class="text-muted mb-0">Ringkasan aktivitas laboratorium dan status pembayaran terkini.</p>
+                    </div>
 
             <!-- Toast Container -->
             <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
@@ -110,7 +88,9 @@
                 </div>
             </div>
 
-        </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <!-- Data Container -->

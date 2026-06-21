@@ -355,6 +355,14 @@ const apiController = {
             
             const user = users[0];
             
+            // Cek role untuk pelanggan
+            if (user.role === 'admin' || user.role === 'superadmin' || user.role === 'petugas') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Silakan gunakan halaman login admin'
+                });
+            }
+            
             // Cek password dengan bcrypt
             const match = await bcrypt.compare(password, user.password);
             console.log('🔐 Password match:', match ? '✅' : '❌');
@@ -411,6 +419,109 @@ const apiController = {
             
         } catch (error) {
             console.error('❌ Login error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Terjadi kesalahan server: ' + error.message
+            });
+        }
+    },
+
+    // ==================== ADMIN LOGIN ====================
+    adminLogin: async (req, res) => {
+        try {
+            const { email, password } = req.body;
+            
+            console.log('📝 Admin Login attempt:', { email });
+            
+            // Validasi input
+            if (!email || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email dan password harus diisi'
+                });
+            }
+
+            // Cari user di database
+            const [users] = await db.query(
+                'SELECT id, email, password, full_name, role, nama_instansi, nomor_telepon, alamat FROM users WHERE email = ?',
+                [email]
+            );
+            
+            console.log('📦 User ditemukan:', users.length > 0 ? '✅' : '❌');
+            
+            if (users.length === 0) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Email atau password salah'
+                });
+            }
+            
+            const user = users[0];
+            
+            // Cek role untuk admin
+            if (user.role !== 'admin' && user.role !== 'superadmin' && user.role !== 'petugas') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Akses ditolak. Hanya untuk administrator.'
+                });
+            }
+            
+            // Cek password dengan bcrypt
+            const match = await bcrypt.compare(password, user.password);
+            console.log('🔐 Password match:', match ? '✅' : '❌');
+            
+            if (!match) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Email atau password salah'
+                });
+            }
+            
+            // Log role user untuk debugging
+            console.log('👤 User role:', user.role);
+            
+            // Generate JWT token
+            const token = jwt.sign(
+                { 
+                    id: user.id, 
+                    email: user.email,
+                    full_name: user.full_name,
+                    role: user.role 
+                },
+                process.env.JWT_SECRET || 'rahasia banget',
+                { expiresIn: '7d' }
+            );
+            
+            // Catat aktivitas login
+            try {
+                await db.query(
+                    'INSERT INTO activities (user_id, activity_name, created_at) VALUES (?, ?, NOW())',
+                    [user.id, 'login']
+                );
+            } catch (activityError) {
+                console.log('Activity log error (non-critical):', activityError.message);
+            }
+            
+            // Response sukses
+            res.json({
+                success: true,
+                message: 'Login berhasil',
+                data: {
+                    token: token,
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        full_name: user.full_name,
+                        role: user.role,
+                        nama_instansi: user.nama_instansi,
+                        nomor_telepon: user.nomor_telepon,
+                        alamat: user.alamat
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('❌ Admin Login error:', error);
             res.status(500).json({
                 success: false,
                 message: 'Terjadi kesalahan server: ' + error.message
@@ -1227,8 +1338,21 @@ const apiController = {
                 WHERE submission_id = ?
             `, [id]);
             
+            // Ambil data kuisioner jika ada
+            const [kuisionerData] = await db.query(`
+                SELECT 
+                    id,
+                    skor_1, skor_2, skor_3, skor_4, skor_5,
+                    skor_6, skor_7, skor_8, skor_9, skor_10,
+                    saran,
+                    created_at as kuisioner_created_at
+                FROM kuisioner 
+                WHERE submission_id = ?
+            `, [id]);
+            
             const payment = payments.length > 0 ? payments[0] : null;
             const report = reports.length > 0 ? reports[0] : null;
+            const kuisioner = kuisionerData.length > 0 ? kuisionerData[0] : null;
             
             // Hitung total tagihan dari samples
             const totalAmount = samples.reduce((sum, item) => {
@@ -1329,7 +1453,24 @@ const apiController = {
                 } : null,
                 
                 // Total
-                total_tagihan: totalAmount
+                total_tagihan: totalAmount,
+                
+                // Kuisioner user
+                kuisioner: kuisioner ? {
+                    id: kuisioner.id,
+                    skor_1: kuisioner.skor_1,
+                    skor_2: kuisioner.skor_2,
+                    skor_3: kuisioner.skor_3,
+                    skor_4: kuisioner.skor_4,
+                    skor_5: kuisioner.skor_5,
+                    skor_6: kuisioner.skor_6,
+                    skor_7: kuisioner.skor_7,
+                    skor_8: kuisioner.skor_8,
+                    skor_9: kuisioner.skor_9,
+                    skor_10: kuisioner.skor_10,
+                    saran: kuisioner.saran,
+                    created_at: kuisioner.kuisioner_created_at
+                } : null
             };
 
             console.log('📦 Response payment.id:', response.payment?.id);
@@ -2707,7 +2848,82 @@ const apiController = {
         }
     },
 
+    // ==================== SUBMIT KUISIONER PUBLIC (form user) ====================
+    submitKuisionerPublic: async (req, res) => {
+        try {
+            const { submission_id, nama_pemohon, instansi, telepon, answers, saran } = req.body;
+            // answers = array of { question_index (1-10), nilai (1-5) }
+            
+            console.log('========== SUBMIT KUISIONER PUBLIC ==========');
+            console.log('📥 Submission ID:', submission_id);
+            console.log('📥 Answers:', answers);
+            
+            if (!submission_id) {
+                return res.status(400).json({ success: false, message: 'Submission ID harus diisi' });
+            }
+            
+            if (!answers || !Array.isArray(answers) || answers.length === 0) {
+                return res.status(400).json({ success: false, message: 'Jawaban tidak boleh kosong' });
+            }
+            
+            // Cek submission ada
+            const [submissions] = await db.query('SELECT id FROM submissions WHERE id = ?', [submission_id]);
+            if (submissions.length === 0) {
+                return res.status(404).json({ success: false, message: 'Data pengujian tidak ditemukan' });
+            }
+            
+            // Cek apakah sudah ada kuisioner
+            const [existing] = await db.query('SELECT id FROM kuisioner WHERE submission_id = ?', [submission_id]);
+            if (existing.length > 0) {
+                return res.status(400).json({ success: false, message: 'Kuisioner sudah pernah diisi' });
+            }
+            
+            // Map answers array ke skor_1 - skor_10
+            const skorMap = {};
+            answers.forEach((ans, idx) => {
+                const col = `skor_${idx + 1}`;
+                const nilai = parseInt(ans.nilai);
+                skorMap[col] = (nilai >= 1 && nilai <= 5) ? nilai : null;
+            });
+            
+            // Isi sisanya dengan null jika kurang dari 10 pertanyaan
+            for (let i = 1; i <= 10; i++) {
+                if (!('skor_' + i in skorMap)) skorMap['skor_' + i] = null;
+            }
+            
+            const [result] = await db.query(
+                `INSERT INTO kuisioner (
+                    submission_id,
+                    skor_1, skor_2, skor_3, skor_4, skor_5,
+                    skor_6, skor_7, skor_8, skor_9, skor_10,
+                    saran, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                    submission_id,
+                    skorMap.skor_1, skorMap.skor_2, skorMap.skor_3,
+                    skorMap.skor_4, skorMap.skor_5, skorMap.skor_6,
+                    skorMap.skor_7, skorMap.skor_8, skorMap.skor_9,
+                    skorMap.skor_10,
+                    saran || null
+                ]
+            );
+            
+            console.log('✅ Kuisioner berhasil disimpan, ID:', result.insertId);
+            
+            res.json({
+                success: true,
+                message: 'Kuisioner berhasil disimpan. Terima kasih!',
+                data: { id: result.insertId }
+            });
+            
+        } catch (error) {
+            console.error('❌ Error submit kuisioner public:', error);
+            res.status(500).json({ success: false, message: 'Gagal menyimpan kuisioner: ' + error.message });
+        }
+    },
+
     // CREATE kuisioner (public) - VERSION LAMA (pake skor_1 - skor_10)
+
     createKuisioner: async (req, res) => {
         try {
             const {

@@ -136,12 +136,13 @@ body {
 
 .menu-link {
     text-decoration: none !important;
-    color: var(--secondary) !important;
+    color: var(--text-muted) !important;
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 10px 10px 10px 8px;
-    gap: 6px;
+    padding: 12px 14px;
+    gap: 12px;
+    line-height: 1;
 }
 
 .menu-icon {
@@ -152,12 +153,15 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 5px;
+    margin: 0;
 }
 
 .menu-text {
     font-size: 14px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .menu-item.active {
