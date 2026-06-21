@@ -84,7 +84,7 @@
             loadBackupHistory();
 
             // Load active sessions
-            loadActiveSessions();
+            // loadActiveSessions();
 
         } catch (error) {
             console.error('Error:', error);
@@ -198,6 +198,8 @@
 
             if (result.success) {
                 showAlert('Foto profil berhasil diupload', 'success');
+                // 🔥 Refresh data agar avatar terbaru tampil
+                await loadSettings();
             } else {
                 showAlert('Gagal upload foto', 'danger');
             }
@@ -603,7 +605,7 @@
     // ==================== BACKUP & RESTORE ====================
     async function loadBackupHistory() {
         try {
-            const response = await fetch(`${API_BASE_URL}/settings/backup/history`, {
+            const response = await fetch(`${API_BASE_URL}/settings/backups`, {
                 headers: getAuthHeaders()
             });
 
@@ -617,17 +619,19 @@
 
             if (result.success && result.data && result.data.length > 0) {
                 let html = '<div class="table-responsive"><table class="table table-hover align-middle">';
-                html += '<thead><tr><th>Tanggal</th><th>Nama File</th><th>Ukuran</th><th>Status</th><th>Aksi</th></tr></thead><tbody>';
+                html += '<thead><tr><th>Tanggal</th><th>Nama File</th><th>Ukuran</th><th>Aksi</th></tr></thead><tbody>';
                 
                 result.data.forEach(backup => {
+                    const sizeInKB = (backup.size / 1024).toFixed(2);
+                    // 🔥 Perbaiki URL: pakai API_BASE_URL (dengan /api)
+                    const downloadUrl = `${API_BASE_URL}/backups/${backup.filename}?token=${getToken()}`;
                     html += `
                         <tr>
                             <td>${formatDate(backup.created_at)}</td>
                             <td><code class="small">${backup.filename}</code></td>
-                            <td>${backup.size || '-'}</td>
-                            <td><span class="badge bg-${backup.status === 'success' ? 'success' : 'danger'}">${backup.status}</span></td>
+                            <td>${sizeInKB} KB</td>
                             <td>
-                                <a href="${API_BASE_URL}/backups/${backup.filename}" class="btn btn-sm btn-outline-primary" title="Download" target="_blank">
+                                <a href="${downloadUrl}" class="btn btn-sm btn-outline-primary" title="Download" target="_blank">
                                     <i class="fas fa-download"></i>
                                 </a>
                             </td>
@@ -641,12 +645,18 @@
                 container.innerHTML = `
                     <div class="text-center py-4 text-muted">
                         <i class="fas fa-database fa-2x mb-2"></i>
-                        <p>Belum ada history backup database</p>
+                        <p>Belum ada backup database</p>
                     </div>
                 `;
             }
         } catch (error) {
             console.error('Error loading backup history:', error);
+            document.getElementById('backupHistory').innerHTML = `
+                <div class="text-center py-4 text-danger">
+                    <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                    <p>Gagal memuat history backup</p>
+                </div>
+            `;
         }
     }
 
@@ -668,7 +678,7 @@
 
             if (result.success) {
                 showAlert('Backup berhasil dibuat', 'success');
-                loadBackupHistory();
+                await loadBackupHistory(); // 🔥 Muat ulang history
             } else {
                 showAlert(result.message || 'Gagal membuat backup', 'danger');
             }
@@ -731,7 +741,8 @@
         logsPage = 1;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/settings/logs?page=${logsPage}&limit=10&filter=${filter}`, {
+            // 🔥 Ganti filter menjadi type
+            const response = await fetch(`${API_BASE_URL}/settings/logs?page=${logsPage}&limit=10&type=${filter}`, {
                 headers: getAuthHeaders()
             });
 
@@ -792,22 +803,32 @@
             let iconClass = 'fa-info-circle text-info';
             let borderStyle = 'border-info';
 
-            if (log.action === 'login') {
+            // Tentukan ikon berdasarkan activity_name
+            const activity = (log.activity_name || '').toLowerCase();
+            if (activity.includes('login')) {
                 iconClass = 'fa-sign-in-alt text-primary';
                 borderStyle = 'border-primary';
-            } else if (log.action === 'update') {
+            } else if (activity.includes('update') || activity.includes('edit')) {
                 iconClass = 'fa-edit text-warning';
                 borderStyle = 'border-warning';
-            } else if (log.action === 'create') {
+            } else if (activity.includes('create') || activity.includes('add') || activity.includes('tambah')) {
                 iconClass = 'fa-plus-circle text-success';
                 borderStyle = 'border-success';
-            } else if (log.action === 'delete') {
+            } else if (activity.includes('delete') || activity.includes('hapus')) {
                 iconClass = 'fa-trash text-danger';
                 borderStyle = 'border-danger';
-            } else if (log.action === 'backup') {
+            } else if (activity.includes('backup')) {
                 iconClass = 'fa-database text-secondary';
                 borderStyle = 'border-secondary';
+            } else if (activity.includes('verifikasi') || activity.includes('verify')) {
+                iconClass = 'fa-check-circle text-success';
+                borderStyle = 'border-success';
             }
+
+            // 🔥 Gunakan activity_name sebagai deskripsi, user_name dari join
+            const userName = log.user_name || 'System';
+            const ip = log.ip_address || '-';
+            const activityName = log.activity_name || 'Aktivitas';
 
             html += `
                 <div class="activity-item p-3 mb-2 bg-white rounded shadow-sm border-start border-3 ${borderStyle}">
@@ -817,8 +838,8 @@
                                 <i class="fas ${iconClass}"></i>
                             </div>
                             <div>
-                                <div class="fw-bold small text-dark">${log.details || ''}</div>
-                                <div class="text-muted small">Oleh: ${log.admin_name || 'System'} • IP: ${log.ip_address || '-'}</div>
+                                <div class="fw-bold small text-dark">${activityName}</div>
+                                <div class="text-muted small">Oleh: ${userName} • IP: ${ip}</div>
                             </div>
                         </div>
                         <div class="text-end">
@@ -837,23 +858,23 @@
     }
 
     // ==================== ACTIVE SESSIONS ====================
-    async function loadActiveSessions() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/settings/sessions`, {
-                headers: getAuthHeaders()
-            });
+    // async function loadActiveSessions() {
+    //     try {
+    //         const response = await fetch(`${API_BASE_URL}/settings/sessions`, {
+    //             headers: getAuthHeaders()
+    //         });
 
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
+    //         if (response.status === 401) {
+    //             handleUnauthorized();
+    //             return;
+    //         }
 
-            const result = await response.json();
-            console.log('Active Sessions:', result);
-        } catch (error) {
-            console.error('Error loading sessions:', error);
-        }
-    }
+    //         const result = await response.json();
+    //         console.log('Active Sessions:', result);
+    //     } catch (error) {
+    //         console.error('Error loading sessions:', error);
+    //     }
+    // }
 
     // ==================== NAVIGATION / SWITCH TAB ====================
     window.switchSection = function(sectionId) {

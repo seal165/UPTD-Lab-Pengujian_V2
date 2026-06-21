@@ -3911,6 +3911,7 @@ const apiController = {
             console.log('========== GET USER DETAIL ==========');
             console.log('📥 User ID:', id);
 
+            // 🔥 QUERY TANPA KOMENTAR DI DALAM SQL
             const [users] = await db.query(`
                 SELECT 
                     u.id,
@@ -3921,6 +3922,7 @@ const apiController = {
                     u.nomor_telepon as phone,
                     u.role,
                     u.created_at,
+                    u.avatar,
                     'active' as status
                 FROM users u
                 WHERE u.id = ?
@@ -3952,7 +3954,7 @@ const apiController = {
             user.pending_transactions = parseInt(stats[0].pending_transactions) || 0;
             user.total_payments = parseFloat(stats[0].total_payments) || 0;
             
-            // 🔴 QUERY YANG LEBIH DETAIL - Ambil semua data sample
+            // Ambil submission terbaru
             const [recentSubmissions] = await db.query(`
                 SELECT 
                     s.id,
@@ -3994,7 +3996,7 @@ const apiController = {
                 LIMIT 10
             `, [id]);
             
-            // Parse JSON samples untuk frontend
+            // Parse JSON samples
             const formattedSubmissions = recentSubmissions.map(sub => {
                 let samples = [];
                 try {
@@ -4002,21 +4004,16 @@ const apiController = {
                 } catch (e) {
                     samples = [];
                 }
-                
                 return {
                     ...sub,
                     samples: samples,
-                    // Gabungkan jenis sample dari semua sample
                     jenis_sample_combined: samples.map(s => s.jenis_sample).join(', ') || '-',
-                    // Gabungkan jenis uji dan kategori
                     jenis_uji_display: sub.jenis_uji || '-',
                     kategori_uji_display: sub.kategori_uji || '-'
                 };
             });
             
             user.recent_submissions = formattedSubmissions;
-            
-            console.log('📦 Sending user detail with samples:', JSON.stringify(formattedSubmissions, null, 2));
             
             res.json({
                 success: true,
@@ -4045,7 +4042,7 @@ const apiController = {
             console.log('========== GET USERS ==========');
             console.log('📥 Params:', { page, limit, status, search });
             
-            // 🔴 PERBAIKAN: Hapus referensi ke kolom 'status'
+            // 🔥 QUERY TANPA KOMENTAR DI DALAM SQL
             let query = `
                 SELECT 
                     u.id,
@@ -4056,7 +4053,7 @@ const apiController = {
                     u.alamat as address,
                     u.role,
                     u.created_at,
-                    -- Gunakan role untuk menentukan status
+                    u.avatar,
                     CASE 
                         WHEN u.role = 'admin' THEN 'active'
                         WHEN u.role = 'pelanggan' THEN 'active'
@@ -4075,28 +4072,23 @@ const apiController = {
             let params = [];
             let countParams = [];
             
-            // Filter berdasarkan role (customer/pelanggan saja)
+            // Hanya pelanggan
             query += ` AND u.role = 'pelanggan'`;
             countQuery += ` AND role = 'pelanggan'`;
             
-            // 🔥 FILTER STATUS - Sesuaikan dengan role
+            // Filter status
             if (status) {
                 if (status === 'active') {
-                    // Aktif = role 'pelanggan'
                     query += ` AND u.role = 'pelanggan'`;
                     countQuery += ` AND role = 'pelanggan'`;
-                } else if (status === 'pending') {
-                    // Tidak ada status pending, jadi return 0
-                    query += ` AND 1=0`; // Ini akan mengembalikan 0 data
-                    countQuery += ` AND 1=0`;
-                } else if (status === 'inactive') {
-                    // Tidak ada status inactive, jadi return 0
-                    query += ` AND 1=0`; // Ini akan mengembalikan 0 data
+                } else if (status === 'pending' || status === 'inactive') {
+                    // Tidak ada status pending/inactive, return 0
+                    query += ` AND 1=0`;
                     countQuery += ` AND 1=0`;
                 }
             }
             
-            // 🔥 FILTER SEARCH
+            // Filter search
             if (search) {
                 query += ` AND (u.full_name LIKE ? OR u.email LIKE ? OR u.nama_instansi LIKE ? OR u.nomor_telepon LIKE ?)`;
                 countQuery += ` AND (full_name LIKE ? OR email LIKE ? OR nama_instansi LIKE ? OR nomor_telepon LIKE ?)`;
@@ -4110,12 +4102,10 @@ const apiController = {
             query += ` ORDER BY u.created_at DESC LIMIT ? OFFSET ?`;
             params.push(limit, offset);
             
-            console.log('📝 Final Query:', query);
-            
             const [users] = await db.query(query, params);
             const [countResult] = await db.query(countQuery, countParams);
             
-            // Hitung stats - berdasarkan role
+            // Hitung stats
             const [stats] = await db.query(`
                 SELECT 
                     COUNT(*) as total,
@@ -4131,10 +4121,8 @@ const apiController = {
             const formattedUsers = users.map(user => ({
                 ...user,
                 total_transactions: parseInt(user.total_transactions) || 0,
-                status: 'active' // Semua pelanggan dianggap aktif
+                status: 'active'
             }));
-            
-            console.log(`✅ Found ${formattedUsers.length} users, total: ${countResult[0].total}`);
             
             res.json({
                 success: true,
@@ -4687,15 +4675,10 @@ const apiController = {
     getProfileSettings: async (req, res) => {
         try {
             const userId = req.user?.id;
-            
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
-            
-            // Ambil data user dari database
+
             const [users] = await db.query(
                 `SELECT 
                     id, 
@@ -4710,39 +4693,39 @@ const apiController = {
                 WHERE id = ?`,
                 [userId]
             );
-            
+
             if (users.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User tidak ditemukan'
-                });
+                return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
             }
-            
+
             const user = users[0];
-            
-            // Format profile
+            const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+
+            // 🔥 Jika avatar ada, pastikan URL lengkap
+            let avatarUrl = null;
+            if (user.avatar) {
+                if (user.avatar.startsWith('http')) {
+                    avatarUrl = user.avatar;
+                } else {
+                    avatarUrl = `${baseUrl}${user.avatar}`;
+                }
+            }
+
             const profile = {
                 id: user.id,
                 name: user.name,
                 employee_id: 'NIP-' + String(user.id).padStart(3, '0'),
                 email: user.email,
                 phone: user.phone || '',
-                avatar: user.avatar,
+                avatar: avatarUrl,
                 position: user.role === 'admin' ? 'Super Administrator (Kepala Teknis)' : 'Staff',
                 updated_at: user.updated_at || user.created_at
             };
-            
-            res.json({
-                success: true,
-                data: profile
-            });
-            
+
+            res.json({ success: true, data: profile });
         } catch (error) {
             console.error('Error getting profile settings:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Gagal mengambil data profile: ' + error.message
-            });
+            res.status(500).json({ success: false, message: 'Gagal mengambil data profile: ' + error.message });
         }
     },
 
@@ -4750,36 +4733,32 @@ const apiController = {
     updateProfile: async (req, res) => {
         try {
             const userId = req.user?.id;
-            
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
-            
-            const { name, email, phone } = req.body;
-            
+
+            const { name, email, phone } = req.body; // employee_id diabaikan
+
             if (!name || !email) {
                 return res.status(400).json({
                     success: false,
                     message: 'Nama dan email harus diisi'
                 });
             }
-            
+
             // Cek email sudah digunakan atau belum
             const [existing] = await db.query(
                 'SELECT id FROM users WHERE email = ? AND id != ?',
                 [email, userId]
             );
-            
+
             if (existing.length > 0) {
                 return res.status(400).json({
                     success: false,
                     message: 'Email sudah digunakan'
                 });
             }
-            
+
             // Update user
             await db.query(
                 `UPDATE users 
@@ -4787,19 +4766,19 @@ const apiController = {
                 WHERE id = ?`,
                 [name, email, phone || null, userId]
             );
-            
+
             // Catat aktivitas
             await db.query(
                 `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
                 VALUES (?, ?, ?, ?)`,
                 [userId, 'Update Profile', req.ip, req.headers['user-agent']]
             );
-            
+
             res.json({
                 success: true,
                 message: 'Profile berhasil diupdate'
             });
-            
+
         } catch (error) {
             console.error('Error updating profile:', error);
             res.status(500).json({
@@ -4908,69 +4887,69 @@ const apiController = {
     changePassword: async (req, res) => {
         try {
             const userId = req.user?.id;
-            
             if (!userId) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Unauthorized'
-                });
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
-            
+
             const { current_password, new_password } = req.body;
-            
+
             if (!current_password || !new_password) {
                 return res.status(400).json({
                     success: false,
                     message: 'Password saat ini dan password baru harus diisi'
                 });
             }
-            
+
             if (new_password.length < 8) {
                 return res.status(400).json({
                     success: false,
                     message: 'Password baru minimal 8 karakter'
                 });
             }
-            
+
             // Ambil password dari database
             const [users] = await db.query(
                 'SELECT password FROM users WHERE id = ?',
                 [userId]
             );
-            
+
             if (users.length === 0) {
                 return res.status(404).json({
                     success: false,
                     message: 'User tidak ditemukan'
                 });
             }
-            
-            // TODO: Ganti dengan bcrypt compare
-            if (current_password !== users[0].password) {
+
+            // 🔥 Verifikasi password dengan bcrypt
+            const bcrypt = require('bcrypt');
+            const isMatch = await bcrypt.compare(current_password, users[0].password);
+            if (!isMatch) {
                 return res.status(400).json({
                     success: false,
                     message: 'Password saat ini salah'
                 });
             }
-            
-            // TODO: Hash password baru dengan bcrypt
+
+            // 🔥 Hash password baru
+            const hashedPassword = await bcrypt.hash(new_password, 10);
+
             await db.query(
                 'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
-                [new_password, userId]
+                [hashedPassword, userId]
             );
-            
+
             // Catat aktivitas
             await db.query(
                 `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
                 VALUES (?, ?, ?, ?)`,
                 [userId, 'Change Password', req.ip, req.headers['user-agent']]
             );
-            
+
             res.json({
                 success: true,
                 message: 'Password berhasil diubah'
             });
-            
+
         } catch (error) {
             console.error('Error changing password:', error);
             res.status(500).json({

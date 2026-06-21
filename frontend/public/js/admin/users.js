@@ -162,6 +162,11 @@
             
             const totalTrans = parseInt(user.total_transactions) || 0;
             
+            // 🔥 AVATAR: tampilkan gambar jika ada, fallback ke inisial
+            const avatarHtml = user.avatar 
+                ? `<img src="${user.avatar}" class="avatar-img" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:white;border:2px solid #e9ecef;">`
+                : `<div class="avatar-initials bg-primary-subtle me-3">${initials}</div>`;
+            
             return `
                 <tr>
                     <td class="ps-4">
@@ -169,9 +174,7 @@
                     </td>
                     <td>
                         <div class="d-flex align-items-center">
-                            <div class="avatar-initials bg-primary-subtle me-3">
-                                ${initials}
-                            </div>
+                            ${avatarHtml}
                             <div>
                                 <div class="fw-bold text-dark">${user.name}</div>
                                 <div class="small text-muted">
@@ -207,7 +210,6 @@
 
                     <td class="text-end pe-4">
                         <div class="btn-group">
-                            <!-- 🔴 PERBAIKI: Arahkan ke halaman detail user -->
                             <a href="/admin/users/${user.id}" class="btn btn-sm btn-light action-btn" title="Detail">
                                 <i class="fas fa-eye"></i>
                             </a>

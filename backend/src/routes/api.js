@@ -138,7 +138,8 @@ router.get('/backups/:filename', authMiddleware, async (req, res) => {
         if (!filename.endsWith('.sql')) {
             return res.status(403).json({ success: false, message: 'Akses ditolak' });
         }
-        const filepath = path.join(__dirname, '../backups', filename);
+        // 🔥 Perbaiki path: dari '../backups' menjadi '../../backups'
+        const filepath = path.join(__dirname, '../../backups', filename);
         if (!fs.existsSync(filepath)) {
             return res.status(404).json({ success: false, message: 'File tidak ditemukan' });
         }

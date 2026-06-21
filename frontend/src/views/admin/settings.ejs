@@ -2,7 +2,25 @@
 <html lang="id">
 <head>
     <%- include('partials/head') %>
-
+    <style>
+        /* 🔥 Perbaikan input di halaman Settings SAJA (tidak mempengaruhi halaman lain) */
+        #settingsContent .input-group input,
+        #settingsContent .input-group select,
+        #settingsContent .input-group textarea {
+            width: 100% !important;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        
+        /* Perbaikan khusus untuk input password biar terlihat */
+        #security-section .input-group input[type="password"] {
+            width: 100% !important;
+            display: block;
+            background: white !important;
+            color: #333 !important;
+            padding: 10px 14px !important;
+        }
+    </style>
 </head>
 <body>
     
@@ -135,34 +153,37 @@
                             <span class="badge bg-light text-muted" id="lastPasswordChange"></span>
                         </div>
                         <form id="passwordForm" onsubmit="changePassword(event)">
-                            <div class="row g-3">
-                                <div class="col-md-12">
-                                    <label class="form-label small fw-bold text-muted">Password Saat Ini</label>
-                                    <div class="input-group">
-                                        <input type="password" class="form-control" id="currentPassword" 
-                                               placeholder="Masukkan password lama..." required>
-                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('currentPassword')">
-                                            <i class="far fa-eye"></i>
-                                        </button>
-                                    </div>
+                            <!-- Password Saat Ini -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-muted">Password Saat Ini</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control bg-white" id="currentPassword" 
+                                        placeholder="Masukkan password lama..." required>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('currentPassword')">
+                                        <i class="far fa-eye"></i>
+                                    </button>
                                 </div>
+                            </div>
+
+                            <!-- Password Baru & Konfirmasi -->
+                            <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Password Baru</label>
+                                    <label class="form-label fw-bold text-muted">Password Baru</label>
                                     <div class="input-group">
-                                        <input type="password" class="form-control" id="newPassword" 
-                                               placeholder="Minimal 8 karakter" oninput="checkPasswordStrength()" required>
+                                        <input type="password" class="form-control bg-white" id="newPassword" 
+                                            placeholder="Minimal 8 karakter" oninput="checkPasswordStrength()" required>
                                         <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('newPassword')">
                                             <i class="far fa-eye"></i>
                                         </button>
                                     </div>
-                                    <div class="password-strength" id="passwordStrength"></div>
+                                    <div class="password-strength mt-2" id="passwordStrength"></div>
                                     <small class="text-muted" id="passwordHint"></small>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Konfirmasi Password Baru</label>
+                                    <label class="form-label fw-bold text-muted">Konfirmasi Password Baru</label>
                                     <div class="input-group">
-                                        <input type="password" class="form-control" id="confirmPassword" 
-                                               placeholder="Ulangi password baru" oninput="checkPasswordMatch()" required>
+                                        <input type="password" class="form-control bg-white" id="confirmPassword" 
+                                            placeholder="Ulangi password baru" oninput="checkPasswordMatch()" required>
                                         <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirmPassword')">
                                             <i class="far fa-eye"></i>
                                         </button>
@@ -170,9 +191,9 @@
                                     <small class="text-muted" id="passwordMatchHint"></small>
                                 </div>
                             </div>
-                            
+
                             <div class="text-end mt-4">
-                                <button type="submit" class="btn btn-outline-primary px-4" id="changePasswordBtn">
+                                <button type="submit" class="btn btn-primary px-4" id="changePasswordBtn">
                                     <span id="changePasswordText">Update Password</span>
                                     <span id="changePasswordSpinner" style="display: none;">
                                         <span class="spinner-border spinner-border-sm me-2"></span>Memproses...

@@ -118,17 +118,32 @@
 
     // ==================== UPDATE PROFILE ====================
     function updateProfile(user) {
-        const profileHtml = `
-            <div class="row">
-                <div class="col-md-3 text-center mb-3 mb-md-0">
-                    <div class="profile-avatar">
-                        ${(user.name || 'U').charAt(0).toUpperCase()}
+            let avatarHtml = '';
+            if (user.avatar && user.avatar !== 'null' && user.avatar !== '') {
+                // Pastikan URL avatar valid
+                let avatarUrl = user.avatar;
+                // Jika avatar tidak dimulai dengan http, tambahkan base URL
+                if (!avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
+                    avatarUrl = `http://localhost:5000/${avatarUrl}`;
+                }
+                avatarHtml = `<img src="${avatarUrl}" alt="${user.name}" class="profile-avatar-img" onerror="this.style.display='none'">`;
+            } else {
+                // Fallback ke inisial
+                const initial = (user.name || 'U').charAt(0).toUpperCase();
+                avatarHtml = `<div class="profile-avatar">${initial}</div>`;
+            }
+            
+            const profileHtml = `
+                <div class="row">
+                    <div class="col-md-3 text-center mb-3 mb-md-0">
+                        <div class="profile-avatar-wrapper">
+                            ${avatarHtml}
+                        </div>
+                        <h5 class="fw-bold mb-1">${user.name || '-'}</h5>
+                        <span class="badge-status ${user.status === 'active' ? 'badge-aktif' : user.status === 'pending' ? 'badge-pending' : 'badge-nonaktif'}">
+                            ${user.status === 'active' ? 'Aktif' : user.status === 'pending' ? 'Pending' : 'Nonaktif'}
+                        </span>
                     </div>
-                    <h5 class="fw-bold mb-1">${user.name || '-'}</h5>
-                    <span class="badge-status ${user.status === 'active' ? 'badge-aktif' : user.status === 'pending' ? 'badge-pending' : 'badge-nonaktif'}">
-                        ${user.status === 'active' ? 'Aktif' : user.status === 'pending' ? 'Pending' : 'Nonaktif'}
-                    </span>
-                </div>
                 <div class="col-md-9">
                     <div class="row">
                         <div class="col-md-6">
