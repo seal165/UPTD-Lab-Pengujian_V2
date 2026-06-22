@@ -48,6 +48,12 @@ router.get('/submissions/:id/report',
     apiController.downloadSubmissionReport
 );
 
+// Hapus laporan hasil pengujian
+router.delete('/submissions/:id/report', 
+    authMiddleware, 
+    apiController.deleteSubmissionReport
+);
+
 // ==================== SKRD API ====================
 router.get('/skrd', authMiddleware, apiController.getSKRD);
 router.get('/skrd/:id', authMiddleware, apiController.getSKRDDetail);
@@ -198,10 +204,13 @@ router.get('/file/laporan/:filename', authMiddleware, apiController.getFile);
 // Akses file SKRD
 router.get('/file/skrd/:filename', authMiddleware, apiController.getFile);
 
-// Transactions (daftar transaksi)
+// Riwayat transaksi user
 router.get('/user/transactions', authMiddleware, apiController.getUserTransactions);
 
-// Transaction Detail
+// Ambil notifikasi spesifik user
+router.get('/user/notifications', authMiddleware, apiController.getUserNotifications);
+
+// Detail transaksi user
 router.get('/user/transactions/:id', authMiddleware, apiController.getUserTransactionDetail);
 
 // Upload payment proof
