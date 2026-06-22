@@ -39,7 +39,7 @@
             <div class="account-info">
                 <div class="account-avatar">
                     <% if (user?.avatar) { %>
-                        <img src="<%= user.avatar.startsWith('http') ? user.avatar : ('http://localhost:5000' + user.avatar) %>" alt="Avatar" class="avatar-image" />
+                        <img src="<%= user.avatar.startsWith('http') ? user.avatar : ('http://localhost:5000' + user.avatar) %>" alt="Avatar" class="avatar-image" onerror="this.outerHTML='<i class=\\\'fas fa-user-circle\\\'></i>'" />
                     <% } else { %>
                         <i class="fas fa-user-circle"></i>
                     <% } %>

@@ -100,10 +100,18 @@
         document.getElementById('phoneNumber').value = data.phone || '';
         document.getElementById('position').value = data.position || 'Super Administrator (Kepala Teknis)';
         
+        let newAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'Admin+Lab')}&background=047857&color=fff&size=150`;
+        
         if (data.avatar) {
-            document.getElementById('profileImage').src = data.avatar;
-        } else {
-            document.getElementById('profileImage').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'Admin+Lab')}&background=667eea&color=fff&size=150`;
+            newAvatarUrl = data.avatar;
+        } 
+        
+        document.getElementById('profileImage').src = newAvatarUrl;
+        
+        // Update avatar di top navbar jika ada
+        const navbarAvatar = document.querySelector('.avatar-image');
+        if (navbarAvatar) {
+            navbarAvatar.src = newAvatarUrl;
         }
         
         document.getElementById('lastProfileUpdate').textContent = data.updated_at ? `Terakhir update: ${formatDate(data.updated_at)}` : '';
@@ -228,7 +236,15 @@
             const result = await response.json();
 
             if (result.success) {
-                document.getElementById('profileImage').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(adminData.name || 'Admin+Lab')}&background=667eea&color=fff&size=150`;
+                const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(adminData.name || 'Admin+Lab')}&background=047857&color=fff&size=150`;
+                document.getElementById('profileImage').src = defaultAvatar;
+                
+                // Update navbar avatar
+                const navbarAvatar = document.querySelector('.avatar-image');
+                if (navbarAvatar) {
+                    navbarAvatar.src = defaultAvatar;
+                }
+                
                 showAlert('Foto profil dihapus', 'success');
             } else {
                 showAlert('Gagal menghapus foto', 'danger');

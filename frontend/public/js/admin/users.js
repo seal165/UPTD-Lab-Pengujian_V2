@@ -122,8 +122,13 @@
             const totalTrans = parseInt(user.total_transactions) || 0;
             
             // 🔥 AVATAR: tampilkan gambar jika ada, fallback ke inisial
-            const avatarHtml = user.avatar 
-                ? `<img src="${user.avatar}" class="avatar-img" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:white;border:2px solid #e9ecef;">`
+            let avatarUrl = user.avatar;
+            if (avatarUrl && !avatarUrl.startsWith('http') && avatarUrl !== 'null' && avatarUrl !== '') {
+                avatarUrl = avatarUrl.startsWith('/') ? `http://localhost:5000${avatarUrl}` : `http://localhost:5000/${avatarUrl}`;
+            }
+            
+            const avatarHtml = (avatarUrl && avatarUrl !== 'null' && avatarUrl !== '')
+                ? `<img src="${avatarUrl}" alt="${user.name}" class="avatar-img me-3 shadow-sm" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:white;border:2px solid #e9ecef;" onerror="this.outerHTML='<div class=\\'avatar-initials bg-primary-subtle me-3\\'>${initials}</div>'">`
                 : `<div class="avatar-initials bg-primary-subtle me-3">${initials}</div>`;
             
             return `
@@ -168,18 +173,18 @@
                     </td>
 
                     <td class="text-end pe-4">
-                        <div class="d-flex gap-2 justify-content-end">
-                            <a href="/admin/users/${user.id}" class="btn btn-sm btn-outline-secondary" title="Detail">
+                        <div class="d-flex gap-3 justify-content-end align-items-center">
+                            <a href="/admin/users/${user.id}" class="text-secondary action-icon" title="Detail" style="font-size: 1.1rem; text-decoration: none;">
                                 <i class="fas fa-external-link-alt"></i>
                             </a>
                             
                             ${user.status === 'pending' ? `
-                                <button class="btn btn-sm btn-outline-success" title="Verifikasi" onclick="window.verifyUser('${user.id}')">
+                                <button class="text-success action-icon bg-transparent border-0 p-0" title="Verifikasi" onclick="window.verifyUser('${user.id}')" style="font-size: 1.1rem;">
                                     <i class="fas fa-check"></i>
                                 </button>
                             ` : ''}
                             
-                            <button class="btn btn-sm btn-outline-danger" title="Hapus" onclick="window.deleteUser('${user.id}')">
+                            <button class="text-danger action-icon bg-transparent border-0 p-0" title="Hapus" onclick="window.deleteUser('${user.id}')" style="font-size: 1.1rem;">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>

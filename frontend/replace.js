@@ -1,38 +1,8 @@
-<%# views/user/history-detail.ejs %>
-<% 
-const title = 'Detail Pengajuan - UPTD Lab';
-const currentPage = 'history';
-const pageTitle = 'Detail Pengajuan';
-const user = locals.user || {};
-const notificationCount = locals.notificationCount || 0;
-const submissionId = locals.id || '';
-const token = locals.token || '';
-%>
+const fs = require('fs');
+const filePath = 'd:/Magang/baru/UPTD-Lab-Pengujian_V2/frontend/src/views/user/history-detail.ejs';
+const content = fs.readFileSync(filePath, 'utf8');
 
-<%- include('partials/header', { title }) %>
-<%- include('partials/sidebar', { currentPage, user }) %>
-
-<main class="main-content">
-    <%- include('partials/top-navbar', { pageTitle, user, notificationCount, backLink: { url: '/user/history', text: 'Kembali' } }) %>
-    
-    <div class="content-body">
-        <!-- Loading State -->
-        <div id="loadingState" style="text-align: center; padding: 50px;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 text-muted">Memuat detail pengajuan...</p>
-        </div>
-        
-        <!-- Error State -->
-        <div id="errorState" style="display: none; text-align: center; padding: 50px;">
-            <i class="fas fa-exclamation-circle text-danger fa-3x mb-3"></i>
-            <h5>Gagal Memuat Data</h5>
-            <p class="text-muted" id="errorMessage">Terjadi kesalahan saat memuat data</p>
-            <a href="/user/history" class="btn btn-primary mt-3">Kembali ke History</a>
-        </div>
-        
-                <!-- Content State -->
+const newContentState = `        <!-- Content State -->
         <div id="contentState" style="display: none;">
             <!-- Header dengan ID dan Status -->
             <div class="card-custom mb-4 p-3 border-0 shadow-sm d-flex flex-column flex-md-row align-items-md-center justify-content-between">
@@ -285,14 +255,15 @@ const token = locals.token || '';
                     </div>
                 </div>
             </div>
-        </div>
+        </div>`;
 
-    <input type="hidden" id="currentSubmissionId" value="<%= submissionId %>">
-    <input type="hidden" id="currentUserToken" value="<%= token %>">
-    <!-- jsPDF untuk download PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <script src="/js/user/history-detail-handler.js"></script>
+const startIdx = content.indexOf('<!-- Content State -->');
+const endIdx = content.indexOf('<input type="hidden" id="currentSubmissionId"');
 
-</main>
-<%- include('partials/footer') %>
+if (startIdx !== -1 && endIdx !== -1) {
+    const updated = content.substring(0, startIdx) + newContentState + '\n\n    ' + content.substring(endIdx);
+    fs.writeFileSync(filePath, updated);
+    console.log('Successfully replaced contentState');
+} else {
+    console.log('Failed to find markers');
+}

@@ -15,17 +15,6 @@
                 <!-- Alert Message -->
                 <div id="alertMessage" class="alert alert-dismissible fade show" style="display: none;"></div>
 
-                <!-- Navigation -->
-                <div class="mb-3 d-flex flex-wrap justify-content-end align-items-center no-print">
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-primary" onclick="window.printInvoice()">
-                            <i class="fas fa-print me-2"></i>Cetak Invoice
-                        </button>
-                        <button class="btn btn-outline-success" onclick="window.sendReminder()" id="remindBtn">
-                            <i class="fas fa-bell me-2"></i>Kirim Pengingat
-                        </button>
-                    </div>
-                </div>
 
                 <!-- Main Invoice -->
                 <div class="invoice-box" id="invoiceContainer">
@@ -140,10 +129,20 @@
                         <!-- ========== END PRINT VERSION ========== -->
 
                         <!-- Invoice Header -->
-                        <div class="invoice-header border-bottom pb-4 mb-5">
-                            <h2 class="fw-bold text-dark mb-1" style="letter-spacing: 2px;">INVOICE</h2>
-                            <h6 class="text-muted mb-2" id="invoiceNumber">#INV-<span id="invoiceId"></span></h6>
-                            <div id="statusBadge" class="mt-2"></div>
+                        <div class="invoice-header border-bottom pb-4 mb-5 d-flex flex-wrap justify-content-between align-items-start gap-3">
+                            <div>
+                                <h2 class="fw-bold text-dark mb-1" style="letter-spacing: 2px;">INVOICE</h2>
+                                <h6 class="text-muted mb-2" id="invoiceNumber">#INV-<span id="invoiceId"></span></h6>
+                                <div id="statusBadge" class="mt-2"></div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 no-print">
+                                <button class="btn btn-outline-primary fw-bold px-3 py-2 shadow-sm" onclick="window.printInvoice()" style="border-radius: 8px;">
+                                    <i class="fas fa-print me-2"></i>Cetak Invoice
+                                </button>
+                                <button class="btn btn-success fw-bold px-3 py-2 shadow-sm" onclick="window.sendReminder()" id="remindBtn" style="border-radius: 8px;">
+                                    <i class="fas fa-bell me-2"></i>Kirim Pengingat
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Company & Payment Details -->
@@ -369,17 +368,10 @@
                         </div>
 
                         <!-- 🔥 SECTION RIWAYAT PEMBAYARAN -->
-                        <div class="card mb-4">
-                            <div class="card-header bg-light">
-                                <h6 class="fw-bold mb-0">
-                                    <i class="fas fa-history me-2 text-info"></i>
-                                    Riwayat Pembayaran
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div id="paymentHistory">
-                                    <p class="text-muted text-center">Belum ada riwayat pembayaran</p>
-                                </div>
+                        <div class="mb-5">
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Riwayat Pembayaran:</h6>
+                            <div class="p-4 bg-light rounded border shadow-sm" id="paymentHistory">
+                                <p class="text-muted text-center mb-0">Belum ada riwayat pembayaran</p>
                             </div>
                         </div>
 
@@ -428,7 +420,6 @@
                                 <p class="fw-bold small" id="createdBy">Bendahara Penerimaan</p>
                                 <p class="small text-muted" id="createdAt"></p>
                             </div>
-                        </div>
                     </div>
                 </div>
             </div>

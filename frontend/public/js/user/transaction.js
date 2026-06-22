@@ -158,10 +158,9 @@
                     <td class="${sisa > 0 ? 'text-danger' : 'text-success'}">${formatRupiah(sisa)}</td>
                     <td>${getStatusBadge(status)}</td>
                     <td>${formattedDate}</td>
-                    <td>
-                        <a href="/user/transaction/${item.id}" class="btn-detail-action">
-                            <span>Detail</span>
-                            <i class="fas fa-chevron-right"></i>
+                    <td class="text-center">
+                        <a href="/user/transaction/${item.id}" class="action-icon text-secondary" title="Detail">
+                            <i class="fas fa-external-link-alt"></i>
                         </a>
                     </td>
                 </tr>

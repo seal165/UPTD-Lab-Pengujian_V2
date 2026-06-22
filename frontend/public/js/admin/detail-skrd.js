@@ -709,21 +709,22 @@
         const paymentHistory = paymentNotes ? paymentNotes.split('\n').filter(line => line.trim() !== '') : [];
         
         if (paymentHistory.length > 0) {
-            let historyHtml = '<div class="payment-timeline">';
+            let historyHtml = '<div class="payment-timeline position-relative ps-4 border-start border-3 border-primary ms-2">';
             
             paymentHistory.forEach((note, index) => {
                 const isLast = index === paymentHistory.length - 1;
                 
                 historyHtml += `
-                    <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
-                        <div class="flex-grow-1">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                                <span class="badge bg-${isLast && remaining === 0 ? 'success' : 'secondary'} rounded-pill">
+                    <div class="position-relative mb-4">
+                        <div class="position-absolute bg-primary rounded-circle border border-2 border-white shadow-sm" style="width: 16px; height: 16px; left: -33px; top: 4px;"></div>
+                        <div class="bg-white p-3 rounded-3 border shadow-sm transition-hover">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="badge bg-secondary text-white rounded-pill px-3 py-1">
                                     Pembayaran #${index + 1}
                                 </span>
-                                ${isLast && remaining === 0 ? '<span class="badge bg-success">LUNAS</span>' : ''}
+                                ${isLast && remaining === 0 ? '<span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-1"><i class="fas fa-check-circle me-1"></i>Lunas</span>' : ''}
                             </div>
-                            <p class="mb-0 text-muted small">${escapeHtml(note)}</p>
+                            <p class="mb-0 text-muted" style="font-size: 0.95rem;">${escapeHtml(note)}</p>
                         </div>
                     </div>
                 `;
@@ -732,25 +733,25 @@
             historyHtml += '</div>';
             
             historyHtml += `
-                <div class="mt-3 pt-2 border-top bg-light p-3 rounded">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="fw-bold">Total Tagihan:</span>
-                        <span class="fw-bold">${formatRupiah(totalAmount)}</span>
+                <div class="mt-4 p-4 bg-white rounded-4 border shadow-sm">
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted fw-bold">Total Tagihan:</span>
+                        <span class="fw-bold text-dark">${formatRupiah(totalAmount)}</span>
                     </div>
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="fw-bold">Total Dibayar:</span>
+                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                        <span class="text-muted fw-bold">Total Dibayar:</span>
                         <span class="fw-bold text-success">${formatRupiah(paidAmount)}</span>
                     </div>
-                    <div class="d-flex justify-content-between">
-                        <span class="fw-bold">Sisa Tagihan:</span>
-                        <span class="fw-bold ${remaining > 0 ? 'text-danger' : 'text-success'}">${formatRupiah(remaining)}</span>
+                    <div class="d-flex justify-content-between pt-1 align-items-center">
+                        <span class="${remaining > 0 ? 'text-danger' : 'text-success'} fw-bold">Sisa Tagihan:</span>
+                        <span class="fw-bold ${remaining > 0 ? 'text-danger' : 'text-success'} fs-5">${formatRupiah(remaining)}</span>
                     </div>
                 </div>
             `;
             
             historyDiv.innerHTML = historyHtml;
         } else {
-            historyDiv.innerHTML = '<p class="text-muted text-center py-3">Belum ada riwayat pembayaran</p>';
+            historyDiv.innerHTML = '<div class="text-center py-4"><i class="fas fa-history fs-1 text-muted opacity-50 mb-3 d-block"></i><p class="text-muted mb-0">Belum ada riwayat pembayaran</p></div>';
         }
     }
 

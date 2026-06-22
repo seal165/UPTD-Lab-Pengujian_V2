@@ -517,24 +517,48 @@
         const timelineHtml = statuses.map((status, index) => {
             let statusClass = 'pending';
             let statusIcon = 'far fa-circle';
+            let statusText = '';
             
-            if (index < currentIndex) {
-                statusClass = 'completed';
-                statusIcon = 'fas fa-check-circle';
-            } else if (index === currentIndex) {
-                statusClass = 'current';
-                statusIcon = 'fas fa-spinner fa-pulse';
+            if (currentStatus === 'Selesai') {
+                if (index <= currentIndex) {
+                    statusClass = 'completed';
+                    statusIcon = 'fas fa-check-circle';
+                    statusText = '<small class="text-success d-block mt-1">Selesai</small>';
+                }
+            } else if (currentStatus === 'Dibatalkan') {
+                if (index === currentIndex) {
+                    statusClass = 'cancelled';
+                    statusIcon = 'fas fa-ban';
+                    statusText = '<small class="text-danger d-block mt-1">Dibatalkan</small>';
+                } else if (index < currentIndex) {
+                    statusClass = 'completed';
+                    statusIcon = 'fas fa-check-circle';
+                    statusText = '<small class="text-success d-block mt-1">Selesai</small>';
+                }
+            } else {
+                if (index < currentIndex) {
+                    statusClass = 'completed';
+                    statusIcon = 'fas fa-check-circle';
+                    statusText = '<small class="text-success d-block mt-1">Selesai</small>';
+                } else if (index === currentIndex) {
+                    statusClass = 'current';
+                    statusIcon = 'fas fa-spinner fa-pulse';
+                    statusText = '<small class="text-primary d-block mt-1">Sedang dalam proses</small>';
+                }
             }
+
+            const borderStyle = statusClass === 'completed' ? '#28a745' : statusClass === 'current' ? '#0d6efd' : statusClass === 'cancelled' ? '#dc3545' : '#e9ecef';
+            const iconColor = statusClass === 'current' ? 'text-primary' : statusClass === 'completed' ? 'text-success' : statusClass === 'cancelled' ? 'text-danger' : 'text-muted';
+            const titleColor = statusClass === 'current' ? 'text-primary' : statusClass === 'cancelled' ? 'text-danger' : '';
             
             return `
-                <div class="timeline-item ${statusClass} mb-3 ps-3" style="border-left: 2px solid ${statusClass === 'completed' ? '#28a745' : statusClass === 'current' ? '#0d6efd' : '#e9ecef'}; position: relative;">
+                <div class="timeline-item ${statusClass} mb-3 ps-3" style="border-left: 2px solid ${borderStyle}; position: relative;">
                     <div class="d-flex align-items-center" style="position: absolute; left: -11px; top: 0; background: white;">
-                        <i class="fas ${statusIcon} ${statusClass === 'current' ? 'text-primary' : statusClass === 'completed' ? 'text-success' : 'text-muted'}" style="font-size: 1.2rem; background: white;"></i>
+                        <i class="fas ${statusIcon} ${iconColor}" style="font-size: 1.2rem; background: white;"></i>
                     </div>
                     <div class="ms-3">
-                        <span class="fw-bold ${statusClass === 'current' ? 'text-primary' : ''}">${status.label}</span>
-                        ${index === currentIndex ? '<small class="text-primary d-block mt-1">Sedang dalam proses</small>' : ''}
-                        ${index < currentIndex ? '<small class="text-success d-block mt-1">Selesai</small>' : ''}
+                        <span class="fw-bold ${titleColor}">${status.label}</span>
+                        ${statusText}
                     </div>
                 </div>
             `;

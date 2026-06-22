@@ -3,22 +3,108 @@
 <head>
     <%- include('partials/head') %>
     <style>
-        /* 🔥 Perbaikan input di halaman Settings SAJA (tidak mempengaruhi halaman lain) */
-        #settingsContent .input-group input,
-        #settingsContent .input-group select,
-        #settingsContent .input-group textarea {
-            width: 100% !important;
-            flex: 1 1 auto;
-            min-width: 0;
+        /* Custom Styling for Settings Page */
+        #settingsContent .card-custom {
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            background: #fff;
         }
         
-        /* Perbaikan khusus untuk input password biar terlihat */
-        #security-section .input-group input[type="password"] {
-            width: 100% !important;
-            display: block;
+        .image-upload-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .image-upload-wrapper:hover {
+            transform: scale(1.02);
+        }
+        
+        .upload-overlay {
+            position: absolute;
+            bottom: 15px;
+            right: 0;
+            background: var(--primary-color, #047857);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+
+        .upload-overlay:hover {
+            background: var(--secondary-color, #0369a1);
+        }
+
+        .settings-section .form-label {
+            font-weight: 600;
+            color: #4b5563;
+        }
+        
+        .settings-section .form-control {
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.6rem 1rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        
+        .settings-section .form-select {
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.6rem 2.25rem 0.6rem 1rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        
+        .settings-section .form-control:focus, .settings-section .form-select:focus {
+            border-color: var(--primary-color, #047857);
+            box-shadow: 0 0 0 0.25rem rgba(4, 120, 87, 0.25);
+        }
+        
+        /* Fix for input-group width and layout */
+        #settingsContent .input-group {
+            display: flex;
+            flex-wrap: nowrap;
+        }
+        
+        #settingsContent .input-group input.form-control,
+        #settingsContent .input-group select.form-control,
+        #settingsContent .input-group textarea.form-control {
+            flex: 1 1 auto !important;
+            width: 1% !important;
+            min-width: 0 !important;
+            display: block !important;
             background: white !important;
             color: #333 !important;
             padding: 10px 14px !important;
+        }
+        
+        #settingsContent .input-group .btn {
+            z-index: 2;
+        }
+        
+        .list-group-item.active {
+            background-color: #ecfdf5 !important;
+            color: #047857 !important;
+            border-right: 3px solid #047857 !important;
+            font-weight: 600;
+        }
+        
+        .list-group-item {
+            color: #4b5563;
+            transition: all 0.2s;
+        }
+        
+        .list-group-item:hover {
+            background-color: #f3f4f6;
+            color: #111827;
         }
     </style>
 </head>

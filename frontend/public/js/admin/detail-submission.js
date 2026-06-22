@@ -257,11 +257,11 @@ III. **KAJI ULANG PERMINTAAN**
                     <i class="fas fa-check-circle text-success me-1"></i> Terupload: ${fileName}
                 `;
                 document.getElementById('suratPermohonanActions').innerHTML = `
-                    <a href="${fileUrl}" download class="btn btn-sm btn-outline-primary me-1">
+                    <a href="${fileUrl}" download class="btn btn-sm btn-outline-success me-2">
                         <i class="fas fa-download"></i>
                     </a>
-                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-eye"></i>
+                    <a href="${fileUrl}" target="_blank" class="text-secondary align-middle" style="font-size: 1.1rem; text-decoration: none;" title="Lihat">
+                        <i class="fas fa-external-link-alt"></i>
                     </a>
                 `;
             } else {
@@ -279,11 +279,11 @@ III. **KAJI ULANG PERMINTAAN**
                     <i class="fas fa-check-circle text-success me-1"></i> Terupload: ${fileName}
                 `;
                 document.getElementById('scanKTPActions').innerHTML = `
-                    <a href="${fileUrl}" download class="btn btn-sm btn-outline-primary me-1">
+                    <a href="${fileUrl}" download class="btn btn-sm btn-outline-success me-2">
                         <i class="fas fa-download"></i>
                     </a>
-                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-eye"></i>
+                    <a href="${fileUrl}" target="_blank" class="text-secondary align-middle" style="font-size: 1.1rem; text-decoration: none;" title="Lihat">
+                        <i class="fas fa-external-link-alt"></i>
                     </a>
                 `;
             } else {
@@ -440,7 +440,14 @@ III. **KAJI ULANG PERMINTAAN**
         // CATATAN DARI USER
         const userNotes = document.getElementById('userNotes');
         if (userNotes) {
-            userNotes.textContent = data.catatan_tambahan || data.notes || '-';
+            const notes = data.catatan_tambahan || data.notes;
+            if (notes && notes.trim() !== '') {
+                userNotes.textContent = notes;
+                userNotes.classList.remove('fst-italic');
+            } else {
+                userNotes.innerHTML = '<i class="fas fa-info-circle me-1"></i> Tidak ada catatan tambahan dari pemohon.';
+                userNotes.classList.add('fst-italic');
+            }
             console.log('📝 Catatan dari user:', data.catatan_tambahan);
         }
         
@@ -455,24 +462,43 @@ III. **KAJI ULANG PERMINTAAN**
             const reportName = normalizeFilename(data.report.file_laporan);
             const reportUrl = buildProtectedFileUrl('laporan', data.report.file_laporan);
             const reportInfo = `
-                <div class="alert alert-success mt-2" id="reportInfoBlock">
-                    <i class="fas fa-check-circle me-2"></i>
-                    Laporan sudah diupload: ${reportName}
-                    <div class="mt-2">
-                        <a href="${reportUrl}" download class="btn btn-sm btn-primary me-1">
-                            <i class="fas fa-download"></i> Download
-                        </a>
-                        <a href="${reportUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-eye"></i> Lihat
-                        </a>
+                <div class="card-custom mb-4" id="reportInfoBlock">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                        <h6 class="fw-bold text-uppercase text-muted small m-0">
+                            <i class="fas fa-file-alt me-2 text-primary"></i>Laporan Hasil Pengujian
+                        </h6>
+                        <span class="badge bg-success bg-opacity-10 text-success">Telah Diupload</span>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-white border rounded shadow-sm text-danger d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                <i class="fas fa-file-pdf fs-4"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark text-truncate" style="max-width: 300px;" title="${reportName}">${reportName}</div>
+                                <div class="text-success small"><i class="fas fa-check me-1"></i>Laporan siap diunduh</div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button onclick="window.deleteReport(${data.id})" class="btn btn-outline-danger px-3 shadow-sm">Hapus</button>
+                            <a href="${reportUrl}" target="_blank" class="btn btn-outline-secondary px-3 shadow-sm">Lihat</a>
+                            <a href="${reportUrl}" download class="btn btn-success px-3 shadow-sm">Download</a>
+                        </div>
                     </div>
                 </div>
             `;
             
-            const uploadArea = document.getElementById('uploadArea');
+            const targetSection = document.getElementById('dokumenWajibSection');
             const existingInfo = document.getElementById('reportInfoBlock');
             if (existingInfo) existingInfo.remove();
-            uploadArea.insertAdjacentHTML('afterend', reportInfo);
+            
+            if (targetSection) {
+                targetSection.insertAdjacentHTML('beforebegin', reportInfo);
+            } else {
+                // Fallback jika elemen tidak ditemukan
+                const uploadArea = document.getElementById('uploadArea');
+                if (uploadArea) uploadArea.insertAdjacentHTML('afterend', reportInfo);
+            }
         }
 
         // Blok status kuisioner (hanya tampil jika laporan sudah ada)
@@ -495,18 +521,23 @@ III. **KAJI ULANG PERMINTAAN**
             // Kuisioner sudah diisi oleh user
             const tanggalIsi = formatDate(data.kuisioner.created_at);
             blockHtml = `
-                <div class="card-custom mt-3" id="kuisionerStatusBlock" style="border-top: 3px solid #198754;">
+                <div class="card-custom mt-3 border-0 shadow-sm" id="kuisionerStatusBlock" style="border-top: 3px solid #198754 !important;">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="bg-success-subtle p-2 rounded me-2 text-success">
-                            <i class="fas fa-star"></i>
+                        <div class="bg-success-subtle rounded me-3 text-success d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                            <i class="fas fa-star fs-5"></i>
                         </div>
-                        <h6 class="fw-bold m-0">Kuisioner Kepuasan</h6>
+                        <div class="fw-bold fs-6 m-0 lh-1" style="color: #2b3445;">Kuisioner Kepuasan</div>
                     </div>
-                    <div class="alert alert-success py-2">
-                        <i class="fas fa-check-circle me-1"></i>
-                        <strong>Sudah diisi</strong> pada ${tanggalIsi}
+                    <div class="p-3 mb-3 rounded-3" style="background-color: #f8fff9; border: 1px solid #c3e6cb;">
+                        <div class="d-flex gap-3 align-items-start">
+                            <i class="fas fa-check-circle text-success mt-1 fs-5"></i>
+                            <div>
+                                <div class="fw-bold text-success mb-1" style="font-size: 0.95rem;">Sudah Diisi</div>
+                                <div class="text-muted small">Diselesaikan pada ${tanggalIsi}</div>
+                            </div>
+                        </div>
                     </div>
-                    <button class="btn btn-outline-success w-100" onclick="downloadKuisionerPDFAdmin()">
+                    <button class="btn btn-outline-success w-100 fw-bold shadow-sm" onclick="downloadKuisionerPDFAdmin()">
                         <i class="fas fa-file-pdf me-2"></i>Download PDF Kuisioner
                     </button>
                 </div>
@@ -514,18 +545,25 @@ III. **KAJI ULANG PERMINTAAN**
         } else {
             // Kuisioner belum diisi user
             blockHtml = `
-                <div class="card-custom mt-3" id="kuisionerStatusBlock" style="border-top: 3px solid #ffc107;">
+                <div class="card-custom mt-3 border-0 shadow-sm" id="kuisionerStatusBlock" style="border-top: 3px solid #ffc107 !important;">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="bg-warning-subtle p-2 rounded me-2 text-warning">
-                            <i class="fas fa-star"></i>
+                        <div class="bg-warning-subtle rounded me-3 text-warning d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                            <i class="fas fa-star fs-5"></i>
                         </div>
-                        <h6 class="fw-bold m-0">Kuisioner Kepuasan</h6>
+                        <div class="fw-bold fs-6 m-0 lh-1" style="color: #2b3445;">Kuisioner Kepuasan</div>
                     </div>
-                    <div class="alert alert-warning py-2">
-                        <i class="fas fa-clock me-1"></i>
-                        <strong>Belum diisi</strong> – Menunggu user mengisi kuisioner setelah download laporan
+                    <div class="p-3 mb-3 rounded-3" style="background-color: #fffdf5; border: 1px solid #ffeeba;">
+                        <div class="d-flex gap-3 align-items-start">
+                            <i class="fas fa-clock text-warning mt-1 fs-5"></i>
+                            <div>
+                                <div class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">Belum Diisi</div>
+                                <div class="text-muted small" style="line-height: 1.4;">Menunggu user mengisi kuisioner setelah download laporan.</div>
+                            </div>
+                        </div>
                     </div>
-                    <small class="text-muted">Laporan tersedia untuk user setelah mengisi kuisioner</small>
+                    <div class="text-muted small d-flex align-items-center gap-2">
+                        <i class="fas fa-info-circle text-info"></i> Laporan tersedia untuk user setelah mengisi kuisioner.
+                    </div>
                 </div>
             `;
         }
@@ -937,18 +975,19 @@ III. **KAJI ULANG PERMINTAAN**
         }
         
         filePreview.innerHTML = `
-            <div class="d-flex align-items-center gap-2 p-2 bg-light rounded">
-                <i class="fas ${fileIcon} ${iconColor} fa-2x"></i>
-                <div class="flex-grow-1">
-                    <small class="fw-bold d-block">${file.name}</small>
-                    <small class="text-muted">${fileSizeMB} MB</small>
+            <div class="mt-2">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <i class="fas ${fileIcon} ${iconColor} fa-2x"></i>
+                    <div style="min-width: 0;">
+                        <div class="fw-bold text-dark text-truncate" title="${file.name}" style="font-size: 0.9rem;">${file.name}</div>
+                        <div class="text-muted" style="font-size: 0.8rem;">${fileSizeMB} MB</div>
+                    </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-primary me-1" onclick="uploadSelectedFile()" id="confirmUploadBtn">
-                    <i class="fas fa-upload"></i> Upload
-                </button>
-                <button type="button" class="btn btn-sm btn-light" onclick="removeFile()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger px-3" onclick="removeFile()">Hapus</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" onclick="previewSelectedFile()">Lihat</button>
+                    <button type="button" class="btn btn-sm btn-success px-4" onclick="uploadSelectedFile()" id="confirmUploadBtn">Upload</button>
+                </div>
             </div>
         `;
         
@@ -975,7 +1014,7 @@ III. **KAJI ULANG PERMINTAAN**
         const uploadBtn = document.getElementById('confirmUploadBtn');
         if (uploadBtn) {
             uploadBtn.disabled = true;
-            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengupload...';
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         }
         
         const formData = new FormData();
@@ -1020,7 +1059,7 @@ III. **KAJI ULANG PERMINTAAN**
                 uploadArea.innerHTML = originalHTML;
                 if (uploadBtn) {
                     uploadBtn.disabled = false;
-                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
                 }
             }
         } catch (error) {
@@ -1029,7 +1068,7 @@ III. **KAJI ULANG PERMINTAAN**
             uploadArea.innerHTML = originalHTML;
             if (uploadBtn) {
                 uploadBtn.disabled = false;
-                uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+                uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
             }
         } finally {
             isUploading = false;
@@ -1045,6 +1084,25 @@ III. **KAJI ULANG PERMINTAAN**
         const fileInputElement = document.getElementById('fileInput');
         if (fileInputElement) fileInputElement.value = '';
         console.log('🗑️ File removed');
+    };
+
+    window.previewSelectedFile = function() {
+        const file = window.selectedFile;
+        if (!file) {
+            showToast('Pilih file terlebih dahulu', 'warning');
+            return;
+        }
+        
+        const fileUrl = window.URL.createObjectURL(file);
+        const newTab = window.open(fileUrl, '_blank');
+        
+        if (!newTab) {
+            alert('Mohon izinkan popup browser untuk melihat file.');
+            return;
+        }
+        
+        // Bersihkan memori setelah tab dibuka
+        setTimeout(() => window.URL.revokeObjectURL(fileUrl), 60000);
     };
 
     // ==================== FORM HANDLERS ====================
@@ -1127,10 +1185,12 @@ III. **KAJI ULANG PERMINTAAN**
         document.getElementById('updateBtnSpinner').style.display = 'inline-block';
 
         try {
-            const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/cancel`, {
+            const API_BASE_URL = 'http://localhost:5000/api';
+            const submissionId = document.getElementById('submissionId').value;
+            const response = await fetch(`${API_BASE_URL}/admin/submissions/${submissionId}/cancel`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${getToken()}`,
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -1138,25 +1198,59 @@ III. **KAJI ULANG PERMINTAAN**
             const result = await response.json();
 
             if (result.success) {
-                showAlert('Pengajuan berhasil dibatalkan', 'success');
-                
-                // Update UI dengan data terbaru
-                if (result.data) {
-                    updatePage(result.data);
-                } else {
-                    // Refresh halaman
-                    setTimeout(() => loadSubmissionDetail(), 1000);
-                }
+                showToast('Pengajuan berhasil dibatalkan', 'success');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                showAlert(result.message || 'Gagal membatalkan pengajuan', 'danger');
+                showToast(result.message || 'Gagal membatalkan pengajuan', 'danger');
             }
         } catch (error) {
             console.error('Error:', error);
-            showAlert('Gagal terhubung ke server: ' + error.message, 'danger');
+            showToast('Gagal terhubung ke server: ' + error.message, 'danger');
         } finally {
             document.getElementById('updateBtn').disabled = false;
             document.getElementById('updateBtnText').style.display = 'inline';
             document.getElementById('updateBtnSpinner').style.display = 'none';
+        }
+    };
+
+    window.deleteReport = async function(submissionId) {
+        if (!confirm('Apakah Anda yakin ingin menghapus dokumen laporan ini?')) {
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showToast('Sesi habis, silakan login ulang', 'danger');
+            return;
+        }
+
+        try {
+            const API_URL = 'http://localhost:5000/api';
+            const response = await fetch(`${API_URL}/submissions/${submissionId}/report`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showToast('Laporan berhasil dihapus', 'success');
+                // Hapus elemen report dari DOM
+                const reportBlock = document.getElementById('reportInfoBlock');
+                if (reportBlock) {
+                    reportBlock.remove();
+                }
+                
+                // Hapus juga blok status kuisioner jika ada karena laporan sudah dihapus
+                const kuisionerBlock = document.getElementById('kuisionerStatusBlock');
+                if (kuisionerBlock) {
+                    kuisionerBlock.remove();
+                }
+            } else {
+                showToast(result.message || 'Gagal menghapus laporan', 'danger');
+            }
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            showToast('Gagal menghapus laporan: ' + error.message, 'danger');
         }
     };
 

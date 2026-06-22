@@ -39,7 +39,16 @@
         <div class="account-dropdown ms-2">
             <div class="account-info">
                 <div class="account-avatar">
-                    <img src="https://ui-avatars.com/api/?name=Admin+User&background=047857&color=fff" class="avatar-image">
+                    <% 
+                        let adminAvatarSrc = "https://ui-avatars.com/api/?name=Admin+User&background=047857&color=fff";
+                        if (locals.user && locals.user.avatar) {
+                            adminAvatarSrc = locals.user.avatar.startsWith('http') ? locals.user.avatar : ('http://localhost:5000' + locals.user.avatar);
+                        } else if (locals.user && (locals.user.full_name || locals.user.name)) {
+                            const adminName = locals.user.full_name || locals.user.name;
+                            adminAvatarSrc = "https://ui-avatars.com/api/?name=" + encodeURIComponent(adminName) + "&background=047857&color=fff";
+                        }
+                    %>
+                    <img src="<%= adminAvatarSrc %>" class="avatar-image" alt="Admin Avatar">
                 </div>
             </div>
         </div>

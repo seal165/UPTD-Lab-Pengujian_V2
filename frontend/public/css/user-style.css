@@ -49,6 +49,7 @@
 
 html {
     height: 100%;
+    zoom: 90%;
 }
 
 body {
@@ -119,6 +120,8 @@ body {
 
 .main-menu ul {
     list-style: none;
+    padding: 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1330,6 +1333,51 @@ body {
     flex: 0 0 auto;
 }
 
+.history-controls .btn-detail-action {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: #f1f5f9;
+    color: var(--secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+}
+
+.btn-detail-action span {
+    display: none;
+}
+
+.btn-detail-action:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+    transform: translateY(-2px);
+}
+
+/* Action Icon for user side */
+.action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    color: var(--secondary);
+    text-decoration: none;
+    background: transparent;
+    border: none;
+}
+
+.action-icon:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--primary);
+}
+
 .history-controls .btn-new-submission {
     display: inline-flex;
     align-items: center;
@@ -1424,23 +1472,26 @@ body {
 
 .history-table th {
     background-color: #f8fafc;
-    padding: 14px 16px;
+    padding: 12px 16px;
     color: var(--secondary);
     font-weight: 700;
     text-transform: uppercase;
     font-size: 11px;
     letter-spacing: 0.05em;
     border-bottom: 2px solid var(--border);
-}
-
-.history-table td {
-    padding: 16px;
-    border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
 }
 
-.history-table tr:hover {
-    background-color: #fcfcfd;
+.history-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    color: var(--dark);
+    font-size: 13px;
+}
+
+.history-table tr:hover, .history-table tbody tr:hover {
+    background-color: #f8fafc;
 }
 
 .btn-action-view {
@@ -2407,20 +2458,23 @@ body {
 
 .minimal-table th {
     text-align: left;
-    padding: 1rem;
+    padding: 12px 16px;
     color: var(--secondary);
     font-size: 11px;
     border-bottom: 2px solid var(--border);
     background: #f8fafc;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
 }
 
 .minimal-table td {
-    padding: 1.2rem 1rem;
-    border-bottom: 1px solid #f8fafc;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
     color: var(--dark);
+    font-size: 13px;
+    vertical-align: middle;
 }
 
 .minimal-table tbody tr:hover {
@@ -2671,22 +2725,24 @@ body {
 }
 
 .custom-table th {
-    padding: 14px 16px;
-    font-size: 12px;
+    padding: 12px 16px;
+    font-size: 11px;
     text-transform: uppercase;
     color: var(--secondary);
     text-align: center;
     border-bottom: 2px solid var(--border);
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
 }
 
 .custom-table td {
-    padding: 14px 16px;
+    padding: 12px 16px;
     color: var(--dark);
     border-bottom: 1px solid var(--border);
     text-align: center;
-    font-size: 14px;
+    font-size: 13px;
+    vertical-align: middle;
 }
 
 .custom-table th:first-child,
@@ -4059,3 +4115,26 @@ body {
     border: 1px solid #e0f2fe;
     color: #0369a1;
 }
+/* --- SHARED CARD CUSTOM COMPONENTS FROM ADMIN --- */
+.card-custom {
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02); 
+    padding: 24px;
+    height: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-custom:hover {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06);
+}
+
+.document-card { transition: all 0.2s; border-left: 4px solid var(--primary); }
+.document-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.document-required { border-left: 4px solid #dc3545; }
+.document-required .badge { background-color: #dc3545; color: white; }
+

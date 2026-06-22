@@ -27,7 +27,7 @@ const profileAvatarSrc = user.avatar
                         <div class="profile-avatar-wrapper">
                             <div class="profile-avatar" id="profileAvatar">
                                 <% if (profileAvatarSrc) { %>
-                                    <img src="<%= profileAvatarSrc %>" alt="Profile" class="profile-avatar-image">
+                                    <img src="<%= profileAvatarSrc %>" alt="Profile" class="profile-avatar-image" onerror="this.outerHTML='<i class=\\\'fas fa-user-circle profile-avatar-icon\\\'></i>'">
                                 <% } else { %>
                                     <i class="fas fa-user-circle profile-avatar-icon"></i>
                                 <% } %>

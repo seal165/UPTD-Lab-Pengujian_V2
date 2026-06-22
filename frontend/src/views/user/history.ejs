@@ -154,9 +154,8 @@ const historyData = locals.submissions || [];
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="/user/history/<%= item.id %>" class="btn-detail-action">
-                                        <span>Detail</span>
-                                        <i class="fas fa-chevron-right"></i>
+                                    <a href="/user/history/<%= item.id %>" class="action-icon text-secondary" title="Detail">
+                                        <i class="fas fa-external-link-alt"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -183,11 +182,12 @@ const historyData = locals.submissions || [];
 
 <style>
     .jenis-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 16px;
+        border-radius: 50rem;
         font-size: 0.8rem;
-        font-weight: 500;
+        font-weight: 600;
     }
     .badge-bahan {
         background-color: #e3f2fd;

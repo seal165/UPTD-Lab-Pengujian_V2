@@ -4,21 +4,29 @@
     <%- include('partials/head') %>
     <style>
         .profile-avatar-wrapper {
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 15px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             overflow: hidden;
-            background: #e9ecef;
+            background: #f8f9fa;
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 3px solid #4361ee;
+            border: 4px solid #fff;
+            box-shadow: 0 0 0 2px #e9ecef;
+            flex-shrink: 0;
         }
         .profile-avatar {
-            font-size: 48px;
-            font-weight: 700;
-            color: #4361ee;
+            font-size: 40px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0; /* Override margin from admin-style.css to prevent off-center */
         }
         .profile-avatar-img {
             width: 100%;
@@ -57,25 +65,25 @@
                 <span class="text-muted small" id="submissionCount"></span>
             </div>
             
-            <div class="table-responsive">
-                <table class="table-submissions">
-                    <thead>
+            <div class="table-responsive rounded border">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
                         <tr>
-                            <th>No. Registrasi</th>
-                            <th>Jenis Uji</th>
-                            <th>Jenis Sample</th>
-                            <th>Nama Proyek</th>
-                            <th>Tanggal</th>
-                            <th>Status</th>
-                            <th>Total</th>
-                            <th class="text-center">Aksi</th>
+                            <th class="ps-4 py-3">No. Registrasi</th>
+                            <th class="py-3">Jenis Uji</th>
+                            <th class="py-3">Jenis Sample</th>
+                            <th class="py-3">Nama Proyek</th>
+                            <th class="py-3">Tanggal</th>
+                            <th class="py-3">Status</th>
+                            <th class="py-3">Total</th>
+                            <th class="text-center pe-4 py-3">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="submissionsTableBody">
                         <tr>
-                            <td colspan="8" class="text-center py-4">
+                            <td colspan="8" class="text-center py-5">
                                 <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                                Memuat data...
+                                <span class="text-muted">Memuat data...</span>
                             </td>
                         </tr>
                     </tbody>
