@@ -274,11 +274,12 @@
             distribusiChart = new Chart(ctx2, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Sangat Tidak Puas (1)', 'Tidak Puas (2)', 'Puas (3)', 'Sangat Puas (4)', 'Sangat Puas (5)'],
+                    labels: ['Sangat Tidak Puas (1)', 'Tidak Puas (2)', 'Cukup Puas (3)', 'Puas (4)', 'Sangat Puas (5)'],
                     datasets: [{
                         data: distribusiData,
-                        backgroundColor: ['#dc2626', '#f97316', '#2563eb', '#059669'],
-                        borderWidth: 0
+                        backgroundColor: ['#dc2626', '#f97316', '#eab308', '#3b82f6', '#10b981'],
+                        borderWidth: 1,
+                        borderColor: '#ffffff'
                     }]
                 },
                 options: {
@@ -321,9 +322,9 @@
                         <br><small class="text-muted">(rata-rata ${rataRata})</small>
                     </td>
                     <td>${item.saran ? item.saran.substring(0, 50) + '...' : '-'}</td>
-                    <td>
-                        <button class="btn btn-sm btn-light action-btn" onclick="previewKuisioner(${item.id})">
-                            <i class="fas fa-eye"></i> Preview
+                    <td class="text-end pe-4">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="previewKuisioner(${item.id})">
+                            <i class="fas fa-external-link-alt"></i>
                         </button>
                     </td>
                 </tr>
@@ -354,7 +355,7 @@
         questions.sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
         
         questions.forEach((q, index) => {
-            const statusClass = 'badge-soft-success';
+            const statusClass = 'bg-success';
             const statusText = 'Aktif';
             
             html += `

@@ -164,54 +164,54 @@
         
         const statsHtml = `
             <div class="col-md-4">
-                <div class="card-custom h-100 flex-row align-items-center justify-content-between">
+                <div class="card-custom h-100 d-flex flex-row align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 small fw-bold text-uppercase">Total Piutang</p>
                         <h3 class="fw-bold m-0 text-dark">${stats.totalReceivable || 'Rp 0'}</h3>
-                        <div class="mt-2 d-flex gap-2">
-                            <span class="badge badge-soft-danger">
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <span class="badge badge-soft-danger px-2 py-1">
                                 <i class="fas fa-times-circle me-1"></i>${totalBelumBayar} Belum Bayar
                             </span>
-                            <span class="badge badge-soft-warning">
+                            <span class="badge badge-soft-warning px-2 py-1">
                                 <i class="fas fa-hourglass-half me-1"></i>${stats.partialCount || 0} Belum Lunas
                             </span>
                         </div>
                     </div>
-                    <div class="bg-danger-subtle p-3 rounded-circle text-danger">
+                    <div class="bg-danger-subtle p-3 rounded-circle text-danger d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; flex-shrink: 0;">
                         <i class="fas fa-wallet fa-lg"></i>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-4">
-                <div class="card-custom h-100 flex-row align-items-center justify-content-between">
+                <div class="card-custom h-100 d-flex flex-row align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 small fw-bold text-uppercase">Perlu Verifikasi</p>
                         <h3 class="fw-bold m-0 text-dark">${stats.waitingVerification || 0}</h3>
-                        <div class="mt-2">
-                            <span class="badge badge-soft-primary">
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <span class="badge badge-soft-primary px-2 py-1">
                                 <i class="fas fa-exclamation-circle me-1"></i>Menunggu Verifikasi
                             </span>
                         </div>
                     </div>
-                    <div class="bg-primary-subtle p-3 rounded-circle text-primary">
+                    <div class="bg-primary-subtle p-3 rounded-circle text-primary d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; flex-shrink: 0;">
                         <i class="fas fa-file-invoice-dollar fa-lg"></i>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-4">
-                <div class="card-custom h-100 flex-row align-items-center justify-content-between">
+                <div class="card-custom h-100 d-flex flex-row align-items-center justify-content-between">
                     <div>
                         <p class="text-muted mb-1 small fw-bold text-uppercase">Pendapatan Bulan Ini</p>
                         <h3 class="fw-bold m-0 text-dark">${stats.monthlyIncome || 'Rp 0'}</h3>
-                        <div class="mt-2">
-                            <span class="badge badge-soft-success">
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <span class="badge badge-soft-success px-2 py-1">
                                 <i class="fas fa-check-circle me-1"></i>${stats.paidCount || 0} Transaksi Lunas
                             </span>
                         </div>
                     </div>
-                    <div class="bg-success-subtle p-3 rounded-circle text-success">
+                    <div class="bg-success-subtle p-3 rounded-circle text-success d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; flex-shrink: 0;">
                         <i class="fas fa-coins fa-lg"></i>
                     </div>
                 </div>
@@ -304,8 +304,7 @@
                 <tr>
                     <td class="ps-4">
                         <span class="fw-bold text-primary">#${invoiceNumber}</span>
-                        <div class="small text-muted">${skrdNumber}</div>
-                    </table>
+                    </td>
                     <td style="min-width: 180px;">
                         <div class="fw-bold text-dark">${companyName}</div>
                         <small class="text-muted">${serviceDesc}</small>
@@ -431,7 +430,7 @@
         
         paginationHtml += `
             <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link rounded-2 me-1" href="#" onclick="changePage(${currentPage - 1})">
+                <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">
                     Prev
                 </a>
             </li>
@@ -441,7 +440,7 @@
             if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
                 paginationHtml += `
                     <li class="page-item ${currentPage === i ? 'active' : ''}">
-                        <a class="page-link rounded-2 me-1" href="#" onclick="changePage(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
                     </li>
                 `;
             } else if (i === currentPage - 3 || i === currentPage + 3) {
@@ -451,7 +450,7 @@
 
         paginationHtml += `
             <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link rounded-2" href="#" onclick="changePage(${currentPage + 1})">
+                <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">
                     Next
                 </a>
             </li>

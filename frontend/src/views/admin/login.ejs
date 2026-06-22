@@ -1,111 +1,142 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
+
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login - UPTD Lab</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="/css/admin-style.css">
+    <style>
+        /* ---- Perbaikan padding & ikon halaman login ---- */
+        .form-input {
+            padding: 10px 14px 10px 38px;
+        }
+
+        .has-icon-end .form-input {
+            padding-right: 38px;
+        }
+
+        /* Alert inline */
+        .alert-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            padding: 11px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .alert-box i {
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            color: #14532d;
+            border: 1px solid #bbf7d0;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
+        /* Lupa password link */
+        .forgot-row {
+            text-align: right;
+            margin-top: 5px;
+        }
+
+        .forgot-row a {
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .forgot-row a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
+
 <body class="login-body">
 
-    <div class="login-container">
-        <div class="text-center mb-4">
-            <div class="flask-icon mb-3">
-                <i class="fas fa-flask"></i>
-            </div>
-            <h4 class="fw-bold text-white">UPTD Lab Manager</h4>
-            <p class="text-white-50 mb-0">Construction Material Testing Laboratory</p>
-        </div>
+    <div class="login-card">
 
-        <div class="login-card">
-            <h5 class="fw-bold mb-2">Admin Login</h5>
-            <p class="text-muted small mb-4">Masukkan kredensial Anda untuk mengakses dashboard</p>
-            
-            <!-- Alert untuk menampilkan pesan error/sukses -->
-            <div id="alertMessage" style="display: none;"></div>
-            
-            <!-- Form Login -->
-            <form id="loginForm">
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">Email</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0">
-                            <i class="far fa-envelope text-muted"></i>
-                        </span>
-                        <input type="email" 
-                               class="form-control border-start-0" 
-                               id="email" 
-                               name="email" 
-                               placeholder="admin@uptd.gov.id" 
-                               required>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">Password</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0">
-                            <i class="fas fa-lock text-muted"></i>
-                        </span>
-                        <input type="password" 
-                               class="form-control border-start-0" 
-                               id="password" 
-                               name="password" 
-                               placeholder="••••••••" 
-                               required>
-                        <button class="btn btn-light border" 
-                                type="button" 
-                                onclick="togglePassword()">
-                            <i class="far fa-eye" id="togglePasswordIcon"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="d-flex justify-content-between mb-4">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="remember">
-                        <label class="form-check-label small" for="remember">
-                            Ingat saya
-                        </label>
-                    </div>
-                    <a href="#" class="small text-decoration-none" onclick="showForgotPassword(event)">
-                        Lupa password?
-                    </a>
-                </div>
-                
-                <button type="submit" class="btn btn-dark w-100 py-2" id="loginButton">
-                    <span id="buttonText">Login sebagai Administrator</span>
-                    <span id="buttonSpinner" style="display: none;">
-                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        Memproses...
-                    </span>
-                </button>
-            </form>
-            
-            <!-- Informasi Login -->
-            <div class="login-info mt-4 pt-3 border-top">
-                <p class="small text-muted mb-1">
-                    <i class="fas fa-shield-alt me-1"></i> 
-                    Gunakan akun administrator yang telah terdaftar
-                </p>
-                <p class="small text-muted mb-0">
-                    <i class="fas fa-database me-1"></i> 
-                    Terhubung dengan database UPTD Lab
-                </p>
-            </div>
+        <!-- Header -->
+        <div class="auth-icon-wrapper">
+            <img src="/img/logo-banten.png" alt="Logo Banten" style="width: 100%; height: auto;">
         </div>
-        
-        <div class="mt-4 text-center small text-white-50">
-            <i class="fas fa-shield-alt me-1"></i> Restricted Access. Authorized Personnel Only.<br>
-            © 2026 UPTD Construction Material Testing Lab.
+        <h2 class="auth-title">Login Administrator</h2>
+        <p class="auth-subtitle">Bahan Konstruksi Bangunan &amp; Informasi Konstruksi</p>
+
+        <!-- Alert JS-injected -->
+        <div id="alertContainer"></div>
+
+        <!-- Form -->
+        <form id="loginForm">
+
+            <div class="form-group">
+                <label class="form-label" for="email">Alamat Email</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-envelope icon-start"></i>
+                    <input type="email" id="email" name="email" class="form-input" placeholder="admin@uptd.gov.id"
+                        required autocomplete="email">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <div class="input-wrapper has-icon-end">
+                    <i class="fas fa-lock icon-start"></i>
+                    <input type="password" id="password" name="password" class="form-input"
+                        placeholder="masukkan password" required autocomplete="current-password">
+                    <i class="fas fa-eye-slash icon-end" id="togglePasswordIcon" style="cursor: pointer;"
+                        onclick="togglePassword()"></i>
+                </div>
+                <div class="forgot-row">
+                    <a href="#" onclick="showForgotPassword(event)">Lupa Password?</a>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-auth-base btn-action-login btn-full" id="loginButton">
+                <span class="button-text" id="buttonText">Masuk</span>
+                <span class="button-loader" id="buttonSpinner" style="display: none;">
+                    <i class="fas fa-spinner fa-spin"></i> Memproses...
+                </span>
+            </button>
+
+        </form>
+
+        <div class="auth-footer" style="margin-top: 30px;">
+            Gunakan akun administrator yang telah terdaftar.<br>
+            © 2026 Pengujian Bahan Konstruksi Bangunan &amp; Informasi Konstruksi Provinsi Banten.
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
     <!-- Login JavaScript -->
     <script src="/js/admin/login.js"></script>
 </body>
+
 </html>

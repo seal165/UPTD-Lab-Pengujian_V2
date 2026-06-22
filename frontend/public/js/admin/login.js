@@ -13,15 +13,22 @@
     const rememberCheck = document.getElementById('remember');
 
     function showAlert(message, type) {
-        alertMessage.style.display = 'block';
-        alertMessage.className = `alert alert-${type} alert-dismissible fade show`;
-        alertMessage.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'"></button>
-        `;
+        let alertType = type;
+        if (type === 'danger') alertType = 'error'; // Map danger to error
+
+        const container = document.getElementById('alertContainer');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = `alert-box alert-${alertType}`;
+        const icon = alertType === 'error' ? 'fa-exclamation-circle' : alertType === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+        div.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+        container.appendChild(div);
+
         setTimeout(() => {
-            if (alertMessage.style.display !== 'none') {
-                alertMessage.style.display = 'none';
+            if (container.contains(div)) {
+                div.remove();
             }
         }, 5000);
     }

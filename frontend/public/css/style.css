@@ -58,6 +58,47 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; margin-bottom: 0.5rem; line-height: 1.2;
 .mt-3 { margin-top: 0.8rem; }
 .mt-4 { margin-top: 1.2rem; }
 
+/* CUSTOM PAGINATION (NEAT PILL STYLE) */
+.pagination { gap: 0.35rem; margin-bottom: 0; }
+.page-item {
+    background-color: transparent !important;
+    border: none !important;
+}
+.page-item .page-link {
+    border-radius: 8px !important;
+    border: none !important;
+    color: var(--secondary);
+    background-color: #f1f5f9;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    margin: 0 !important;
+    transition: all 0.2s ease;
+    box-shadow: none !important;
+}
+.page-item.active {
+    background-color: transparent !important;
+}
+.page-item.active .page-link {
+    background-color: var(--primary) !important;
+    color: var(--white) !important;
+    box-shadow: 0 4px 6px rgba(4, 120, 87, 0.2) !important;
+    border: none !important;
+}
+.page-item.disabled .page-link {
+    background-color: transparent !important;
+    color: #cbd5e1 !important;
+}
+.page-item .page-link:hover:not(.active):not(.disabled) {
+    background-color: #e2e8f0 !important;
+    color: var(--dark);
+    transform: translateY(-1px);
+}
+.page-item .page-link:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
 /* =========================================
    2. BUTTONS 
    ========================================= */

@@ -23,34 +23,42 @@
                 <!-- Alert Message -->
                 <div id="alertMessage" class="alert" style="display: none;"></div>
 
-                <div class="mb-4">
+                <div class="mb-2">
                     <h5 class="fw-bold">Daftar Pengajuan Masuk</h5>
-                    <p class="text-muted">Kelola dan pantau status pengajuan pengujian laboratorium.</p>
+                    <p class="text-muted mb-0">Kelola dan pantau status pengajuan pengujian laboratorium.</p>
                 </div>
 
+                <!-- Custom Style for Filters -->
+                <style>
+                    .filter-container::-webkit-scrollbar { display: none; }
+                    .filter-container { -ms-overflow-style: none; scrollbar-width: none; }
+                    .filter-pill { height: 34px; border: 1px solid #f8f9fa; }
+                    /* Perkecil jarak antara teks dan ikon chevron pada dropdown */
+                    .filter-pill .form-select {
+                        padding-right: 1.2rem !important;
+                        background-position: right 0.2rem center !important;
+                    }
+                </style>
                 <!-- Filter dan Search Section -->
-                <div class="card-custom mb-4 border-0 shadow-sm">
-                    <div class="d-flex align-items-center bg-light rounded-3 p-1 overflow-auto" style="white-space: nowrap; border: 1px solid #e9ecef;">
+                <div class="mb-4">
+                    <div class="d-flex align-items-center gap-2 overflow-auto filter-container py-2" style="white-space: nowrap;">
                         <!-- Search -->
-                        <div class="d-flex align-items-center px-3" style="min-width: 220px; border-right: 1px solid #dee2e6;">
-                            <i class="fas fa-search text-muted me-2"></i>
-                            <input type="text" class="form-control form-control-sm bg-transparent border-0 shadow-none px-0" id="searchInput" placeholder="Cari ID, Perusahaan...">
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill" style="min-width: 200px;">
+                            <i class="fas fa-search text-muted me-1" style="font-size: 0.85rem;"></i>
+                            <input type="text" class="form-control form-control-sm bg-transparent border-0 shadow-none px-0 py-0 m-0" id="searchInput" placeholder="Cari ID, Perusahaan..." style="font-size: 0.85rem;">
                         </div>
                         
                         <!-- Filter Tanggal -->
-                        <div class="d-flex align-items-center px-3" style="min-width: 250px; border-right: 1px solid #dee2e6;">
-                            <i class="fas fa-calendar-alt text-muted me-2"></i>
-                            <input type="date" class="form-control form-control-sm bg-transparent border-0 shadow-none px-0 text-muted" id="startDateFilter" onchange="applyFilter()">
-                            <span class="text-muted mx-2">-</span>
-                            <input type="date" class="form-control form-control-sm bg-transparent border-0 shadow-none px-0 text-muted" id="endDateFilter" onchange="applyFilter()">
-                            <button class="btn btn-sm text-danger p-0 ms-2" onclick="resetDateFilter()" title="Reset">
-                                <i class="fas fa-times"></i>
-                            </button>
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill">
+                            <span class="text-muted fw-bold me-1" style="font-size: 0.85rem;">Periode:</span>
+                            <input type="date" class="form-control form-control-sm bg-transparent border-0 shadow-none px-0 py-0 m-0 text-muted" id="startDateFilter" onchange="applyFilter()" style="font-size: 0.85rem; width: 105px;">
+                            <span class="text-muted mx-1" style="font-size: 0.85rem;">-</span>
+                            <input type="date" class="form-control form-control-sm bg-transparent border-0 shadow-none px-0 py-0 m-0 text-muted" id="endDateFilter" onchange="applyFilter()" style="font-size: 0.85rem; width: 105px;">
                         </div>
                         
                         <!-- Filter Jenis Pengujian -->
-                        <div class="px-2" style="border-right: 1px solid #dee2e6;">
-                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted" id="testTypeFilter" style="min-width: 140px; cursor: pointer;">
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill">
+                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted ps-0 py-0 m-0" id="testTypeFilter" style="width: 105px; cursor: pointer; font-size: 0.85rem;">
                                 <option value="">Semua Tipe</option>
                                 <option value="PENGUJIAN BAHAN">PENGUJIAN BAHAN</option>
                                 <option value="PENGUJIAN KONSTRUKSI">PENGUJIAN KONSTRUKSI</option>
@@ -58,8 +66,8 @@
                         </div>
 
                         <!-- Filter Kategori -->
-                        <div class="px-2" style="border-right: 1px solid #dee2e6;">
-                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted" id="testCategoryFilter" style="min-width: 140px; cursor: pointer;">
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill">
+                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted ps-0 py-0 m-0" id="testCategoryFilter" style="width: 130px; cursor: pointer; font-size: 0.85rem;">
                                 <option value="">Semua Kategori</option>
                                 <option value="Agregat">Agregat</option>
                                 <option value="Tanah">Tanah</option>
@@ -71,8 +79,8 @@
                         </div>
 
                         <!-- Filter Status -->
-                        <div class="px-2" style="border-right: 1px solid #dee2e6;">
-                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted" id="statusSelect" style="min-width: 160px; cursor: pointer;">
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill">
+                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted ps-0 py-0 m-0" id="statusSelect" style="width: 120px; cursor: pointer; font-size: 0.85rem;">
                                 <option value="">Semua Status</option>
                                 <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
                                 <option value="Pengecekan Sampel">Pengecekan Sampel</option>
@@ -87,8 +95,8 @@
                         </div>
                         
                         <!-- Sort -->
-                        <div class="px-2">
-                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted" id="sortSelect" style="min-width: 110px; cursor: pointer;">
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill">
+                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted ps-0 py-0 m-0" id="sortSelect" style="width: 75px; cursor: pointer; font-size: 0.85rem;">
                                 <option value="desc">Terbaru</option>
                                 <option value="asc">Terlama</option>
                             </select>
@@ -124,7 +132,7 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="card-footer bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <div class="card-footer bg-white border-0 py-3 px-4 d-flex justify-content-between align-items-center">
                         <small class="text-muted" id="paginationInfo"></small>
                         <nav aria-label="Page navigation">
                             <ul class="pagination mb-0" id="pagination">
@@ -141,6 +149,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- Custom JS for submissions -->
-    <script src="/js/admin/submissions.js"></script>
+    <script src="/js/admin/submissions.js?v=4"></script>
 </body>
 </html>

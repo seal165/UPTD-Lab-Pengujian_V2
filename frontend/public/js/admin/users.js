@@ -78,55 +78,14 @@
     // ==================== UPDATE STATS ====================
     function updateStats(stats) {
         const statsHtml = `
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Total Pemohon</small>
-                            <h3 class="fw-bold mb-0">${stats.total || 0}</h3>
-                        </div>
-                        <div class="bg-primary-subtle p-2 rounded-circle">
-                            <i class="fas fa-users text-primary"></i>
-                        </div>
+            <div class="stats-card h-100">
+                <div class="d-flex justify-content-between align-items-center h-100">
+                    <div>
+                        <small class="text-muted d-block mb-1">Total Pemohon</small>
+                        <h3 class="fw-bold mb-0">${stats.total || 0}</h3>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Aktif</small>
-                            <h3 class="fw-bold mb-0 text-success">${stats.active || 0}</h3>
-                        </div>
-                        <div class="bg-success-subtle p-2 rounded-circle">
-                            <i class="fas fa-check-circle text-success"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Pending</small>
-                            <h3 class="fw-bold mb-0 text-warning">${stats.pending || 0}</h3>
-                        </div>
-                        <div class="bg-warning-subtle p-2 rounded-circle">
-                            <i class="fas fa-clock text-warning"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Perusahaan</small>
-                            <h3 class="fw-bold mb-0 text-info">${stats.companies || 0}</h3>
-                        </div>
-                        <div class="bg-info-subtle p-2 rounded-circle">
-                            <i class="fas fa-building text-info"></i>
-                        </div>
+                    <div class="bg-primary-subtle p-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="fas fa-users text-primary fs-5"></i>
                     </div>
                 </div>
             </div>
@@ -209,18 +168,18 @@
                     </td>
 
                     <td class="text-end pe-4">
-                        <div class="btn-group">
-                            <a href="/admin/users/${user.id}" class="btn btn-sm btn-light action-btn" title="Detail">
-                                <i class="fas fa-eye"></i>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="/admin/users/${user.id}" class="btn btn-sm btn-outline-secondary" title="Detail">
+                                <i class="fas fa-external-link-alt"></i>
                             </a>
                             
                             ${user.status === 'pending' ? `
-                                <button class="btn btn-sm btn-light text-success action-btn" title="Verifikasi" onclick="window.verifyUser('${user.id}')">
+                                <button class="btn btn-sm btn-outline-success" title="Verifikasi" onclick="window.verifyUser('${user.id}')">
                                     <i class="fas fa-check"></i>
                                 </button>
                             ` : ''}
                             
-                            <button class="btn btn-sm btn-light text-danger action-btn" title="Hapus" onclick="window.deleteUser('${user.id}')">
+                            <button class="btn btn-sm btn-outline-danger" title="Hapus" onclick="window.deleteUser('${user.id}')">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
