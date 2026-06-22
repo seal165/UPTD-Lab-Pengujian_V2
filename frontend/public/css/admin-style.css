@@ -54,22 +54,29 @@ body {
 }
 
 .logo-section {
-    padding: 12px 10px;
+    padding: 24px 24px;
     background: linear-gradient(135deg, var(--primary-green, #16a34a), var(--primary-hover, #15803d));
     color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .logo-title {
-    font-size: 17px;
+    font-size: 19px;
     font-weight: 800;
     margin: 0;
+    padding: 0;
     line-height: 1.2;
+    letter-spacing: 0.5px;
 }
 
 .logo-subtitle {
-    font-size: 12px;
+    font-size: 13px;
     color: rgba(255, 255, 255, 0.9);
-    margin-top: 3px;
+    margin: 4px 0 0 0;
+    padding: 0;
+    letter-spacing: 0.2px;
 }
 
 .main-menu {
@@ -1309,3 +1316,256 @@ body {
     background-color: rgba(0, 0, 0, 0.6) !important;
     opacity: 1 !important;
 }
+/* ==================================================== */
+/* EXTRACTED ADMIN STYLES */
+/* ==================================================== */
+
+/* --- From detail-user.ejs --- */
+.profile-avatar-wrapper {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid #fff;
+            box-shadow: 0 0 0 2px #e9ecef;
+            flex-shrink: 0;
+        }
+        .profile-avatar {
+            font-size: 40px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0; /* Override margin from admin-style.css to prevent off-center */
+        }
+        .profile-avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+/* --- From kuisioner.ejs --- */
+.stats-card {
+                        background: #fff;
+                        border-radius: 12px;
+                        padding: 1.5rem;
+                        border: 1px solid #f1f5f9;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                        height: 100%;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                    }
+                    .stats-number {
+                        font-size: 2rem;
+                        font-weight: 700;
+                        color: #16a34a;
+                        margin-bottom: 0.5rem;
+                    }
+                    .stats-label {
+                        font-size: 0.875rem;
+                        color: #64748b;
+                        font-weight: 500;
+                    }
+
+/* --- From login.ejs --- */
+/* ---- Perbaikan padding & ikon halaman login ---- */
+        .form-input {
+            padding: 10px 14px 10px 38px;
+        }
+
+        .has-icon-end .form-input {
+            padding-right: 38px;
+        }
+
+        /* Alert inline */
+        .alert-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            padding: 11px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .alert-box i {
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            color: #14532d;
+            border: 1px solid #bbf7d0;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
+        /* Lupa password link */
+        .forgot-row {
+            text-align: right;
+            margin-top: 5px;
+        }
+
+        .forgot-row a {
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .forgot-row a:hover {
+            text-decoration: underline;
+        }
+
+/* --- From settings.ejs --- */
+/* Custom Styling for Settings Page */
+        #settingsContent .card-custom {
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            background: #fff;
+        }
+        
+        .image-upload-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .image-upload-wrapper:hover {
+            transform: scale(1.02);
+        }
+        
+        .upload-overlay {
+            position: absolute;
+            bottom: 15px;
+            right: 0;
+            background: var(--primary-color, #047857);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+
+        .upload-overlay:hover {
+            background: var(--secondary-color, #0369a1);
+        }
+
+        .settings-section .form-label {
+            font-weight: 600;
+            color: #4b5563;
+        }
+        
+        .settings-section .form-control {
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.6rem 1rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        
+        .settings-section .form-select {
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.6rem 2.25rem 0.6rem 1rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        
+        .settings-section .form-control:focus, .settings-section .form-select:focus {
+            border-color: var(--primary-color, #047857);
+            box-shadow: 0 0 0 0.25rem rgba(4, 120, 87, 0.25);
+        }
+        
+        /* Fix for input-group width and layout */
+        #settingsContent .input-group {
+            display: flex;
+            flex-wrap: nowrap;
+        }
+        
+        #settingsContent .input-group input.form-control,
+        #settingsContent .input-group select.form-control,
+        #settingsContent .input-group textarea.form-control {
+            flex: 1 1 auto !important;
+            width: 1% !important;
+            min-width: 0 !important;
+            display: block !important;
+            background: white !important;
+            color: #333 !important;
+            padding: 10px 14px !important;
+        }
+        
+        #settingsContent .input-group .btn {
+            z-index: 2;
+        }
+        
+        .list-group-item.active {
+            background-color: #ecfdf5 !important;
+            color: #047857 !important;
+            border-right: 3px solid #047857 !important;
+            font-weight: 600;
+        }
+        
+        .list-group-item {
+            color: #4b5563;
+            transition: all 0.2s;
+        }
+        
+        .list-group-item:hover {
+            background-color: #f3f4f6;
+            color: #111827;
+        }
+
+/* --- From skrd.ejs --- */
+.filter-container::-webkit-scrollbar { display: none; }
+                    .filter-container { -ms-overflow-style: none; scrollbar-width: none; }
+                    .filter-pill { height: 34px; border: 1px solid #f8f9fa; }
+                    /* Perkecil jarak antara teks dan ikon chevron pada dropdown */
+                    .filter-pill .form-select, .filter-pill .dropdown-toggle {
+                        padding-right: 1.2rem !important;
+                        background-position: right 0.2rem center !important;
+                    }
+
+/* --- From submissions.ejs --- */
+.filter-container::-webkit-scrollbar { display: none; }
+                    .filter-container { -ms-overflow-style: none; scrollbar-width: none; }
+                    .filter-pill { height: 34px; border: 1px solid #f8f9fa; }
+                    /* Perkecil jarak antara teks dan ikon chevron pada dropdown */
+                    .filter-pill .form-select {
+                        padding-right: 1.2rem !important;
+                        background-position: right 0.2rem center !important;
+                    }

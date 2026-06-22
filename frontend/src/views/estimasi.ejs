@@ -409,67 +409,6 @@
     });
 </script>
 
-<style>
-    #itemSelect {
-        height: auto;
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    #itemSelect optgroup {
-        font-weight: bold;
-        color: var(--primary);
-    }
-    #itemSelect option {
-        padding: 8px 12px;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    #itemSelect option:hover {
-        background-color: #f8f9fa;
-    }
-    .service-option {
-        background: white;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 20px;
-        cursor: pointer;
-        transition: all 0.3s;
-        text-align: center;
-    }
-    .service-option.active {
-        border-color: var(--primary);
-        background: rgba(67, 97, 238, 0.05);
-        transform: translateY(-3px);
-        box-shadow: 0 10px 25px rgba(67, 97, 238, 0.1);
-    }
-    .icon-circle {
-        font-size: 2rem;
-        margin-bottom: 10px;
-    }
-    .service-option h4 {
-        font-size: 1rem;
-        font-weight: 600;
-        margin-bottom: 5px;
-        color: var(--dark);
-    }
-    .jadwal-sibuk-info {
-        animation: slideDown 0.3s ease;
-    }
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    #loadingOverlay, .loading-overlay, .skeleton-loader {
-        display: none !important;
-    }
-    .text-muted {
-        color: #6c757d;
-    }
-</style>
+
 
 <%- include('layout/footer') %>

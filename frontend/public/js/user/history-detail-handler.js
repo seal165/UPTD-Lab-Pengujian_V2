@@ -239,17 +239,21 @@
             hasProofs = true;
             const fileUrl = buildProtectedFileUrl('payment', payment.bukti_pembayaran_1, token);
             html += `
-                <div class="document-item d-flex align-items-center p-2 mb-2 border rounded">
-                    <div class="doc-icon me-2">
-                        <i class="fas fa-file-pdf text-danger"></i>
-                    </div>
-                    <div class="doc-info flex-grow-1">
-                        <small>Bukti Pembayaran 1</small>
-                        ${payment.bukti_pembayaran_notes ? `<small class="text-muted d-block">Catatan: ${payment.bukti_pembayaran_notes}</small>` : ''}
-                    </div>
-                    <div class="doc-action">
-                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <div class="document-card p-3 border rounded mb-3">
+                    <div class="d-flex flex-column flex-xl-row gap-3 align-items-xl-center">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="bg-light rounded text-success d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 44px; height: 44px; border: 1px solid #dee2e6;">
+                                <i class="fas fa-file-invoice-dollar fs-4"></i>
+                            </div>
+                            <div>
+                                <span class="fw-bold d-block text-dark">Bukti Pembayaran 1</span>
+                                ${payment.bukti_pembayaran_notes ? `<small class="text-muted d-block mt-1" style="line-height: 1.4;">${payment.bukti_pembayaran_notes.replace(/\n/g, '<br>')}</small>` : ''}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-shrink-0 ms-xl-auto">
+                            <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-success">Buka</a>
+                            <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">Download</a>
+                        </div>
                     </div>
                 </div>
             `;
@@ -259,16 +263,20 @@
             hasProofs = true;
             const fileUrl = buildProtectedFileUrl('payment', payment.bukti_pembayaran_2, token);
             html += `
-                <div class="document-item d-flex align-items-center p-2 mb-2 border rounded">
-                    <div class="doc-icon me-2">
-                        <i class="fas fa-file-pdf text-danger"></i>
-                    </div>
-                    <div class="doc-info flex-grow-1">
-                        <small>Bukti Pembayaran 2</small>
-                    </div>
-                    <div class="doc-action">
-                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <div class="document-card p-3 border rounded mb-3">
+                    <div class="d-flex flex-column flex-xl-row gap-3 align-items-xl-center">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="bg-light rounded text-success d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 44px; height: 44px; border: 1px solid #dee2e6;">
+                                <i class="fas fa-file-invoice-dollar fs-4"></i>
+                            </div>
+                            <div>
+                                <span class="fw-bold d-block text-dark">Bukti Pembayaran 2</span>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-shrink-0 ms-xl-auto">
+                            <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-success">Buka</a>
+                            <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">Download</a>
+                        </div>
                     </div>
                 </div>
             `;
@@ -286,8 +294,8 @@
             setText('status-doc-permohonan', '✅ Terupload');
             const fileUrl = buildProtectedFileUrl('surat', data.file_surat_permohonan, token);
             document.getElementById('action-doc-permohonan').innerHTML = `
-                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">Buka</a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary">Download</a>
             `;
         } else {
             setText('status-doc-permohonan', '❌ Belum diupload');
@@ -299,8 +307,8 @@
             setText('status-doc-ktp', '✅ Terupload');
             const fileUrl = buildProtectedFileUrl('ktp', data.file_ktp, token);
             document.getElementById('action-doc-ktp').innerHTML = `
-                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">Buka</a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary">Download</a>
             `;
         } else {
             setText('status-doc-ktp', '❌ Belum diupload');
@@ -332,10 +340,10 @@
             // 🔥 TAMPILKAN 2 TOMBOL: Preview dan Download
             actionLaporan.innerHTML = `
                 <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">
-                    <i class="fas fa-eye"></i> Preview
+                    Preview
                 </a>
                 <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">
-                    <i class="fas fa-download"></i> Download
+                    Download
                 </a>
             `;
             
@@ -372,17 +380,17 @@
                         <h6>Terima Kasih!</h6>
                         <p class="text-muted small mb-3">Anda telah mengisi kuisioner kepuasan untuk layanan ini.</p>
                         <button class="btn btn-outline-primary" onclick="window.downloadKuisionerPDF()">
-                            <i class="fas fa-download me-2"></i>Download Salinan Kuisioner
+                            Download Salinan Kuisioner
                         </button>
                     </div>
                 `;
                 
                 actionLaporan.innerHTML = `
                     <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">
-                        <i class="fas fa-eye"></i> Preview
+                        Preview
                     </a>
                     <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">
-                        <i class="fas fa-download"></i> Download
+                        Download
                     </a>
                 `;
             }

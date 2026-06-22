@@ -119,8 +119,8 @@
                 const fileUrl = `http://localhost:5000/api/file/skrd/${data.skrd_file}?token=${token}`;
                 skrdInfo.innerHTML = '<i class="fas fa-check-circle text-success"></i> SKRD telah diupload';
                 skrdAction.innerHTML = `
-                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary me-2"><i class="fas fa-eye"></i> Lihat</a>
-                    <a href="${fileUrl}" download class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary me-2">Lihat</a>
+                    <a href="${fileUrl}" download class="btn btn-sm btn-primary">Download</a>
                 `;
             } else {
                 skrdInfo.innerHTML = '<i class="fas fa-hourglass-half text-warning"></i> SKRD sedang diproses oleh admin';
@@ -151,8 +151,8 @@
                                     <div class="text-muted small">${uploadedAt ? `Diunggah: ${formatDate(uploadedAt)}` : ''}</div>
                                 </div>
                                 <div class="btn-group">
-                                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> Lihat</a>
-                                    <a href="${fileUrl}" download class="btn btn-sm btn-outline-success"><i class="fas fa-download"></i> Download</a>
+                                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat</a>
+                                    <a href="${fileUrl}" download class="btn btn-sm btn-outline-success">Download</a>
                                 </div>
                             </div>
                         </div>
