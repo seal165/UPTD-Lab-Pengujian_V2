@@ -62,7 +62,6 @@ const historyData = locals.submissions || [];
                 </select>
                 
                 <a href="/user/submission" class="btn-new-submission">
-                    <i class="fas fa-plus"></i>
                     <span>Buat Pengajuan Baru</span>
                 </a>
             </div>
@@ -154,9 +153,8 @@ const historyData = locals.submissions || [];
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="/user/history/<%= item.id %>" class="btn-detail-action">
-                                        <span>Detail</span>
-                                        <i class="fas fa-chevron-right"></i>
+                                    <a href="/user/history/<%= item.id %>" class="action-icon text-secondary" title="Detail">
+                                        <i class="fas fa-external-link-alt"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -181,69 +179,7 @@ const historyData = locals.submissions || [];
     
 <script src="/js/user/history.js"></script>
 
-<style>
-    .jenis-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
-    .badge-bahan {
-        background-color: #e3f2fd;
-        color: #0d47a1;
-    }
-    .badge-konstruksi {
-        background-color: #fff3e0;
-        color: #e65100;
-    }
-    .pagination {
-        display: flex;
-        justify-content: center;
-        gap: 5px;
-        margin-top: 20px;
-    }
-    .page-number, .page-nav {
-        padding: 8px 12px;
-        border: 1px solid #dee2e6;
-        background: white;
-        cursor: pointer;
-        border-radius: 4px;
-    }
-    .page-number.active {
-        background: #4361ee;
-        color: white;
-        border-color: #4361ee;
-    }
-    .page-number:hover, .page-nav:hover {
-        background: #e9ecef;
-    }
-    .page-nav:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .page-dots {
-        padding: 8px 12px;
-    }
-    .pagination-info {
-        text-align: right;
-        margin-top: 10px;
-        color: #6c757d;
-        font-size: 0.9rem;
-    }
-    .history-table th:nth-child(1) { width: 10%; }  /* No. Urut */
-    .history-table th:nth-child(2) { width: 15%; }  /* No. Permohonan */
-    .history-table th:nth-child(3) { width: 15%; }  /* Jenis Pengujian */
-    .history-table th:nth-child(4) { width: 25%; }  /* Proyek */
-    .history-table th:nth-child(5) { width: 12%; }  /* Tanggal */
-    .history-table th:nth-child(6) { width: 12%; }  /* Status */
-    .history-table th:nth-child(7) { width: 11%; }  /* Aksi */
-    
-    .text-monospace {
-        font-family: 'Courier New', monospace;
-        letter-spacing: 0.5px;
-    }
-</style>
+
 
 </main>
 <%- include('partials/footer') %>

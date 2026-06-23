@@ -38,12 +38,17 @@
         <!-- User Account -->
         <div class="account-dropdown ms-2">
             <div class="account-info">
-                <div class="account-details text-end d-none d-md-flex me-2">
-                    <span class="account-name"><%= locals.user?.full_name || 'Admin User' %></span>
-                    <span class="account-role text-primary"><%= locals.user?.role || 'Administrator' %></span>
-                </div>
                 <div class="account-avatar">
-                    <img src="https://ui-avatars.com/api/?name=Admin+User&background=047857&color=fff" class="avatar-image">
+                    <% 
+                        let adminAvatarSrc = "https://ui-avatars.com/api/?name=Admin+User&background=047857&color=fff";
+                        if (locals.user && locals.user.avatar) {
+                            adminAvatarSrc = locals.user.avatar.startsWith('http') ? locals.user.avatar : ('http://localhost:5000' + locals.user.avatar);
+                        } else if (locals.user && (locals.user.full_name || locals.user.name)) {
+                            const adminName = locals.user.full_name || locals.user.name;
+                            adminAvatarSrc = "https://ui-avatars.com/api/?name=" + encodeURIComponent(adminName) + "&background=047857&color=fff";
+                        }
+                    %>
+                    <img src="<%= adminAvatarSrc %>" class="avatar-image" alt="Admin Avatar">
                 </div>
             </div>
         </div>
@@ -72,18 +77,34 @@
         }
     }
     
-    function markAllAsRead() {
-        const list = document.getElementById('notificationList');
-        if (list) {
-            list.innerHTML = `
-                <div class="notification-empty">
-                    <i class="far fa-bell-slash"></i>
-                    <p>Tidak ada notifikasi baru</p>
-                </div>
-            `;
+    async function markAllAsRead() {
+        try {
+            let token = localStorage.getItem('token') || localStorage.getItem('admin_token');
+            if (!token) {
+                const tokenMatch = document.cookie.match(/token=([^;]+)/);
+                if (tokenMatch) token = tokenMatch[1];
+            }
+            if (!token) return;
             
-            const badge = document.querySelector('.notification-badge');
-            if (badge) badge.remove();
+            await fetch('http://localhost:5000/api/admin/notifications/mark-all-read', {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const list = document.getElementById('notificationList');
+            if (list) {
+                list.innerHTML = `
+                    <div class="notification-empty" style="padding: 20px; text-align: center; color: #94a3b8;">
+                        <i class="far fa-bell-slash" style="font-size: 24px; margin-bottom: 8px;"></i>
+                        <p style="margin: 0; font-size: 0.9rem;">Tidak ada notifikasi baru</p>
+                    </div>
+                `;
+                
+                const badge = document.querySelector('.notification-badge');
+                if (badge) badge.remove();
+            }
+        } catch (e) {
+            console.error("Error marking all as read:", e);
         }
     }
     
@@ -94,6 +115,81 @@
         
         if (wrapper && panel && !wrapper.contains(e.target) && panel.style.display === 'block') {
             panel.style.display = 'none';
+        }
+    });
+
+    // Fetch avatar & notifications dynamically
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const API_BASE_URL = 'http://localhost:5000/api';
+            // Get token from localStorage or cookie
+            let token = localStorage.getItem('token') || localStorage.getItem('admin_token');
+            if (!token) {
+                const tokenMatch = document.cookie.match(/token=([^;]+)/);
+                if (tokenMatch) token = tokenMatch[1];
+            }
+            if (!token) return;
+            
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // 1. Fetch Profile for Avatar
+            fetch(`${API_BASE_URL}/settings/profile`, { headers })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        const avatarSrc = data.data.avatar 
+                            ? (data.data.avatar.startsWith('http') ? data.data.avatar : `http://localhost:5000${data.data.avatar}`)
+                            : `https://ui-avatars.com/api/?name=${encodeURIComponent(data.data.full_name || data.data.name || 'Admin+User')}&background=047857&color=fff`;
+                        const avatars = document.querySelectorAll('.avatar-image');
+                        avatars.forEach(img => img.src = avatarSrc);
+                    }
+                }).catch(err => console.error("Error fetching avatar:", err));
+
+            // 2. Fetch True Admin Notifications
+            fetch(`${API_BASE_URL}/admin/notifications`, { headers })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        const notifications = data.data;
+                        const unreadNotifs = notifications.filter(n => !n.is_read);
+                        const list = document.getElementById('notificationList');
+                        
+                        if (notifications.length > 0) {
+                            list.innerHTML = notifications.slice(0, 10).map(act => `
+                                <a href="${act.href || '#'}" class="notification-item ${!act.is_read ? 'unread' : ''}" style="display: block; padding: 12px; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: inherit; ${!act.is_read ? 'background-color: #f8fafc;' : ''}">
+                                    <div style="font-weight: 600; font-size: 0.9rem; color: #1e293b;">${act.title}</div>
+                                    <div style="font-size: 0.85rem; color: #475569; margin: 4px 0;">${act.message}</div>
+                                </a>
+                            `).join('');
+                            
+                            // Update badge
+                            if (unreadNotifs.length > 0) {
+                                let badge = document.querySelector('.notification-badge');
+                                if (!badge) {
+                                    badge = document.createElement('span');
+                                    badge.className = 'notification-badge';
+                                    document.getElementById('notificationBtn').appendChild(badge);
+                                }
+                                badge.textContent = unreadNotifs.length > 9 ? '9+' : unreadNotifs.length;
+                            } else {
+                                const badge = document.querySelector('.notification-badge');
+                                if (badge) badge.remove();
+                            }
+                        } else {
+                            list.innerHTML = `
+                                <div class="notification-empty" style="padding: 20px; text-align: center; color: #94a3b8;">
+                                    <i class="far fa-bell-slash" style="font-size: 24px; margin-bottom: 8px;"></i>
+                                    <p style="margin: 0; font-size: 0.9rem;">Tidak ada notifikasi baru</p>
+                                </div>
+                            `;
+                            const badge = document.querySelector('.notification-badge');
+                            if (badge) badge.remove();
+                        }
+                    }
+                }).catch(err => console.error("Error fetching notifications:", err));
+
+        } catch (error) {
+            console.error("Error initializing top navbar:", error);
         }
     });
 </script>

@@ -239,17 +239,21 @@
             hasProofs = true;
             const fileUrl = buildProtectedFileUrl('payment', payment.bukti_pembayaran_1, token);
             html += `
-                <div class="document-item d-flex align-items-center p-2 mb-2 border rounded">
-                    <div class="doc-icon me-2">
-                        <i class="fas fa-file-pdf text-danger"></i>
-                    </div>
-                    <div class="doc-info flex-grow-1">
-                        <small>Bukti Pembayaran 1</small>
-                        ${payment.bukti_pembayaran_notes ? `<small class="text-muted d-block">Catatan: ${payment.bukti_pembayaran_notes}</small>` : ''}
-                    </div>
-                    <div class="doc-action">
-                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <div class="document-card p-3 border rounded mb-3">
+                    <div class="d-flex flex-column flex-xl-row gap-3 align-items-xl-center">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="bg-light rounded text-success d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 44px; height: 44px; border: 1px solid #dee2e6;">
+                                <i class="fas fa-file-invoice-dollar fs-4"></i>
+                            </div>
+                            <div>
+                                <span class="fw-bold d-block text-dark">Bukti Pembayaran 1</span>
+                                ${payment.bukti_pembayaran_notes ? `<small class="text-muted d-block mt-1" style="line-height: 1.4;">${payment.bukti_pembayaran_notes.replace(/\n/g, '<br>')}</small>` : ''}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-shrink-0 ms-xl-auto">
+                            <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-success">Buka</a>
+                            <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">Download</a>
+                        </div>
                     </div>
                 </div>
             `;
@@ -259,16 +263,20 @@
             hasProofs = true;
             const fileUrl = buildProtectedFileUrl('payment', payment.bukti_pembayaran_2, token);
             html += `
-                <div class="document-item d-flex align-items-center p-2 mb-2 border rounded">
-                    <div class="doc-icon me-2">
-                        <i class="fas fa-file-pdf text-danger"></i>
-                    </div>
-                    <div class="doc-info flex-grow-1">
-                        <small>Bukti Pembayaran 2</small>
-                    </div>
-                    <div class="doc-action">
-                        <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                        <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <div class="document-card p-3 border rounded mb-3">
+                    <div class="d-flex flex-column flex-xl-row gap-3 align-items-xl-center">
+                        <div class="d-flex align-items-center flex-grow-1">
+                            <div class="bg-light rounded text-success d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 44px; height: 44px; border: 1px solid #dee2e6;">
+                                <i class="fas fa-file-invoice-dollar fs-4"></i>
+                            </div>
+                            <div>
+                                <span class="fw-bold d-block text-dark">Bukti Pembayaran 2</span>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-shrink-0 ms-xl-auto">
+                            <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-success">Buka</a>
+                            <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">Download</a>
+                        </div>
                     </div>
                 </div>
             `;
@@ -286,8 +294,8 @@
             setText('status-doc-permohonan', '✅ Terupload');
             const fileUrl = buildProtectedFileUrl('surat', data.file_surat_permohonan, token);
             document.getElementById('action-doc-permohonan').innerHTML = `
-                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">Buka</a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary">Download</a>
             `;
         } else {
             setText('status-doc-permohonan', '❌ Belum diupload');
@@ -299,8 +307,8 @@
             setText('status-doc-ktp', '✅ Terupload');
             const fileUrl = buildProtectedFileUrl('ktp', data.file_ktp, token);
             document.getElementById('action-doc-ktp').innerHTML = `
-                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i> Buka</a>
-                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a>
+                <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">Buka</a>
+                <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-primary">Download</a>
             `;
         } else {
             setText('status-doc-ktp', '❌ Belum diupload');
@@ -332,10 +340,10 @@
             // 🔥 TAMPILKAN 2 TOMBOL: Preview dan Download
             actionLaporan.innerHTML = `
                 <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">
-                    <i class="fas fa-eye"></i> Preview
+                    Preview
                 </a>
                 <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">
-                    <i class="fas fa-download"></i> Download
+                    Download
                 </a>
             `;
             
@@ -372,17 +380,17 @@
                         <h6>Terima Kasih!</h6>
                         <p class="text-muted small mb-3">Anda telah mengisi kuisioner kepuasan untuk layanan ini.</p>
                         <button class="btn btn-outline-primary" onclick="window.downloadKuisionerPDF()">
-                            <i class="fas fa-download me-2"></i>Download Salinan Kuisioner
+                            Download Salinan Kuisioner
                         </button>
                     </div>
                 `;
                 
                 actionLaporan.innerHTML = `
                     <a href="#" onclick="window.openFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-outline-primary me-1">
-                        <i class="fas fa-eye"></i> Preview
+                        Preview
                     </a>
                     <a href="#" onclick="window.downloadFileWithToken('${fileUrl}', '${token}'); return false;" class="btn btn-sm btn-success">
-                        <i class="fas fa-download"></i> Download
+                        Download
                     </a>
                 `;
             }
@@ -517,24 +525,48 @@
         const timelineHtml = statuses.map((status, index) => {
             let statusClass = 'pending';
             let statusIcon = 'far fa-circle';
+            let statusText = '';
             
-            if (index < currentIndex) {
-                statusClass = 'completed';
-                statusIcon = 'fas fa-check-circle';
-            } else if (index === currentIndex) {
-                statusClass = 'current';
-                statusIcon = 'fas fa-spinner fa-pulse';
+            if (currentStatus === 'Selesai') {
+                if (index <= currentIndex) {
+                    statusClass = 'completed';
+                    statusIcon = 'fas fa-check-circle';
+                    statusText = '<small class="text-success d-block mt-1">Selesai</small>';
+                }
+            } else if (currentStatus === 'Dibatalkan') {
+                if (index === currentIndex) {
+                    statusClass = 'cancelled';
+                    statusIcon = 'fas fa-ban';
+                    statusText = '<small class="text-danger d-block mt-1">Dibatalkan</small>';
+                } else if (index < currentIndex) {
+                    statusClass = 'completed';
+                    statusIcon = 'fas fa-check-circle';
+                    statusText = '<small class="text-success d-block mt-1">Selesai</small>';
+                }
+            } else {
+                if (index < currentIndex) {
+                    statusClass = 'completed';
+                    statusIcon = 'fas fa-check-circle';
+                    statusText = '<small class="text-success d-block mt-1">Selesai</small>';
+                } else if (index === currentIndex) {
+                    statusClass = 'current';
+                    statusIcon = 'fas fa-spinner fa-pulse';
+                    statusText = '<small class="text-primary d-block mt-1">Sedang dalam proses</small>';
+                }
             }
+
+            const borderStyle = statusClass === 'completed' ? '#28a745' : statusClass === 'current' ? '#0d6efd' : statusClass === 'cancelled' ? '#dc3545' : '#e9ecef';
+            const iconColor = statusClass === 'current' ? 'text-primary' : statusClass === 'completed' ? 'text-success' : statusClass === 'cancelled' ? 'text-danger' : 'text-muted';
+            const titleColor = statusClass === 'current' ? 'text-primary' : statusClass === 'cancelled' ? 'text-danger' : '';
             
             return `
-                <div class="timeline-item ${statusClass} mb-3 ps-3" style="border-left: 2px solid ${statusClass === 'completed' ? '#28a745' : statusClass === 'current' ? '#0d6efd' : '#e9ecef'}; position: relative;">
+                <div class="timeline-item ${statusClass} mb-3 ps-3" style="border-left: 2px solid ${borderStyle}; position: relative;">
                     <div class="d-flex align-items-center" style="position: absolute; left: -11px; top: 0; background: white;">
-                        <i class="fas ${statusIcon} ${statusClass === 'current' ? 'text-primary' : statusClass === 'completed' ? 'text-success' : 'text-muted'}" style="font-size: 1.2rem; background: white;"></i>
+                        <i class="fas ${statusIcon} ${iconColor}" style="font-size: 1.2rem; background: white;"></i>
                     </div>
                     <div class="ms-3">
-                        <span class="fw-bold ${statusClass === 'current' ? 'text-primary' : ''}">${status.label}</span>
-                        ${index === currentIndex ? '<small class="text-primary d-block mt-1">Sedang dalam proses</small>' : ''}
-                        ${index < currentIndex ? '<small class="text-success d-block mt-1">Selesai</small>' : ''}
+                        <span class="fw-bold ${titleColor}">${status.label}</span>
+                        ${statusText}
                     </div>
                 </div>
             `;

@@ -1013,6 +1013,66 @@ const apiController = {
         }
     },
 
+    // ==================== ADMIN NOTIFICATIONS ====================
+    getAdminNotifications: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({ success: false, message: 'Forbidden' });
+            }
+
+            const [notifications] = await db.query(`
+                SELECT * FROM notifications 
+                WHERE user_id = 0 
+                ORDER BY created_at DESC 
+                LIMIT 50
+            `);
+
+            res.json({
+                success: true,
+                data: notifications
+            });
+
+        } catch (error) {
+            console.error('❌ Error getting admin notifications:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil notifikasi admin: ' + error.message
+            });
+        }
+    },
+
+    markAllAdminNotificationsRead: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({ success: false, message: 'Forbidden' });
+            }
+
+            await db.query(`UPDATE notifications SET is_read = 1 WHERE user_id = 0`);
+
+            res.json({
+                success: true,
+                message: 'Semua notifikasi admin telah ditandai dibaca'
+            });
+
+        } catch (error) {
+            console.error('❌ Error marking admin notifications read:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal menandai notifikasi: ' + error.message
+            });
+        }
+    },
+
     // ==================== GET SUBMISSIONS ====================
     getSubmissions: async (req, res) => {
         try {
@@ -1550,6 +1610,22 @@ const apiController = {
                 [userId, `Update status ke ${status}`]
             );
 
+            // Buat notifikasi ke user pemohon
+            const [subCheck] = await db.query('SELECT user_id, no_permohonan FROM submissions WHERE id = ?', [id]);
+            if (subCheck.length > 0 && subCheck[0].user_id) {
+                const subUserId = subCheck[0].user_id;
+                const noPermohonan = subCheck[0].no_permohonan || `APP-${id}`;
+                await db.query(
+                    `INSERT INTO notifications (user_id, title, message, href) VALUES (?, ?, ?, ?)`,
+                    [
+                        subUserId, 
+                        'Update Status Pengajuan', 
+                        `Status pengajuan ${noPermohonan} telah diperbarui menjadi: ${status}.`, 
+                        `/user/history/${id}`
+                    ]
+                );
+            }
+
             res.json({ success: true, message: 'Submission berhasil diupdate' });
 
         } catch (error) {
@@ -1769,6 +1845,22 @@ const apiController = {
                 [userId, `Upload Laporan Submission #${id}`, req.ip, req.headers['user-agent']]
             );
 
+            // Buat notifikasi ke user pemohon
+            const [subCheck] = await db.query('SELECT user_id, no_permohonan FROM submissions WHERE id = ?', [id]);
+            if (subCheck.length > 0 && subCheck[0].user_id) {
+                const subUserId = subCheck[0].user_id;
+                const noPermohonan = subCheck[0].no_permohonan || `APP-${id}`;
+                await db.query(
+                    `INSERT INTO notifications (user_id, title, message, href) VALUES (?, ?, ?, ?)`,
+                    [
+                        subUserId, 
+                        'Hasil Uji Selesai', 
+                        `Laporan hasil pengujian untuk ${noPermohonan} telah tersedia dan dapat diunduh.`, 
+                        `/user/history/${id}`
+                    ]
+                );
+            }
+
             res.json({
                 success: true,
                 message: 'Laporan berhasil diupload',
@@ -1833,6 +1925,52 @@ const apiController = {
                 success: false,
                 message: 'Gagal download laporan: ' + error.message
             });
+        }
+    },
+
+    // ==================== DELETE SUBMISSION REPORT ====================
+    deleteSubmissionReport: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+
+            if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+                return res.status(403).json({ success: false, message: 'Forbidden - Admin only' });
+            }
+
+            // Check if report exists
+            const [reports] = await db.query('SELECT file_laporan FROM test_reports WHERE submission_id = ?', [id]);
+            
+            if (reports.length === 0 || !reports[0].file_laporan) {
+                return res.status(404).json({ success: false, message: 'Laporan tidak ditemukan' });
+            }
+
+            const filename = reports[0].file_laporan;
+            const filepath = path.join(__dirname, '../../uploads/reports', filename);
+
+            // Delete the file from filesystem
+            if (fs.existsSync(filepath)) {
+                fs.unlinkSync(filepath);
+            }
+
+            // Update database to remove report file reference (or delete the row)
+            await db.query('DELETE FROM test_reports WHERE submission_id = ?', [id]);
+
+            // Catat aktivitas
+            await db.query(
+                `INSERT INTO activities (user_id, activity_name, ip_address, user_agent) 
+                VALUES (?, ?, ?, ?)`,
+                [userId, `Hapus Laporan Submission #${id}`, req.ip, req.headers['user-agent']]
+            );
+
+            res.json({ success: true, message: 'Laporan berhasil dihapus' });
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            res.status(500).json({ success: false, message: 'Gagal hapus laporan: ' + error.message });
         }
     },
 
@@ -2308,6 +2446,21 @@ const apiController = {
                 [userId, `Verifikasi pembayaran SKRD #${payment.no_invoice} sebesar Rp ${paid_amount}`]
             );
 
+            // Buat notifikasi ke user
+            const [subCheck] = await db.query('SELECT user_id FROM submissions WHERE id = ?', [payment.submission_id]);
+            if (subCheck.length > 0 && subCheck[0].user_id) {
+                const subUserId = subCheck[0].user_id;
+                await db.query(
+                    `INSERT INTO notifications (user_id, title, message, href) VALUES (?, ?, ?, ?)`,
+                    [
+                        subUserId, 
+                        'Pembayaran Diverifikasi', 
+                        `Pembayaran Anda untuk Tagihan ${payment.no_invoice} sebesar Rp ${parseFloat(paid_amount).toLocaleString('id-ID')} telah diverifikasi. Status: ${newStatus}.`, 
+                        `/user/transaction/${id}`
+                    ]
+                );
+            }
+
             // Ambil data terbaru
             const [updatedPayments] = await db.query(
                 'SELECT * FROM payments WHERE id = ?',
@@ -2473,6 +2626,7 @@ const apiController = {
             const [invoices] = await db.query(`
                 SELECT 
                     p.*,
+                    s.user_id,
                     s.nama_pemohon,
                     s.nama_instansi,
                     s.email_pemohon,
@@ -2528,6 +2682,20 @@ const apiController = {
                 VALUES (?, ?, NOW())`,
                 [userId, reminderNote]
             );
+
+            // Buat notifikasi untuk user
+            if (invoice.user_id) {
+                await db.query(
+                    `INSERT INTO notifications (user_id, title, message, href)
+                    VALUES (?, ?, ?, ?)`,
+                    [
+                        invoice.user_id,
+                        'Peringatan Pembayaran',
+                        `Silakan segera lakukan pembayaran untuk Tagihan (Invoice) ${invoice.no_invoice} sebesar ${formatRupiah(remainingAmount)}.`,
+                        `/user/transaction/${invoice.id}`
+                    ]
+                );
+            }
             
             // Jika email tersedia, kita bisa kirim (simulasi sukses)
             if (emailTo) {
@@ -2537,7 +2705,7 @@ const apiController = {
             
             res.json({
                 success: true,
-                message: emailTo ? 'Pengingat pembayaran berhasil dikirim' : 'Pengingat dicatat (email tidak tersedia)'
+                message: emailTo ? 'Pengingat pembayaran dan notifikasi berhasil dikirim' : 'Pengingat dicatat dan notifikasi dikirim'
             });
 
         } catch (error) {
@@ -4122,11 +4290,18 @@ const apiController = {
             `);
             
             // Format users
-            const formattedUsers = users.map(user => ({
-                ...user,
-                total_transactions: parseInt(user.total_transactions) || 0,
-                status: 'active'
-            }));
+            const formattedUsers = users.map(user => {
+                let avatarUrl = null;
+                if (user.avatar) {
+                    avatarUrl = user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`;
+                }
+                return {
+                    ...user,
+                    total_transactions: parseInt(user.total_transactions) || 0,
+                    status: 'active',
+                    avatar: avatarUrl
+                };
+            });
             
             res.json({
                 success: true,
@@ -5977,6 +6152,12 @@ const apiController = {
             // 10. LOG ACTIVITY & RESPONSE
             await db.query("INSERT INTO activities (user_id, activity_name, created_at) VALUES (?, 'create_submission', NOW())", [userId]);
             
+            // 11. NOTIFY ADMIN (user_id = 0)
+            await db.query(
+                `INSERT INTO notifications (user_id, title, message, href) VALUES (?, ?, ?, ?)`,
+                [0, 'Pengajuan Baru Masuk', `Ada pengajuan baru (${no_permohonan_final}) dari ${nama_instansi || nama_pemohon || 'Pelanggan'}`, `/admin/submissions`]
+            );
+
             console.log('✅ SUBMISSION SUCCESS:', submissionId, 'Qty:', finalQty);
             
             res.json({
@@ -6254,6 +6435,40 @@ const apiController = {
         }
     },
 
+    // ==================== GET USER NOTIFICATIONS ====================
+    getUserNotifications: async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized'
+                });
+            }
+            
+            // Ambil notifikasi dari db
+            const [notifications] = await db.query(`
+                SELECT * FROM notifications 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 50
+            `, [userId]);
+            
+            res.json({
+                success: true,
+                data: notifications
+            });
+            
+        } catch (error) {
+            console.error('❌ Error getting user notifications:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Gagal mengambil notifikasi: ' + error.message
+            });
+        }
+    },
+
     // ==================== GET USER TRANSACTION DETAIL ====================
     getUserTransactionDetail: async (req, res) => {
         try {
@@ -6480,6 +6695,12 @@ const apiController = {
             
             console.log('✅ Update result:', updateResult);
             console.log('✅ Payment proof uploaded successfully');
+            
+            // NOTIFY ADMIN (user_id = 0)
+            await db.query(
+                `INSERT INTO notifications (user_id, title, message, href) VALUES (?, ?, ?, ?)`,
+                [0, 'Bukti Pembayaran Diunggah', `Bukti pembayaran untuk Invoice ${check[0].no_invoice || '-'} telah diunggah`, `/admin/submissions`]
+            );
             
             res.json({
                 success: true,

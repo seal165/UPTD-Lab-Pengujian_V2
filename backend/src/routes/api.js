@@ -19,6 +19,10 @@ router.post('/auth/admin/login', apiController.adminLogin);
 
 // ==================== ADMIN DASHBOARD API ====================
 router.get('/admin/dashboard/stats', authMiddleware, apiController.getAdminDashboardStats);
+
+// Admin Notifications
+router.get('/admin/notifications', authMiddleware, apiController.getAdminNotifications);
+router.put('/admin/notifications/mark-all-read', authMiddleware, apiController.markAllAdminNotificationsRead);
 router.get('/dashboard/complete', authMiddleware, apiController.getDashboardData);
 
 // ==================== SUBMISSIONS API (ADMIN) ====================
@@ -46,6 +50,12 @@ router.post('/submissions/:id/report',
 router.get('/submissions/:id/report', 
     authMiddleware, 
     apiController.downloadSubmissionReport
+);
+
+// Hapus laporan hasil pengujian
+router.delete('/submissions/:id/report', 
+    authMiddleware, 
+    apiController.deleteSubmissionReport
 );
 
 // ==================== SKRD API ====================
@@ -198,10 +208,13 @@ router.get('/file/laporan/:filename', authMiddleware, apiController.getFile);
 // Akses file SKRD
 router.get('/file/skrd/:filename', authMiddleware, apiController.getFile);
 
-// Transactions (daftar transaksi)
+// Riwayat transaksi user
 router.get('/user/transactions', authMiddleware, apiController.getUserTransactions);
 
-// Transaction Detail
+// Ambil notifikasi spesifik user
+router.get('/user/notifications', authMiddleware, apiController.getUserNotifications);
+
+// Detail transaksi user
 router.get('/user/transactions/:id', authMiddleware, apiController.getUserTransactionDetail);
 
 // Upload payment proof

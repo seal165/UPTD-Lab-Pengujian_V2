@@ -78,55 +78,14 @@
     // ==================== UPDATE STATS ====================
     function updateStats(stats) {
         const statsHtml = `
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Total Pemohon</small>
-                            <h3 class="fw-bold mb-0">${stats.total || 0}</h3>
-                        </div>
-                        <div class="bg-primary-subtle p-2 rounded-circle">
-                            <i class="fas fa-users text-primary"></i>
-                        </div>
+            <div class="stats-card h-100">
+                <div class="d-flex justify-content-between align-items-center h-100">
+                    <div>
+                        <small class="text-muted d-block mb-1">Total Pemohon</small>
+                        <h3 class="fw-bold mb-0">${stats.total || 0}</h3>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Aktif</small>
-                            <h3 class="fw-bold mb-0 text-success">${stats.active || 0}</h3>
-                        </div>
-                        <div class="bg-success-subtle p-2 rounded-circle">
-                            <i class="fas fa-check-circle text-success"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Pending</small>
-                            <h3 class="fw-bold mb-0 text-warning">${stats.pending || 0}</h3>
-                        </div>
-                        <div class="bg-warning-subtle p-2 rounded-circle">
-                            <i class="fas fa-clock text-warning"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <small class="text-muted d-block">Perusahaan</small>
-                            <h3 class="fw-bold mb-0 text-info">${stats.companies || 0}</h3>
-                        </div>
-                        <div class="bg-info-subtle p-2 rounded-circle">
-                            <i class="fas fa-building text-info"></i>
-                        </div>
+                    <div class="bg-primary-subtle p-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="fas fa-users text-primary fs-5"></i>
                     </div>
                 </div>
             </div>
@@ -163,8 +122,13 @@
             const totalTrans = parseInt(user.total_transactions) || 0;
             
             // 🔥 AVATAR: tampilkan gambar jika ada, fallback ke inisial
-            const avatarHtml = user.avatar 
-                ? `<img src="${user.avatar}" class="avatar-img" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:white;border:2px solid #e9ecef;">`
+            let avatarUrl = user.avatar;
+            if (avatarUrl && !avatarUrl.startsWith('http') && avatarUrl !== 'null' && avatarUrl !== '') {
+                avatarUrl = avatarUrl.startsWith('/') ? `http://localhost:5000${avatarUrl}` : `http://localhost:5000/${avatarUrl}`;
+            }
+            
+            const avatarHtml = (avatarUrl && avatarUrl !== 'null' && avatarUrl !== '')
+                ? `<img src="${avatarUrl}" alt="${user.name}" class="avatar-img me-3 shadow-sm" style="width:40px;height:40px;border-radius:50%;object-fit:cover;background:white;border:2px solid #e9ecef;" onerror="this.outerHTML='<div class=\\'avatar-initials bg-primary-subtle me-3\\'>${initials}</div>'">`
                 : `<div class="avatar-initials bg-primary-subtle me-3">${initials}</div>`;
             
             return `
@@ -209,18 +173,18 @@
                     </td>
 
                     <td class="text-end pe-4">
-                        <div class="btn-group">
-                            <a href="/admin/users/${user.id}" class="btn btn-sm btn-light action-btn" title="Detail">
-                                <i class="fas fa-eye"></i>
+                        <div class="d-flex gap-3 justify-content-end align-items-center">
+                            <a href="/admin/users/${user.id}" class="text-secondary action-icon" title="Detail" style="font-size: 1.1rem; text-decoration: none;">
+                                <i class="fas fa-external-link-alt"></i>
                             </a>
                             
                             ${user.status === 'pending' ? `
-                                <button class="btn btn-sm btn-light text-success action-btn" title="Verifikasi" onclick="window.verifyUser('${user.id}')">
+                                <button class="text-success action-icon bg-transparent border-0 p-0" title="Verifikasi" onclick="window.verifyUser('${user.id}')" style="font-size: 1.1rem;">
                                     <i class="fas fa-check"></i>
                                 </button>
                             ` : ''}
                             
-                            <button class="btn btn-sm btn-light text-danger action-btn" title="Hapus" onclick="window.deleteUser('${user.id}')">
+                            <button class="text-danger action-icon bg-transparent border-0 p-0" title="Hapus" onclick="window.deleteUser('${user.id}')" style="font-size: 1.1rem;">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>

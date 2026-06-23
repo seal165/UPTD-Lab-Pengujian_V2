@@ -216,14 +216,14 @@
         const statsHtml = `
             <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
                 <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
-                    <div>
-                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Total Pendapatan</p>
-                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.income || 'Rp 0'}</h2>
+                    <div style="min-width: 0;">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase text-truncate" title="Total Pendapatan">Total Pendapatan</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark text-nowrap" style="font-size: clamp(1.1rem, 1.4vw, 1.65rem);" title="${stats.income || 'Rp 0'}">${stats.income || 'Rp 0'}</h2>
                         <span class="badge badge-soft-success mt-2 admin-kpi-chip">
                             <i class="fas fa-chart-line me-1"></i>Bulan ini
                         </span>
                     </div>
-                    <div class="bg-success-subtle rounded-circle text-success admin-kpi-icon-wrap">
+                    <div class="bg-success-subtle rounded-circle text-success admin-kpi-icon-wrap ms-2">
                         <i class="fas fa-rupiah-sign fa-lg"></i>
                     </div>
                 </div>
@@ -231,15 +231,15 @@
 
             <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
                 <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
-                    <div>
-                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Menunggu Verifikasi</p>
-                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.pending || 0}</h2>
+                    <div style="min-width: 0;">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase text-truncate" title="Menunggu Verifikasi">Menunggu Verifikasi</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark text-nowrap">${stats.pending || 0}</h2>
                         ${stats.pending > 0 ? 
-                            '<span class="badge badge-soft-warning mt-2 admin-kpi-chip"><i class="fas fa-exclamation-circle me-1"></i>Perlu Tindakan</span>' : 
-                            '<span class="badge badge-soft-success mt-2 admin-kpi-chip"><i class="fas fa-check me-1"></i>Tidak Ada</span>'
+                            '<span class="badge badge-soft-warning mt-2 admin-kpi-chip text-nowrap"><i class="fas fa-exclamation-circle me-1"></i>Perlu Tindakan</span>' : 
+                            '<span class="badge badge-soft-success mt-2 admin-kpi-chip text-nowrap"><i class="fas fa-check me-1"></i>Tidak Ada</span>'
                         }
                     </div>
-                    <div class="bg-warning-subtle rounded-circle text-warning admin-kpi-icon-wrap">
+                    <div class="bg-warning-subtle rounded-circle text-warning admin-kpi-icon-wrap ms-2">
                         <i class="far fa-clock fa-lg"></i>
                     </div>
                 </div>
@@ -247,14 +247,14 @@
 
             <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
                 <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
-                    <div>
-                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Pengujian Selesai</p>
-                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.completed || 0}</h2>
-                        <span class="badge badge-soft-primary mt-2 admin-kpi-chip">
+                    <div style="min-width: 0;">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase text-truncate" title="Pengujian Selesai">Pengujian Selesai</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark text-nowrap">${stats.completed || 0}</h2>
+                        <span class="badge badge-soft-primary mt-2 admin-kpi-chip text-nowrap">
                             <i class="fas fa-flask me-1"></i>Total
                         </span>
                     </div>
-                    <div class="bg-primary-subtle rounded-circle text-primary admin-kpi-icon-wrap">
+                    <div class="bg-primary-subtle rounded-circle text-primary admin-kpi-icon-wrap ms-2">
                         <i class="fas fa-check-double fa-lg"></i>
                     </div>
                 </div>
@@ -262,14 +262,14 @@
 
             <div class="col-xxl-3 col-xl-6 col-md-6 admin-kpi-col fade-in">
                 <div class="card-custom admin-kpi-card d-flex flex-row justify-content-between align-items-center h-100">
-                    <div>
-                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase">Menunggu Bayar</p>
-                        <h2 class="admin-kpi-value fw-bold m-0 text-dark">${stats.awaitingPayment || 0}</h2>
-                        <span class="badge badge-soft-danger mt-2 admin-kpi-chip">
+                    <div style="min-width: 0;">
+                        <p class="admin-kpi-title text-muted mb-1 small fw-bold text-uppercase text-truncate" title="Menunggu Bayar">Menunggu Bayar</p>
+                        <h2 class="admin-kpi-value fw-bold m-0 text-dark text-nowrap">${stats.awaitingPayment || 0}</h2>
+                        <span class="badge badge-soft-danger mt-2 admin-kpi-chip text-nowrap">
                             <i class="fas fa-credit-card me-1"></i>Belum Lunas
                         </span>
                     </div>
-                    <div class="bg-danger-subtle rounded-circle text-danger admin-kpi-icon-wrap">
+                    <div class="bg-danger-subtle rounded-circle text-danger admin-kpi-icon-wrap ms-2">
                         <i class="far fa-credit-card fa-lg"></i>
                     </div>
                 </div>

@@ -50,7 +50,7 @@
 
         if (initialSubmissions.length > 0) {
             renderTable(initialSubmissions);
-            updatePaginationInfo(initialPagination);
+            updatePagination(initialPagination);
         } else {
             loadSubmissions();
         }
@@ -178,8 +178,8 @@
                         </span>
                     </td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewDetail(${sub.id}); event.stopPropagation();">
-                            <i class="fas fa-eye"></i>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="viewDetail(${sub.id}); event.stopPropagation();">
+                            <i class="fas fa-external-link-alt"></i>
                         </button>
                     </td>
                 </tr>
@@ -265,43 +265,64 @@
 
     // ==================== UPDATE PAGINATION ====================
     function updatePagination(data) {
-        const totalPages = data.totalPages || 1;
+        const itemsTotal = parseInt(data && data.total ? data.total : totalData) || 0;
+        const totalPages = Math.ceil(itemsTotal / ITEMS_PER_PAGE);
         const pagination = document.getElementById('pagination');
+        const paginationInfo = document.getElementById('paginationInfo');
         
-        if (!pagination) return;
+        console.log('🔄 Memperbarui paginasi:', { itemsTotal, totalPages, currentPage });
+        
+        if (!pagination) {
+            console.error('❌ Elemen pagination tidak ditemukan!');
+            return;
+        }
         
         if (totalPages <= 1) {
             pagination.innerHTML = '';
+            if (paginationInfo) {
+                paginationInfo.innerHTML = `Menampilkan ${itemsTotal} data`;
+            }
             return;
         }
 
+        const currPage = parseInt(currentPage) || 1;
         let html = '';
         
-        if (currentPage > 1) {
-            html += `<li class="page-item"><a class="page-link" href="#" onclick="window.changePage(${currentPage - 1})"><i class="fas fa-chevron-left"></i></a></li>`;
-        }
+        html += `
+            <li class="page-item ${currPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="window.changePage(${currPage - 1})">
+                    Prev
+                </a>
+            </li>
+        `;
         
         for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                html += `<li class="page-item ${currentPage === i ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="window.changePage(${i})">${i}</a>
-                </li>`;
-            } else if (i === currentPage - 3 || i === currentPage + 3) {
+            if (i === 1 || i === totalPages || (i >= currPage - 2 && i <= currPage + 2)) {
+                html += `
+                    <li class="page-item ${currPage === i ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="window.changePage(${i})">${i}</a>
+                    </li>
+                `;
+            } else if (i === currPage - 3 || i === currPage + 3) {
                 html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
             }
         }
         
-        if (currentPage < totalPages) {
-            html += `<li class="page-item"><a class="page-link" href="#" onclick="window.changePage(${currentPage + 1})"><i class="fas fa-chevron-right"></i></a></li>`;
-        }
+        html += `
+            <li class="page-item ${currPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="window.changePage(${currPage + 1})">
+                    Next
+                </a>
+            </li>
+        `;
         
+        console.log('📝 HTML Paginasi generated:', html);
         pagination.innerHTML = html;
         
-        const paginationInfo = document.getElementById('paginationInfo');
         if (paginationInfo) {
-            const start = ((currentPage - 1) * ITEMS_PER_PAGE) + 1;
-            const end = Math.min(currentPage * ITEMS_PER_PAGE, data.total);
-            paginationInfo.innerHTML = `Menampilkan ${start}-${end} dari ${data.total} data`;
+            const start = ((currPage - 1) * ITEMS_PER_PAGE) + 1;
+            const end = Math.min(currPage * ITEMS_PER_PAGE, itemsTotal);
+            paginationInfo.innerHTML = `Menampilkan ${start}-${end} dari ${itemsTotal} data`;
         }
     }
 

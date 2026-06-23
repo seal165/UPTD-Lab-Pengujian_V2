@@ -337,9 +337,10 @@ async function collectNotificationsFromApi() {
     const apiBase = 'http://localhost:5000/api';
     const headers = { Authorization: `Bearer ${token}` };
 
-    const [historyResult, transactionResult] = await Promise.allSettled([
+    const [historyResult, transactionResult, notifResult] = await Promise.allSettled([
         fetch(`${apiBase}/user/history`, { headers }),
-        fetch(`${apiBase}/user/transactions`, { headers })
+        fetch(`${apiBase}/user/transactions`, { headers }),
+        fetch(`${apiBase}/user/notifications`, { headers })
     ]);
 
     const notifications = [];
@@ -361,6 +362,24 @@ async function collectNotificationsFromApi() {
             records.forEach((item) => notifications.push(buildTransactionNotification(item)));
         } catch (error) {
             console.warn('Failed to parse transaction notifications:', error);
+        }
+    }
+
+    if (notifResult.status === 'fulfilled' && notifResult.value.ok) {
+        try {
+            const json = await notifResult.value.json();
+            const records = Array.isArray(json.data) ? json.data : [];
+            records.forEach((item) => {
+                notifications.push({
+                    id: `db-notif-${item.id}`,
+                    title: item.title,
+                    message: item.message,
+                    time: item.created_at,
+                    href: item.href || '#'
+                });
+            });
+        } catch (error) {
+            console.warn('Failed to parse db notifications:', error);
         }
     }
 
