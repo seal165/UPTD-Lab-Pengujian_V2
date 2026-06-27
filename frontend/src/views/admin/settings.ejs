@@ -2,94 +2,7 @@
 <html lang="id">
 <head>
     <%- include('partials/head') %>
-    <style>
-        /* Perbaikan input di halaman Settings agar terlihat */
-        #settingsContent .input-group input,
-        #settingsContent .input-group select,
-        #settingsContent .input-group textarea {
-            flex: 1 1 auto !important;
-            min-width: 0 !important;
-        }
 
-        #security-section .input-group input[type="password"],
-        #security-section .input-group input[type="text"],
-        #security-section .input-group input[type="email"] {
-            background: white !important;
-            color: #1e293b !important;
-            padding: 10px 14px !important;
-            border: 1.5px solid #d1d5db !important;
-            border-radius: 8px 0 0 8px !important;
-            font-size: 14px !important;
-            height: auto !important;
-            flex: 1 1 auto !important;
-            min-width: 0 !important;
-        }
-
-        #security-section .input-group .btn-outline-secondary {
-            border-radius: 0 8px 8px 0 !important;
-            background: #f1f5f9 !important;
-            border: 1.5px solid #d1d5db !important;
-            border-left: none !important;
-            color: #1e293b !important;
-            padding: 10px 14px !important;
-        }
-
-        #security-section .input-group .btn-outline-secondary:hover {
-            background: #e2e8f0 !important;
-        }
-
-        #security-section .form-label {
-            font-weight: 600 !important;
-            color: #1e293b !important;
-            margin-bottom: 4px !important;
-            font-size: 14px !important;
-            display: block !important;
-        }
-
-        #security-section .password-strength {
-            width: 100% !important;
-            height: 5px !important;
-            border-radius: 4px !important;
-            background: #e2e8f0 !important;
-            transition: background 0.3s !important;
-            margin-top: 6px !important;
-        }
-
-        #security-section #passwordHint,
-        #security-section #passwordMatchHint {
-            font-size: 12px !important;
-            color: #64748b !important;
-            margin-top: 4px !important;
-            display: block !important;
-        }
-
-        #security-section .btn-primary {
-            background-color: #2563eb !important;
-            border-color: #2563eb !important;
-            font-weight: 600 !important;
-            padding: 10px 30px !important;
-            border-radius: 8px !important;
-            transition: all 0.2s !important;
-        }
-
-        #security-section .btn-primary:hover {
-            background-color: #1d4ed8 !important;
-            border-color: #1d4ed8 !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(37,99,235,0.25) !important;
-        }
-
-        @media (max-width: 768px) {
-            #security-section .row.g-3 {
-                flex-direction: column !important;
-            }
-            #security-section .col-md-6 {
-                width: 100% !important;
-                flex: 0 0 100% !important;
-                max-width: 100% !important;
-            }
-        }
-    </style>
 </head>
 <body>
     
@@ -224,7 +137,7 @@
                         <form id="passwordForm" onsubmit="changePassword(event)">
                             <!-- Password Saat Ini -->
                             <div class="mb-3">
-                                <label class="form-label fw-bold text-muted">Password Saat Ini</label>
+                                <label class="form-label small fw-bold text-muted">Password Saat Ini <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <input type="password" class="form-control bg-white" id="currentPassword" 
                                         placeholder="Masukkan password lama..." required>
@@ -237,7 +150,7 @@
                             <!-- Password Baru & Konfirmasi -->
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold text-muted">Password Baru</label>
+                                    <label class="form-label small fw-bold text-muted">Password Baru <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="password" class="form-control bg-white" id="newPassword" 
                                             placeholder="Minimal 8 karakter" oninput="checkPasswordStrength()" required>
@@ -249,7 +162,7 @@
                                     <small class="text-muted" id="passwordHint"></small>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold text-muted">Konfirmasi Password Baru</label>
+                                    <label class="form-label small fw-bold text-muted">Konfirmasi Password Baru <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="password" class="form-control bg-white" id="confirmPassword" 
                                             placeholder="Ulangi password baru" oninput="checkPasswordMatch()" required>
@@ -261,7 +174,7 @@
                                 </div>
                             </div>
 
-                            <div class="text-end mt-4">
+                            <div class="text-end mt-3">
                                 <button type="submit" class="btn btn-primary px-4" id="changePasswordBtn">
                                     <span id="changePasswordText">Update Password</span>
                                     <span id="changePasswordSpinner" style="display: none;">
@@ -299,11 +212,6 @@
                                     <label class="form-label small fw-bold text-muted">Email Kantor</label>
                                     <input type="email" class="form-control" id="officeEmail">
                                 </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label small fw-bold text-muted">Website</label>
-                                <input type="url" class="form-control" id="website">
                             </div>
 
                             <div class="row align-items-center bg-light p-3 rounded-3 mx-0 mb-3">

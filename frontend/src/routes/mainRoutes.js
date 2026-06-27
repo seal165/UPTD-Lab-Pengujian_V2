@@ -4,6 +4,8 @@ const pageController = require('../controllers/pageController');
 const authMiddleware = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
+const globalSettings = require('../middleware/globalSettings');
+const checkUploadSize = require('../middleware/checkUploadSize');
 
 // Konfigurasi storage untuk upload file
 const storage = multer.diskStorage({
@@ -51,10 +53,12 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage: storage,
     limits: { 
-        fileSize: 5 * 1024 * 1024
+        fileSize: 50 * 1024 * 1024
     },
     fileFilter: fileFilter
 });
+
+router.use(globalSettings);
 
 // ==================== HALAMAN PUBLIK ====================
 router.get('/', pageController.getLandingPage || pageController.getHomePage);
@@ -101,11 +105,7 @@ router.get('/user/dashboard', authMiddleware.verifyUserAccess, pageController.us
 router.get('/user/submission', authMiddleware.verifyUserAccess, pageController.userSubmission);
 router.post('/user/submission', 
     authMiddleware.verifyUserAccess,
-    upload.fields([
-        { name: 'surat_permohonan', maxCount: 1 },
-        { name: 'scan_ktp', maxCount: 1 },
-        { name: 'lampiran_pendukung', maxCount: 1 }
-    ]), 
+    upload.fields([]), checkUploadSize, 
     pageController.postSubmission
 );
 router.get('/user/history', authMiddleware.verifyUserAccess, pageController.userHistory);
@@ -114,7 +114,7 @@ router.get('/user/transaction', authMiddleware.verifyUserAccess, pageController.
 router.get('/user/transaction/:id', authMiddleware.verifyUserAccess, pageController.userTransactionDetail);
 router.post('/user/transaction/:id/upload', 
     authMiddleware.verifyUserAccess,
-    upload.single('payment_proof'),
+    upload.single(''), checkUploadSize,
     pageController.uploadPaymentProof
 );
 router.get('/user/profile', authMiddleware.verifyUserAccess, pageController.userProfile);

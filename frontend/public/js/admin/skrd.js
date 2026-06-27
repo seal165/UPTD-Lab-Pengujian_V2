@@ -389,18 +389,15 @@
         }
 
         // STATUS FILTER - langsung pakai status dari database
-        document.querySelectorAll('#statusFilter .dropdown-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const status = e.target.dataset.status;
-                currentStatus = status;
-                const selectedText = e.target.textContent;
-                document.getElementById('selectedFilter').innerHTML = selectedText;
+        const statusSelect = document.getElementById('statusSelect');
+        if (statusSelect) {
+            statusSelect.addEventListener('change', (e) => {
+                currentStatus = e.target.value;
                 currentPage = 1;
                 loadInvoices(true);
-                console.log('📊 Filter status:', status);
+                console.log('📊 Filter status:', currentStatus);
             });
-        });
+        }
 
         // TANGGAL FILTER
         const startDateFilter = document.getElementById('startDateFilter');

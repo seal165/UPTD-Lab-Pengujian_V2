@@ -13,20 +13,17 @@
         <div style="display: flex; flex-direction: column; gap: 12px; min-width: 280px;">
             <div style="display: flex; gap: 12px;">
                 <i class="fas fa-map-marker-alt" style="margin-top: 4px; color: #e11d48; width: 16px; text-align: center;"></i> 
-                <span style="font-size: 0.9rem; color: #475569; line-height: 1.5;">
-                    Jalan Bhayangkara No.21, Cipocok Jaya,<br>
-                    Serang, Banten - 42118
-                </span>
+                <span style="font-size: 0.9rem; color: #475569; line-height: 1.5; white-space: pre-line;"><%= locals.settings && locals.settings.address ? locals.settings.address : 'Jalan Bhayangkara No.21, Cipocok Jaya,\nSerang, Banten - 42118' %></span>
             </div>
             
             <div style="display: flex; align-items: center; gap: 12px;">
                 <i class="fas fa-phone" style="color: #2563eb; width: 16px; text-align: center;"></i> 
-                <span style="font-size: 0.9rem; color: #475569;">0877-7698-1959</span>
+                <span style="font-size: 0.9rem; color: #475569;"><%= locals.settings && locals.settings.office_phone ? locals.settings.office_phone : '0877-7698-1959' %></span>
             </div>
             
             <div style="display: flex; align-items: center; gap: 12px;">
                 <i class="fas fa-envelope" style="color: #64748b; width: 16px; text-align: center;"></i> 
-                <span style="font-size: 0.9rem; color: #475569;">puprlab@gmail.com</span>
+                <span style="font-size: 0.9rem; color: #475569;"><%= locals.settings && locals.settings.office_email ? locals.settings.office_email : 'puprlab@gmail.com' %></span>
             </div>
         </div>
 

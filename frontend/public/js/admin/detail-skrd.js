@@ -164,7 +164,7 @@
         const namaPemohon = data.nama_instansi || data.nama_pemohon || '....................................';
         const alamat = data.alamat || '....................................';
         const telepon = data.nomor_telepon || '....................................';
-        const kodePengujian = data.no_permohonan || '....................................';
+        const kodePengujian = '....................................';
         
         const printContent = `
         <!DOCTYPE html>
@@ -229,7 +229,7 @@
                 </table>
 
                 <div class="doc-num-section">
-                    Nomor : _______________________________
+                    Nomor : ${data.no_permohonan || data.registration_number || '_______________________________'}
                 </div>
 
                 <div class="info-section">

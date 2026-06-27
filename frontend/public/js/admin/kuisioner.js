@@ -682,9 +682,21 @@
             ];
             
             const rows = data.map((item, index) => {
+                let answers = {};
+                try {
+                    answers = typeof item.jawaban_json === 'string' ? JSON.parse(item.jawaban_json) : (item.jawaban_json || {});
+                } catch (e) {
+                    console.error('Error parsing jawaban_json', e);
+                }
+
                 const nilaiList = [];
                 for (let i = 1; i <= kriteriaList.length; i++) {
-                    nilaiList.push(item[`skor_${i}`] || '');
+                    const keyList = Object.keys(answers);
+                    if (i <= keyList.length) {
+                        nilaiList.push(answers[keyList[i - 1]] || '');
+                    } else {
+                        nilaiList.push(item[`skor_${i}`] || '');
+                    }
                 }
                 
                 const validNilai = nilaiList.filter(n => n !== '');
@@ -692,6 +704,9 @@
                     ? (validNilai.reduce((a, b) => parseInt(a) + parseInt(b), 0) / validNilai.length).toFixed(1)
                     : '-';
                 
+                // Escape quotes untuk mencegah string terpotong di CSV
+                const saranStr = String(item.saran || '').replace(/"/g, '""');
+
                 return [
                     index + 1,
                     item.nama_pemohon || '',
@@ -699,7 +714,7 @@
                     item.nomor_telepon || '',
                     ...nilaiList,
                     rataRata,
-                    item.saran || '',
+                    saranStr,
                     formatDate(item.created_at)
                 ];
             });

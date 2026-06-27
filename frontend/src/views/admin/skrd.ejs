@@ -68,22 +68,19 @@
                         </div>
                         
                         <!-- Filter Status -->
-                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill dropdown">
-                            <button class="btn btn-sm text-muted dropdown-toggle shadow-none border-0 px-0 py-0 m-0 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.85rem; width: 115px; text-align: left; display: flex; justify-content: space-between; align-items: center;">
-                                <span id="selectedFilter">Semua Status</span>
-                            </button>
-                            <ul class="dropdown-menu shadow-sm border-0" id="statusFilter" style="font-size: 0.85rem;">
-                                <li><a class="dropdown-item" href="#" data-status="">Semua Status</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Menunggu Verifikasi">Menunggu Verifikasi</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Pengecekan Sampel">Pengecekan Sampel</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Belum Bayar">Belum Bayar</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Menunggu SKRD Upload">Menunggu SKRD</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Belum Lunas">Belum Lunas</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Lunas">Lunas</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Sedang Diuji">Sedang Diuji</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Selesai">Selesai</a></li>
-                                <li><a class="dropdown-item" href="#" data-status="Dibatalkan">Dibatalkan</a></li>
-                            </ul>
+                        <div class="d-flex align-items-center bg-white rounded-pill shadow-sm px-3 filter-pill">
+                            <select class="form-select form-select-sm bg-transparent border-0 shadow-none text-muted ps-0 py-0 m-0" id="statusSelect" style="width: 150px; cursor: pointer; font-size: 0.85rem;" onchange="applyFilter()">
+                                <option value="">Semua Status</option>
+                                <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
+                                <option value="Pengecekan Sampel">Pengecekan Sampel</option>
+                                <option value="Belum Bayar">Belum Bayar</option>
+                                <option value="Menunggu SKRD Upload">Menunggu SKRD</option>
+                                <option value="Belum Lunas">Belum Lunas</option>
+                                <option value="Lunas">Lunas</option>
+                                <option value="Sedang Diuji">Sedang Diuji</option>
+                                <option value="Selesai">Selesai</option>
+                                <option value="Dibatalkan">Dibatalkan</option>
+                            </select>
                         </div>
 
                         <!-- Export Button -->

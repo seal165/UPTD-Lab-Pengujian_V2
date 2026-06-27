@@ -123,7 +123,7 @@
         document.getElementById('officeAddress').value = data.address || '';
         document.getElementById('officePhone').value = data.phone || '';
         document.getElementById('officeEmail').value = data.email || '';
-        document.getElementById('website').value = data.website || '';
+        
         document.getElementById('maintenanceMode').checked = data.maintenance_mode || false;
         document.getElementById('maxUploadSize').value = data.max_upload_size || '5';
     }
@@ -356,7 +356,7 @@
             address: document.getElementById('officeAddress').value,
             phone: document.getElementById('officePhone').value,
             email: document.getElementById('officeEmail').value,
-            website: document.getElementById('website').value,
+            
             maintenance_mode: document.getElementById('maintenanceMode').checked,
             max_upload_size: parseInt(document.getElementById('maxUploadSize').value)
         };
@@ -418,9 +418,36 @@
 
     // Toggle mode sibuk
     if (document.getElementById('busyModeToggle')) {
-        document.getElementById('busyModeToggle').addEventListener('change', function(e) {
-            busyModeActive = e.target.checked;
-            document.getElementById('busyPeriodContainer').style.display = busyModeActive ? 'block' : 'none';
+        document.getElementById('busyModeToggle').addEventListener('change', async function(e) {
+            const isActive = e.target.checked;
+            busyModeActive = isActive;
+            document.getElementById('busyPeriodContainer').style.display = isActive ? 'block' : 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/settings/busy-mode`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ active: isActive })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Status mode sibuk berhasil diperbarui', 'success');
+                } else {
+                    showAlert('Gagal memperbarui status mode sibuk', 'danger');
+                    // Revert toggle
+                    e.target.checked = !isActive;
+                    busyModeActive = !isActive;
+                    document.getElementById('busyPeriodContainer').style.display = busyModeActive ? 'block' : 'none';
+                }
+            } catch (error) {
+                console.error('Error updating busy mode:', error);
+                showAlert('Terjadi kesalahan', 'danger');
+                // Revert toggle
+                e.target.checked = !isActive;
+                busyModeActive = !isActive;
+                document.getElementById('busyPeriodContainer').style.display = busyModeActive ? 'block' : 'none';
+            }
         });
     }
 
