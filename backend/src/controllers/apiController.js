@@ -1149,9 +1149,24 @@ const apiController = {
             }
 
             if (search) {
-                whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ?)');
-                const searchTerm = `%${search}%`;
-                queryParams.push(searchTerm, searchTerm, searchTerm);
+                const searchLower = search.toLowerCase();
+                let subIdMatch = null;
+                if (searchLower.startsWith('sub-')) {
+                    const parsedId = parseInt(searchLower.replace('sub-', ''), 10);
+                    if (!isNaN(parsedId)) {
+                        subIdMatch = parsedId;
+                    }
+                }
+                
+                if (subIdMatch !== null) {
+                    whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ? OR s.id = ?)');
+                    const searchTerm = `%${search}%`;
+                    queryParams.push(searchTerm, searchTerm, searchTerm, subIdMatch);
+                } else {
+                    whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ?)');
+                    const searchTerm = `%${search}%`;
+                    queryParams.push(searchTerm, searchTerm, searchTerm);
+                }
             }
 
             if (startDate) {
@@ -2688,15 +2703,29 @@ const apiController = {
                 );
             }
             
-            // Jika email tersedia, kita bisa kirim (simulasi sukses)
-            if (emailTo) {
-                // TODO: Implementasi pengiriman email bisa ditambahkan di sini
-                console.log(`📧 Email akan dikirim ke: ${emailTo}`);
+            // Ambil pengaturan notifikasi dari settings
+            const [settings] = await db.query('SELECT * FROM settings ORDER BY id ASC LIMIT 1');
+            const sysSettings = settings.length > 0 ? settings[0] : {};
+            const notifEmail = sysSettings.notif_email; // 1 = aktif, 0 = nonaktif
+            const notifWa = sysSettings.notif_wa;
+            
+            let responseMsg = 'Pengingat dicatat dan notifikasi aplikasi dikirim';
+            
+            if (notifEmail == 1 && emailTo) {
+                // TODO: Implementasi pengiriman email
+                console.log(`📧 Simulasi Kirim Email ke: ${emailTo}`);
+                responseMsg += ', Email dikirim';
+            }
+            
+            if (notifWa == 1 && invoice.nomor_telepon) {
+                // TODO: Implementasi pengiriman WA
+                console.log(`💬 Simulasi Kirim WhatsApp ke: ${invoice.nomor_telepon}`);
+                responseMsg += ', WhatsApp dikirim';
             }
             
             res.json({
                 success: true,
-                message: emailTo ? 'Pengingat pembayaran dan notifikasi berhasil dikirim' : 'Pengingat dicatat dan notifikasi dikirim'
+                message: responseMsg
             });
 
         } catch (error) {

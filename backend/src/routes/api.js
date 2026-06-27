@@ -2,9 +2,13 @@ const express = require('express');
 const router = express.Router();
 const apiController = require('../controllers/apiController');
 const upload = require('../config/multer');
+const globalSettings = require('../middleware/globalSettings');
+const checkUploadSize = require('../middleware/checkUploadSize');
 const authMiddleware = require('../middleware/auth');
 const path = require('path');
 const fs = require('fs');
+
+router.use(globalSettings);
 
 // ==================== PUBLIC API (TIDAK PERLU AUTH) ====================
 router.get('/services', apiController.getServices);
@@ -36,13 +40,13 @@ router.post('/submissions/:id/cancel', authMiddleware, apiController.cancelSubmi
 router.post('/submissions', authMiddleware, upload.fields([
     { name: 'surat_permohonan', maxCount: 1 },
     { name: 'ktp', maxCount: 1 }
-]), apiController.createSubmission);
+]), checkUploadSize, apiController.createSubmission);
 
 // ==================== SUBMISSION REPORTS API ====================
 // Upload laporan hasil pengujian
 router.post('/submissions/:id/report', 
     authMiddleware, 
-    upload.single('laporan'), 
+    upload.single('laporan'), checkUploadSize, 
     apiController.uploadSubmissionReport
 );
 
@@ -64,7 +68,7 @@ router.get('/skrd/:id', authMiddleware, apiController.getSKRDDetail);
 router.post('/skrd', authMiddleware, apiController.createSKRD);
 router.put('/skrd/:id/status', authMiddleware, apiController.updateSKRDStatus);
 router.post('/skrd/:id/verify-payment', authMiddleware, apiController.verifyPayment);
-router.post('/skrd/:id/upload-skrd', authMiddleware, upload.single('skrd'), apiController.uploadSkrd);  // ⚠️ PERHATIKAN: 'skrd' sebagai field name
+router.post('/skrd/:id/upload-skrd', authMiddleware, upload.single('skrd'), checkUploadSize, apiController.uploadSkrd);  // ⚠️ PERHATIKAN: 'skrd' sebagai field name
 router.post('/skrd/:id/reject-proof', authMiddleware, apiController.rejectProof);
 router.post('/skrd/:id/remind', authMiddleware, apiController.sendPaymentReminder);
 router.post('/skrd/:id/cancel', authMiddleware, apiController.cancelInvoice);
@@ -126,7 +130,7 @@ router.get('/reports', authMiddleware, apiController.getReports);
 // Profile settings
 router.get('/settings/profile', authMiddleware, apiController.getProfileSettings);
 router.put('/settings/profile', authMiddleware, apiController.updateProfile);
-router.post('/settings/profile/avatar', authMiddleware, upload.single('avatar'), apiController.uploadAvatar);
+router.post('/settings/profile/avatar', authMiddleware, upload.single('avatar'), checkUploadSize, apiController.uploadAvatar);
 router.delete('/settings/profile/avatar', authMiddleware, apiController.deleteAvatar);
 
 // Password
@@ -160,7 +164,7 @@ router.get('/backups/:filename', authMiddleware, async (req, res) => {
     }
 });
 router.post('/settings/backup', authMiddleware, apiController.createBackup);
-router.post('/settings/restore', authMiddleware, upload.single('backup_file'), apiController.restoreBackup);
+router.post('/settings/restore', authMiddleware, upload.single('backup_file'), checkUploadSize, apiController.restoreBackup);
 
 // Activity logs
 router.get('/settings/logs', authMiddleware, apiController.getActivityLogs);
@@ -184,7 +188,7 @@ router.post('/user/submission',
         { name: 'surat_permohonan', maxCount: 1 },
         { name: 'scan_ktp', maxCount: 1 },
         { name: 'lampiran_pendukung', maxCount: 1 }
-    ]), 
+    ]), checkUploadSize, 
     apiController.createSubmission
 );
 
@@ -225,7 +229,7 @@ router.get('/user/transactions/:id', authMiddleware, apiController.getUserTransa
 // Upload payment proof
 router.post('/user/transactions/:id/upload', 
     authMiddleware, 
-    upload.single('payment_proof'), 
+    upload.single('payment_proof'), checkUploadSize, 
     apiController.uploadPaymentProof
 );
 
@@ -243,7 +247,7 @@ router.put('/user/profile', authMiddleware, apiController.updateUserProfile);
 // Upload avatar
 router.post('/user/avatar', 
     authMiddleware, 
-    upload.single('avatar'), 
+    upload.single('avatar'), checkUploadSize, 
     apiController.uploadAvatar
 );
 
