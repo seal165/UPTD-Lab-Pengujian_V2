@@ -257,20 +257,29 @@
 
                                 <!-- Upload area tetap -->
                                 <div class="mb-3">
-                                    <label class="small fw-bold mb-1 text-muted">Unggah Hasil (Sertifikat)</label>
-                                    <div class="upload-area rounded-3 p-4 text-center bg-light position-relative" 
-                                        id="uploadArea"
-                                        style="border-style: dashed !important; cursor: pointer;">
-                                        <i class="fas fa-cloud-upload-alt text-primary fa-2x mb-2"></i>
-                                        <div class="small text-muted fw-bold">Klik atau drag & drop file</div>
-                                        <small class="text-muted d-block" style="font-size: 0.7rem;">
-                                            PDF/JPG, maksimal <%= locals.settings?.max_upload_size || 5 %>MB
-                                        </small>
-                                        <input type="file" class="position-absolute top-0 start-0 w-100 h-100 opacity-0" 
-                                            id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="cursor: pointer;">
-                                    </div>
-                                    <div id="filePreview" class="mt-2" style="display: none;"></div>
-                                </div>
+                                      <label class="small fw-bold mb-1 text-muted">Unggah Hasil (Sertifikat)</label>
+                                      <div class="upload-area rounded-3 p-4 text-center bg-light position-relative" 
+                                          id="uploadArea"
+                                          style="border-style: dashed !important; cursor: pointer;">
+                                          
+                                          <div id="uploadContent">
+                                              <i class="fas fa-cloud-upload-alt text-primary fa-2x mb-2"></i>
+                                              <div class="small text-muted fw-bold">Klik atau drag & drop file</div>
+                                              <small class="text-muted d-block" style="font-size: 0.7rem;">
+                                                  PDF/JPG, maksimal <%= locals.settings?.max_upload_size || 5 %>MB
+                                              </small>
+                                          </div>
+                                          
+                                          <div id="uploadLoading" style="display: none;" class="py-2">
+                                              <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
+                                              <small class="d-block text-muted mt-1">Mengupload...</small>
+                                          </div>
+                                          
+                                          <input type="file" class="position-absolute top-0 start-0 w-100 h-100 opacity-0" 
+                                              id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="cursor: pointer;">
+                                      </div>
+                                      <div id="filePreview" class="mt-2" style="display: none;"></div>
+                                  </div>
 
                                 <div class="mb-4">
                                     <label class="small fw-bold mb-1 text-muted">Catatan Internal</label>
@@ -278,15 +287,17 @@
                                             id="internalNotes" placeholder="Tulis catatan untuk tim..."></textarea>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary w-100 mb-2 fw-bold py-2" id="updateBtn">
-                                    <span id="updateBtnText">Simpan Perubahan</span>
-                                    <span id="updateBtnSpinner" style="display: none;">
-                                        <span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...
-                                    </span>
-                                </button>
-                                <button type="button" class="btn btn-outline-danger w-100 py-2" onclick="cancelSubmission()">
-                                    Batalkan Pengajuan
-                                </button>
+                                <div class="d-flex flex-column gap-2 mt-4">
+                                    <button type="submit" form="updateForm" class="btn btn-primary fw-bold text-center" id="updateBtn">
+                                        <span id="updateBtnText">Simpan Perubahan</span>
+                                        <span id="updateBtnSpinner" style="display: none;">
+                                            <span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...
+                                        </span>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger fw-bold text-center" onclick="cancelSubmission()">
+                                        <i class="fas fa-times me-2"></i> Batalkan Pengajuan
+                                    </button>
+                                </div>
                             </form>
                         </div>
                         

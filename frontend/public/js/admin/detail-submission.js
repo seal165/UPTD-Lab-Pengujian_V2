@@ -883,55 +883,33 @@ III. **KAJI ULANG PERMINTAAN**
     let isUploading = false;
 
     if (uploadArea && fileInput) {
-        // 🔥 HAPUS EVENT LISTENER LAMA DENGAN CLONE
-        const newUploadArea = uploadArea.cloneNode(true);
-        uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
-        
-        const newFileInput = newUploadArea.querySelector('#fileInput');
-        const finalUploadArea = document.getElementById('uploadArea');
-        
-        finalUploadArea.addEventListener('click', (e) => {
-            // 🔥 CEK STATUS UPLOAD
-            if (isUploading) {
-                console.log('⏳ Upload in progress, ignore click');
-                return;
-            }
-            // Jangan trigger jika area upload tidak visible atau disabled
-            if (finalUploadArea.style.display === 'none' || finalUploadArea.style.pointerEvents === 'none') {
-                return;
-            }
-            // Jangan trigger jika klik pada preview atau tombol
-            if (e.target.closest('#filePreview')) return;
-            e.stopPropagation();
-            newFileInput.click();
-        });
         
         // Drag & drop
-        finalUploadArea.addEventListener('dragover', (e) => {
+        uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            finalUploadArea.style.borderColor = '#4361ee';
-            finalUploadArea.style.backgroundColor = '#f0f7ff';
+            uploadArea.style.borderColor = '#4361ee';
+            uploadArea.style.backgroundColor = '#f0f7ff';
         });
 
-        finalUploadArea.addEventListener('dragleave', () => {
-            finalUploadArea.style.borderColor = '#dee2e6';
-            finalUploadArea.style.backgroundColor = 'transparent';
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#dee2e6';
+            uploadArea.style.backgroundColor = 'transparent';
         });
 
-        finalUploadArea.addEventListener('drop', (e) => {
+        uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            finalUploadArea.style.borderColor = '#dee2e6';
-            finalUploadArea.style.backgroundColor = 'transparent';
+            uploadArea.style.borderColor = '#dee2e6';
+            uploadArea.style.backgroundColor = 'transparent';
             
             if (e.dataTransfer.files.length && !isUploading) {
                 const file = e.dataTransfer.files[0];
-                newFileInput.files = e.dataTransfer.files;
+                fileInput.files = e.dataTransfer.files;
                 handleFileSelect(file);
             }
         });
 
         // 🔥 CHANGE EVENT - HANYA SEKALI
-        newFileInput.addEventListener('change', (e) => {
+        fileInput.addEventListener('change', (e) => {
             if (e.target.files.length && !isUploading) {
                 handleFileSelect(e.target.files[0]);
             }
@@ -1026,14 +1004,15 @@ III. **KAJI ULANG PERMINTAAN**
         formData.append('laporan', file);
         
         // Tampilkan loading di upload area
-        const uploadArea = document.getElementById('uploadArea');
-        const originalHTML = uploadArea.innerHTML;
-        uploadArea.innerHTML = `
-            <div class="text-center py-2">
-                <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
-                <small>Mengupload...</small>
-            </div>
-        `;
+        const uploadContent = document.getElementById('uploadContent');
+        const uploadLoading = document.getElementById('uploadLoading');
+        const fileInputEl = document.getElementById('fileInput');
+        
+        if (uploadContent && uploadLoading) {
+            uploadContent.style.display = 'none';
+            uploadLoading.style.display = 'block';
+        }
+        if (fileInputEl) fileInputEl.disabled = true;
         
         try {
             const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/report`, {
@@ -1065,25 +1044,39 @@ III. **KAJI ULANG PERMINTAAN**
                 if (uploadLabel) uploadLabel.style.display = 'none';
                 
                 // Kembalikan tampilan upload area
-                uploadArea.innerHTML = originalHTML;
+                if (uploadContent && uploadLoading) {
+                    uploadContent.style.display = 'block';
+                    uploadLoading.style.display = 'none';
+                }
                 
                 // Refresh data untuk update status (dengan delay lebih lama)
                 setTimeout(() => {
                     loadSubmissionDetail();
                 }, 1500);
+            } else {
+                showToast(result.message || 'Gagal mengupload laporan', 'danger');
+                if (uploadContent && uploadLoading) {
+                    uploadContent.style.display = 'block';
+                    uploadLoading.style.display = 'none';
+                }
             }
         } catch (error) {
             console.error('Error uploading:', error);
             showToast('Gagal upload file: ' + error.message, 'danger');
-            uploadArea.innerHTML = originalHTML;
+            if (uploadContent && uploadLoading) {
+                uploadContent.style.display = 'block';
+                uploadLoading.style.display = 'none';
+            }
             if (uploadBtn) {
                 uploadBtn.disabled = false;
                 uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
             }
         } finally {
             isUploading = false;
-            const fileInputElement = document.getElementById('fileInput');
-            if (fileInputElement) fileInputElement.value = '';
+            if (fileInputEl) {
+                fileInputEl.value = '';
+                fileInputEl.disabled = false;
+            }
         }
     };
 

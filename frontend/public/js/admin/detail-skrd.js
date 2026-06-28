@@ -523,7 +523,7 @@
                     <tr>
                         <td>${description} <small class="text-muted">(${satuan})</small></td>
                         <td class="text-center">${quantity}</td>
-                        <td class="text-end">${formatRupiah(price)}</td>
+                    <td class="text-end">${formatRupiah(price)}</td>
                         <td class="text-end">${formatRupiah(subtotal)}</td>
                     </tr>
                 `;
@@ -532,14 +532,12 @@
         }
     }
 
+    window.viewProofUrl = function(url) {
+        window.open(url, '_blank');
+    };
+
     function updatePaymentProof(data) {
         const proofSection = document.getElementById('paymentProofSection');
-        const proofStatusBadge = document.getElementById('proofStatusBadge');
-        const proofFilename = document.getElementById('proofFilename');
-        const proofUploadedAt = document.getElementById('proofUploadedAt');
-        const verifyBtn = document.getElementById('verifyBtn');
-        const rejectBtn = document.getElementById('rejectBtn');
-        
         if (!proofSection) return;
         
         console.log('💳 Data pembayaran:', {
@@ -548,89 +546,69 @@
             status_pembayaran: data.status_pembayaran
         });
         
-        // 🔥 Status final: Lunas, Selesai, Dibatalkan
         const finalStatuses = ['Lunas', 'Selesai', 'Dibatalkan'];
         
-        // CEK JIKA STATUS SUDAH FINAL
-        if (finalStatuses.includes(data.status_pembayaran)) {
-            proofSection.style.display = 'block';
-            
-            // Tampilkan badge sesuai status ASLI
-            if (proofStatusBadge && data.status_pembayaran) {
-                proofStatusBadge.innerHTML = getBadgeHtml(data.status_pembayaran);
-            }
-            
-            // Sembunyikan tombol aksi
-            if (verifyBtn) verifyBtn.style.display = 'none';
-            if (rejectBtn) rejectBtn.style.display = 'none';
-            
-            // Tampilkan info file jika ada
-            if (data.bukti_pembayaran_1) {
-                if (proofFilename) {
-                    const fileName = data.bukti_pembayaran_1_filename || 
-                                    data.bukti_pembayaran_1.split('/').pop() || 
-                                    'Bukti Pembayaran';
-                    proofFilename.textContent = fileName;
-                }
-                
-                if (proofUploadedAt) {
-                    const uploadDate = data.bukti_pembayaran_1_uploaded_at ? 
-                        formatDateTime(data.bukti_pembayaran_1_uploaded_at) : '-';
-                    proofUploadedAt.textContent = `Diunggah: ${uploadDate}`;
-                }
-                
-                // Simpan URL untuk fungsi viewProof
-                const fileUrl = `http://localhost:5000/uploads/payment/${data.bukti_pembayaran_1}`;
-                window.currentProofUrl = fileUrl;
-            } else {
-                if (proofFilename) proofFilename.textContent = 'Tidak ada bukti pembayaran';
-                if (proofUploadedAt) proofUploadedAt.textContent = '';
-            }
-            
-            return;
+        const proofs = [];
+        if (data.bukti_pembayaran_1) {
+            proofs.push({
+                file: data.bukti_pembayaran_1,
+                date: data.bukti_pembayaran_1_uploaded_at || data.updated_at,
+                title: data.bukti_pembayaran_1_filename || 'Bukti Pembayaran (Awal)',
+                isLatest: !data.bukti_pembayaran_2
+            });
+        }
+        if (data.bukti_pembayaran_2) {
+            proofs.push({
+                file: data.bukti_pembayaran_2,
+                date: data.bukti_pembayaran_2_uploaded_at || data.updated_at,
+                title: data.bukti_pembayaran_2_filename || 'Bukti Pembayaran (Pelunasan)',
+                isLatest: true
+            });
         }
         
-        // CEK APAKAH ADA BUKTI PEMBAYARAN UNTUK STATUS NON-FINAL
-        if (data.bukti_pembayaran_1) {
+        if (proofs.length > 0) {
             proofSection.style.display = 'block';
+            let html = '<h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Bukti Pembayaran dari User:</h6>';
             
-            // Tentukan file URL
-            const fileUrl = `http://localhost:5000/uploads/payment/${data.bukti_pembayaran_1}`;
+            proofs.forEach((proof) => {
+                const fileName = proof.file.split('/').pop() || proof.title;
+                const uploadDate = proof.date ? formatDateTime(proof.date) : '-';
+                const proofUrl = 'http://localhost:5000/uploads/payment/' + proof.file;
+                
+                let actionButtonsHtml = '<button class="btn btn-outline-primary action-btn" onclick="window.viewProofUrl(\'' + proofUrl + '\')" title="Lihat Bukti"><i class="fas fa-external-link-alt"></i></button>';
+                
+                if (proof.isLatest && !finalStatuses.includes(data.status_pembayaran)) {
+                    if (data.status_pembayaran === 'Menunggu SKRD Upload' || data.status_pembayaran === 'Menunggu Verifikasi') {
+                        window.currentProofUrl = proofUrl;
+                        actionButtonsHtml += '<button class="btn btn-success action-btn ms-2" onclick="window.showVerifyModal()" title="Verifikasi & Input Nominal"><i class="fas fa-check"></i></button>';
+                        actionButtonsHtml += '<button class="btn btn-outline-danger action-btn ms-2" onclick="window.rejectProof()" title="Tolak"><i class="fas fa-times"></i></button>';
+                    }
+                }
+                
+                let badgeStatus = proof.isLatest && data.status_pembayaran ? getBadgeHtml(data.status_pembayaran) : '';
+                
+                html += `
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border shadow-sm flex-wrap gap-3 mb-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-white p-2 rounded shadow-sm d-flex align-items-center justify-content-center text-warning" style="width: 48px; height: 48px;">
+                            <i class="fas fa-receipt fs-4"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="fw-bold text-dark mb-0" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${fileName}</h6>
+                                <span class="badge text-bg-secondary">${proof.title}</span>
+                                ${badgeStatus}
+                            </div>
+                            <small class="text-muted">Diunggah: ${uploadDate}</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        ${actionButtonsHtml}
+                    </div>
+                </div>`;
+            });
             
-            if (proofFilename) {
-                const fileName = data.bukti_pembayaran_1_filename || 
-                                data.bukti_pembayaran_1.split('/').pop() || 
-                                'Bukti Pembayaran';
-                proofFilename.textContent = fileName;
-            }
-            
-            if (proofUploadedAt) {
-                const uploadDate = data.bukti_pembayaran_1_uploaded_at ? 
-                    formatDateTime(data.bukti_pembayaran_1_uploaded_at) : '-';
-                proofUploadedAt.textContent = `Diunggah: ${uploadDate}`;
-            }
-            
-            // Update status badge sesuai status ASLI
-            if (proofStatusBadge && data.status_pembayaran) {
-                proofStatusBadge.innerHTML = getBadgeHtml(data.status_pembayaran);
-            }
-            
-            // Tampilkan/sembunyikan tombol berdasarkan status
-            if (data.status_pembayaran === 'Menunggu SKRD Upload' || data.status_pembayaran === 'Menunggu Verifikasi') {
-                if (verifyBtn) verifyBtn.style.display = 'inline-block';
-                if (rejectBtn) rejectBtn.style.display = 'inline-block';
-            } else if (data.status_pembayaran === 'Belum Lunas') {
-                // Status Belum Lunas: tetap bisa verifikasi tambahan
-                if (verifyBtn) verifyBtn.style.display = 'inline-block';
-                if (rejectBtn) rejectBtn.style.display = 'none';
-            } else {
-                if (verifyBtn) verifyBtn.style.display = 'none';
-                if (rejectBtn) rejectBtn.style.display = 'none';
-            }
-            
-            // Simpan URL untuk fungsi viewProof
-            window.currentProofUrl = fileUrl;
-            
+            proofSection.innerHTML = html;
         } else {
             proofSection.style.display = 'none';
         }
@@ -1268,17 +1246,20 @@
         if (overlay) overlay.style.display = show ? 'flex' : 'none';
     }
 
-    function showAlert(message, type) {
-        const alertDiv = document.getElementById('alertMessage');
-        if (!alertDiv) return;
-        
-        alertDiv.style.display = 'block';
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'"></button>
-        `;
-        setTimeout(() => alertDiv.style.display = 'none', 5000);
+    function showAlert(message, type = 'info') {
+        let swalType = type === 'danger' ? 'error' : (type === 'primary' ? 'info' : type);
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: swalType,
+            title: message,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            customClass: {
+                popup: 'swal2-toast'
+            }
+        });
     }
 
     // ==================== EXPOSE FUNCTIONS TO WINDOW ====================

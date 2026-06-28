@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kuisioner Kepuasan – UPTD Laboratorium</title>
+    <title>Kuisioner Kepuasan – UPTD Pengujian Bahan, Konstruksi Bangunan dan Informasi Konstruksi</title>
     <link rel="icon" type="image/png" href="/img/logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,21 +12,21 @@
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: 'Inter', sans-serif;
-            background: #f8fafc;
+            background: #f4f7f6;
             color: #1e293b;
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            padding: 32px 16px;
+            padding: 24px 16px;
             line-height: 1.6;
         }
         .page-wrap {
             max-width: 720px;
             width: 100%;
             background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-            padding: 40px 32px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+            padding: 32px 32px;
             position: relative;
         }
 
@@ -36,12 +36,12 @@
             top: 0;
             background: white;
             z-index: 10;
-            padding: 4px 0 12px 0;
-            margin-bottom: 4px;
+            padding: 4px 0 16px 0;
+            margin-bottom: 8px;
             border-radius: 20px 20px 0 0;
         }
         .progress-fill {
-            height: 4px;
+            height: 6px;
             background: linear-gradient(90deg, #2563eb, #7c3aed);
             border-radius: 8px;
             width: 0%;
@@ -51,11 +51,11 @@
         /* ===== TITLE CARD ===== */
         .title-card {
             text-align: center;
-            padding: 24px 0 20px 0;
+            padding: 24px 0 28px 0;
             border-bottom: 1px solid #e9edf2;
         }
         .title-card h1 {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 700;
             color: #0f172a;
             margin-bottom: 8px;
@@ -236,7 +236,10 @@
 
         /* ===== SARAN ===== */
         .saran-wrap {
-            margin-top: 20px;
+            background: #fafcff;
+            border: 1px solid #e9edf2;
+            border-radius: 16px;
+            margin-top: 16px;
             padding: 20px 24px;
         }
         .saran-wrap label {
@@ -270,9 +273,8 @@
             gap: 12px;
             justify-content: space-between;
             align-items: center;
-            margin-top: 20px;
-            padding: 16px 0 0 0;
-            border-top: 1px solid #e9edf2;
+            margin-top: 24px;
+            padding: 0;
         }
         .btn-submit {
             background: #2563eb;
@@ -384,13 +386,13 @@
 
         /* ===== RESPONSIVE ===== */
         @media (max-width: 600px) {
-            .page-wrap { padding: 24px 16px; }
+            .page-wrap { padding: 24px 20px; }
             .title-card h1 { font-size: 20px; }
-            .q-card { padding: 16px; }
+            .q-card, .saran-wrap { padding: 16px 20px; }
             .likert-table th { font-size: 12px; min-width: 28px; padding: 6px 2px; }
             .likert-table td { padding: 4px 2px; font-size: 13px; }
             .likert-radio { width: 16px; height: 16px; }
-            .submit-row { flex-direction: column-reverse; align-items: stretch; }
+            .submit-row { flex-direction: column-reverse; align-items: stretch; margin-top: 24px; }
             .btn-submit { justify-content: center; }
             .btn-clear { text-align: center; }
         }
@@ -415,7 +417,7 @@
             Bantu kami meningkatkan kualitas layanan dengan memberikan penilaian Anda.
             Jawaban Anda sangat berarti dan bersifat rahasia.
         </p>
-        <span class="org-tag"><i class="fas fa-flask"></i> UPTD Laboratorium Pengujian Bahan Konstruksi Bangunan</span>
+        <span class="org-tag"><i class="fas fa-flask"></i> UPTD Pengujian Bahan, Konstruksi Bangunan dan Informasi Konstruksi</span>
     </div>
 
     <!-- ===== FILLED BANNER ===== -->

@@ -95,7 +95,6 @@
     // ==================== UPDATE FORMS ====================
     function updateProfileForm(data) {
         document.getElementById('fullName').value = data.name || '';
-        // document.getElementById('employeeId').value = data.employee_id || ''; // <-- HAPUS/KOMENTARI
         document.getElementById('officialEmail').value = data.email || '';
         document.getElementById('phoneNumber').value = data.phone || '';
         document.getElementById('position').value = data.position || 'Super Administrator (Kepala Teknis)';
@@ -947,23 +946,20 @@
     };
 
     // ==================== NOTIFICATION SYSTEM ====================
-    window.showAlert = function(message, type = 'info') {
-        const alertBox = document.getElementById('alertMessage');
-        if (!alertBox) return;
-
-        alertBox.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
-        alertBox.style.zIndex = '10000';
-        alertBox.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        alertBox.style.display = 'block';
-
-        // Auto close after 4 seconds
-        setTimeout(() => {
-            const bsAlert = new bootstrap.Alert(alertBox);
-            bsAlert.close();
-        }, 4000);
+    function showAlert(message, type = 'info') {
+        let swalType = type === 'danger' ? 'error' : (type === 'primary' ? 'info' : type);
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: swalType,
+            title: message,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            customClass: {
+                popup: 'swal2-toast'
+            }
+        });
     };
 
     // ==================== DATE FORMATTERS ====================

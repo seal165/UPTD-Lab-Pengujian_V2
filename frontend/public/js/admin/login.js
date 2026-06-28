@@ -12,25 +12,20 @@
     const alertMessage = document.getElementById('alertMessage');
     const rememberCheck = document.getElementById('remember');
 
-    function showAlert(message, type) {
-        let alertType = type;
-        if (type === 'danger') alertType = 'error'; // Map danger to error
-
-        const container = document.getElementById('alertContainer');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        const div = document.createElement('div');
-        div.className = `alert-box alert-${alertType}`;
-        const icon = alertType === 'error' ? 'fa-exclamation-circle' : alertType === 'success' ? 'fa-check-circle' : 'fa-info-circle';
-        div.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
-        container.appendChild(div);
-
-        setTimeout(() => {
-            if (container.contains(div)) {
-                div.remove();
+    function showAlert(message, type = 'info') {
+        let swalType = type === 'danger' ? 'error' : (type === 'primary' ? 'info' : type);
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: swalType,
+            title: message,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            customClass: {
+                popup: 'swal2-toast'
             }
-        }, 5000);
+        });
     }
 
     window.togglePassword = function() {

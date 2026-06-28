@@ -573,20 +573,20 @@
         }
     }
 
-    function showAlert(message, type) {
-        const alertDiv = document.getElementById('alertMessage');
-        if (!alertDiv) return;
-        
-        alertDiv.style.display = 'block';
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'"></button>
-        `;
-        
-        setTimeout(() => {
-            alertDiv.style.display = 'none';
-        }, 5000);
+    function showAlert(message, type = 'info') {
+        let swalType = type === 'danger' ? 'error' : (type === 'primary' ? 'info' : type);
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: swalType,
+            title: message,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            customClass: {
+                popup: 'swal2-toast'
+            }
+        });
     }
 
     // ==================== INITIALIZE ====================

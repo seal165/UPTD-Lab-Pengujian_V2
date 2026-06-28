@@ -217,6 +217,11 @@
             } else if (date2) {
                 latestDate = date2;
             }
+
+            if (!latestDate && paymentStatus === 'Lunas') {
+                latestDate = data.payment.updated_at || data.payment.created_at;
+            }
+
             setText('det-payment-date', latestDate ? formatDate(latestDate) : '-');
             
             renderPaymentProofs(data.payment, token);
@@ -802,7 +807,7 @@
 
     function getPaymentStatusClass(status) {
         const classes = {
-            'Lunas': 'badge-soft-success',
+            'Lunas': 'bg-success text-white',
             'Belum Lunas': 'badge-soft-danger',
             'Belum Bayar': 'badge-soft-danger',
             'Menunggu SKRD Upload': 'badge-soft-warning',

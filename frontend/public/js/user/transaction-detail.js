@@ -185,15 +185,23 @@
             } else if (status === 'Lunas' || status === 'Selesai' || status === 'Dibatalkan') {
                 showUploadBtn.style.display = 'none';
                 uploadSection.style.display = 'none';
-            } else if (hasProof1 && !hasProof2) {
+            } else if (status === 'Menunggu Verifikasi') {
+                // Menunggu verifikasi admin, sembunyikan upload form agar tidak tertimpa
+                showUploadBtn.style.display = 'none';
+                uploadSection.style.display = 'none';
+            } else if (hasProof1 && !hasProof2 && status === 'Belum Lunas') {
+                // Status Belum Lunas berarti Bukti 1 sudah diverifikasi tapi ada kurang bayar
                 uploadTitle.innerHTML = '<i class="fas fa-cloud-upload-alt text-primary me-2"></i>Upload Bukti Pelunasan';
                 uploadDesc.innerHTML = `Sisa tagihan: ${formatRupiah(sisa)}`;
                 showUploadBtn.style.display = 'block';
                 uploadSection.style.display = 'none';
-            } else {
+            } else if (!hasProof1) {
                 uploadTitle.innerHTML = '<i class="fas fa-cloud-upload-alt text-primary me-2"></i>Upload Bukti Pembayaran';
                 uploadDesc.innerHTML = `Total tagihan: ${formatRupiah(total)}`;
                 showUploadBtn.style.display = 'block';
+                uploadSection.style.display = 'none';
+            } else {
+                showUploadBtn.style.display = 'none';
                 uploadSection.style.display = 'none';
             }
         }

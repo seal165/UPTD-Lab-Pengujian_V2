@@ -27,7 +27,7 @@
     --border-color: #e2e8f0;
     --sidebar-offset: 260px;
     --desktop-content-max: 1360px;
-    --desktop-page-gutter: 32px;
+    --desktop-page-gutter: 24px;
 
     --transition: all 0.2s ease;
 }
@@ -88,7 +88,7 @@ body {
 }
 
 .logo-section {
-    padding: 24px 24px;
+    padding: 20px 16px;
     background: linear-gradient(135deg, var(--primary), var(--gradient-end));
     color: var(--white);
     display: flex;
@@ -4364,7 +4364,7 @@ body {
     border-radius: 12px;
     background: white;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-    padding: 24px;
+    padding: 20px;
     height: auto;
     min-height: 0;
     display: flex;
@@ -4781,33 +4781,7 @@ body {
     border-top: 1px solid #f1f3f4;
 }
 
-.btn-submit {
-    background: #059669;
-    color: white;
-    border: none;
-    padding: 0 28px;
-    height: 44px;
-    border-radius: 4px;
-    font-family: 'Google Sans', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background .2s, box-shadow .2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
 
-.btn-submit:hover {
-    background: #047857;
-    box-shadow: 0 2px 8px rgba(4, 120, 87, .4);
-}
-
-.btn-submit:disabled {
-    background: #b0b0b0;
-    cursor: not-allowed;
-    box-shadow: none;
-}
 
 .btn-clear {
     background: transparent;
@@ -5310,4 +5284,17 @@ body {
 .text-monospace {
     font-family: 'Courier New', monospace;
     letter-spacing: 0.5px;
+}
+
+/* SweetAlert Notification Alignment Fix */
+.swal2-toast .swal2-icon {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    margin-right: 12px !important;
+}
+.swal2-toast .swal2-title {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: 1.5 !important;
+    padding-top: 2px !important;
 }
