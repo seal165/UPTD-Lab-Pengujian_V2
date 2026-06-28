@@ -1149,24 +1149,9 @@ const apiController = {
             }
 
             if (search) {
-                const searchLower = search.toLowerCase();
-                let subIdMatch = null;
-                if (searchLower.startsWith('sub-')) {
-                    const parsedId = parseInt(searchLower.replace('sub-', ''), 10);
-                    if (!isNaN(parsedId)) {
-                        subIdMatch = parsedId;
-                    }
-                }
-                
-                if (subIdMatch !== null) {
-                    whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ? OR s.id = ?)');
-                    const searchTerm = `%${search}%`;
-                    queryParams.push(searchTerm, searchTerm, searchTerm, subIdMatch);
-                } else {
-                    whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ?)');
-                    const searchTerm = `%${search}%`;
-                    queryParams.push(searchTerm, searchTerm, searchTerm);
-                }
+                whereConditions.push('(s.no_permohonan LIKE ? OR s.nama_instansi LIKE ? OR s.nama_pemohon LIKE ? OR CONCAT("SUB-", LPAD(s.id, 5, "0")) LIKE ?)');
+                const searchTerm = `%${search}%`;
+                queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
             }
 
             if (startDate) {
@@ -2032,9 +2017,9 @@ const apiController = {
             }
             
             if (search) {
-                countQuery += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ? OR s.no_permohonan LIKE ?)`;
+                countQuery += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ? OR s.no_permohonan LIKE ? OR CONCAT('SUB-', LPAD(s.id, 5, '0')) LIKE ?)`;
                 const searchPattern = `%${search}%`;
-                countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
+                countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
             }
             
             const [countResult] = await db.query(countQuery, countParams);
@@ -2104,9 +2089,9 @@ const apiController = {
             }
             
             if (search) {
-                query += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ? OR s.no_permohonan LIKE ?)`;
+                query += ` AND (p.no_invoice LIKE ? OR u.nama_instansi LIKE ? OR s.nama_proyek LIKE ? OR s.no_permohonan LIKE ? OR CONCAT('SUB-', LPAD(s.id, 5, '0')) LIKE ?)`;
                 const searchPattern = `%${search}%`;
-                params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+                params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
             }
             
             query += ` ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
@@ -2765,8 +2750,8 @@ const apiController = {
             );
             
             await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [userId, 'cancel', `Invoice ${invoices[0].invoice_number} dibatalkan. Alasan: ${reason || '-'}`]
+                'INSERT INTO activities (user_id, activity_name, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+                [userId, `Invoice ${invoices[0].invoice_number} dibatalkan. Alasan: ${reason || '-'}`, req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -2804,8 +2789,8 @@ const apiController = {
             );
 
             await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [userId, 'update_status', `Status invoice ID ${id} diubah menjadi ${status}`]
+                'INSERT INTO activities (user_id, activity_name, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+                [userId, `Status invoice ID ${id} diubah menjadi ${status}`, req.ip, req.headers['user-agent']]
             );
 
             res.json({
@@ -4956,7 +4941,7 @@ const apiController = {
                 return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
 
-            const { name, email, phone } = req.body; // employee_id dihapus
+            const { name, email, phone, employee_id } = req.body; 
 
             if (!name || !email) {
                 return res.status(400).json({
@@ -4981,14 +4966,14 @@ const apiController = {
             // Update user
             await db.query(
                 `UPDATE users 
-                SET full_name = ?, email = ?, nomor_telepon = ?, updated_at = NOW()
+                SET full_name = ?, employee_id = COALESCE(?, employee_id), email = ?, nomor_telepon = ?, updated_at = NOW()
                 WHERE id = ?`,
-                [name, email, phone || null, userId]
+                [name, employee_id !== undefined ? employee_id : null, email, phone || null, userId]
             );
 
             // Ambil data user terbaru
             const [updatedUser] = await db.query(
-                `SELECT id, email, full_name, nomor_telepon, avatar, role, updated_at 
+                `SELECT id, email, full_name, employee_id, nomor_telepon, avatar, role, updated_at 
                 FROM users WHERE id = ?`,
                 [userId]
             );
@@ -6823,6 +6808,11 @@ const apiController = {
             console.log('📁 Updating field:', fieldName);
             console.log('📁 Filename to save:', file.filename);
             
+            const existingNotes = check[0].bukti_pembayaran_notes || '';
+            const uploadDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'numeric', year: 'numeric' });
+            const newNoteStr = `[${uploadDate}] Upload Bukti: ${notes || 'Bukti pembayaran diunggah'}`;
+            const finalNotes = existingNotes ? `${existingNotes}\n${newNoteStr}` : newNoteStr;
+            
             const [updateResult] = await db.query(
                 `UPDATE payments 
                 SET ${fieldName} = ?, 
@@ -6830,7 +6820,7 @@ const apiController = {
                     status_pembayaran = 'Menunggu Verifikasi',
                     updated_at = NOW()
                 WHERE id = ?`,
-                [file.filename, notes, transactionId]
+                [file.filename, finalNotes, transactionId]
             );
             
             console.log('✅ Update result:', updateResult);

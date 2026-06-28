@@ -69,8 +69,8 @@ const authController = {
             
             // Catat aktivitas login
             await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [user.id, 'login', 'Admin login ke sistem']
+                'INSERT INTO activities (user_id, activity_name, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+                [user.id, 'Admin login ke sistem', req.ip, req.headers['user-agent']]
             );
             
             // Kirim response sukses
@@ -148,8 +148,8 @@ const authController = {
             
             // Catat aktivitas logout
             await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [userId, 'logout', 'Admin logout dari sistem']
+                'INSERT INTO activities (user_id, activity_name, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+                [userId, 'Admin logout dari sistem', req.ip, req.headers['user-agent']]
             );
             
             res.json({
@@ -241,8 +241,8 @@ const authController = {
 
             // Catat aktivitas register
             await db.query(
-                'INSERT INTO activities (user_id, action, description) VALUES (?, ?, ?)',
-                [result.insertId, 'register', 'User baru mendaftar']
+                'INSERT INTO activities (user_id, activity_name, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+                [result.insertId, 'User baru mendaftar', req.ip, req.headers['user-agent']]
             );
 
             res.status(201).json({
